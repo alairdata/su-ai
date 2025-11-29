@@ -1,63 +1,314 @@
-import Image from "next/image";
+"use client";
+
+import React, { useEffect, useState } from "react";
+
+type Message = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+type Chat = {
+  id: string;
+  title: string;
+  messages: Message[];
+};
 
 export default function Home() {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [input, setInput] = useState("");
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Load chats + current chat selection from localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const savedChats = window.localStorage.getItem("chats");
+      const savedCurrentId = window.localStorage.getItem("currentChatId");
+
+      if (savedChats) {
+        setChats(JSON.parse(savedChats));
+      }
+      if (savedCurrentId) {
+        setCurrentChatId(savedCurrentId);
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, []);
+
+  // Persist chats
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("chats", JSON.stringify(chats));
+  }, [chats]);
+
+  // Persist current chat id
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (currentChatId) {
+      window.localStorage.setItem("currentChatId", currentChatId);
+    } else {
+      window.localStorage.removeItem("currentChatId");
+    }
+  }, [currentChatId]);
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => !prev);
+  };
+
+  const currentChat = currentChatId
+    ? chats.find((c) => c.id === currentChatId) || null
+    : null;
+
+  const messages: Message[] = currentChat?.messages ?? [];
+  const showGreeting = !currentChat || messages.length === 0;
+
+  // Generate a chat title from the first message text
+  const generateTitleFromText = (text: string): string => {
+    const t = text.toLowerCase();
+
+    if (/\b(hi|hello|hey|heyy|hiii)\b/.test(t)) return "User greeting";
+    if (t.includes("sql") || t.includes("query")) return "SQL question";
+    if (t.includes("data") && t.includes("story")) return "Data storytelling";
+    if (t.includes("weight") || t.includes("gym") || t.includes("body"))
+      return "Body & wellness chat";
+
+    const trimmed = text.trim();
+    if (!trimmed) return `Chat ${chats.length + 1}`;
+    return trimmed.length > 30 ? trimmed.slice(0, 30) + "..." : trimmed;
+  };
+
+  const handleNewChat = () => {
+    // Start fresh: no active chat selected yet
+    setCurrentChatId(null);
+    setInput("");
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
+
+    const userMessage: Message = { role: "user", content: input };
+    setInput("");
+    setIsLoading(true);
+
+    let activeChatId: string;
+
+    if (!currentChat) {
+      // First message in a brand new chat → create chat
+      activeChatId = Date.now().toString();
+      const title = generateTitleFromText(userMessage.content);
+      const newChat: Chat = {
+        id: activeChatId,
+        title,
+        messages: [userMessage],
+      };
+      setChats((prev) => [newChat, ...prev]);
+      setCurrentChatId(activeChatId);
+    } else {
+      // Append to existing chat
+      activeChatId = currentChat.id;
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === activeChatId
+            ? { ...c, messages: [...c.messages, userMessage] }
+            : c
+        )
+      );
+    }
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMessage.content }),
+      });
+
+      const data = await res.json();
+      const botMessage: Message = {
+        role: "assistant",
+        content: data.reply ?? "No reply from Claude.",
+      };
+
+      // Append Claude's reply to the same chat
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === activeChatId
+            ? { ...c, messages: [...c.messages, botMessage] }
+            : c
+        )
+      );
+    } catch (err) {
+      console.error(err);
+      const errorMessage: Message = {
+        role: "assistant",
+        content: "Something went wrong talking to Claude.",
+      };
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === activeChatId
+            ? { ...c, messages: [...c.messages, errorMessage] }
+            : c
+        )
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleSelectChat = (id: string) => {
+    setCurrentChatId(id);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="app">
+      {/* SIDEBAR */}
+      <aside className={`sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
+        <div className="sidebar-header">
+          <button
+            className="sidebar-toggle"
+            onClick={toggleSidebar}
+            aria-label="Toggle sidebar"
+          >
+            ☰
+          </button>
+          <div className="brand brand-text">Claude</div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="section">
+          <div className="nav-item" onClick={handleNewChat}>
+            <div className="nav-icon">+</div>
+            <div className="nav-text">New chat</div>
+          </div>
+
+          <div className="nav-item">
+            <div className="nav-icon">💬</div>
+            <div className="nav-text">Chats</div>
+          </div>
+        </div>
+
+        <div className="section-label">Recent chats</div>
+        <div className="recents-list">
+          {chats.length === 0 && (
+            <div className="recent-item" style={{ opacity: 0.6 }}>
+              No chats yet
+            </div>
+          )}
+          {chats.map((chat) => (
+            <div
+              key={chat.id}
+              className="recent-item"
+              onClick={() => handleSelectChat(chat.id)}
+              style={
+                chat.id === currentChatId
+                  ? { background: "#efe1cf", fontWeight: 500 }
+                  : {}
+              }
+            >
+              {chat.title}
+            </div>
+          ))}
+        </div>
+
+        <div className="sidebar-footer">
+          <div className="avatar">PA</div>
+          <div className="user-info">
+            <div style={{ fontSize: 13 }}>Princilla Abena Koranteng</div>
+            <div style={{ fontSize: 11, color: "#85735a" }}>Free plan</div>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN */}
+      <main className="main">
+        <div className="top-bar">
+          <div className="pill">
+            <span>Free plan</span> ·
+            <span className="upgrade">Upgrade</span>
+          </div>
+          <div className="ghost">👻</div>
+        </div>
+
+        <div className={`main-center ${showGreeting ? "empty" : ""}`}>
+          {showGreeting && (
+            <>
+              <div className="greeting-logo">✺</div>
+              <div className="greeting-text">Afternoon, Princilla</div>
+            </>
+          )}
+
+          {/* Chat history – only when we’re in a chat with messages */}
+          {!showGreeting && (
+            <div className="chat-container">
+              {messages.map((m, idx) => (
+                <div
+                  key={idx}
+                  className={`message-row ${
+                    m.role === "user" ? "user" : "assistant"
+                  }`}
+                >
+                  <div
+                    className={`message-bubble ${
+                      m.role === "user" ? "user" : "assistant"
+                    }`}
+                  >
+                    <div>{m.content}</div>
+                  </div>
+                </div>
+              ))}
+
+              {isLoading && (
+                <div className="message-row assistant">
+                  <div className="message-bubble assistant">
+                    <div className="typing-indicator">
+                      <span className="typing-dot" />
+                      <span className="typing-dot" />
+                      <span className="typing-dot" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Input – always visible, but layout feels different when empty vs chatting */}
+          <div className="input-card">
+            <div className="input-row">
+              <textarea
+                rows={1}
+                placeholder="What's up? Spill it..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={isLoading}
+              />
+              <button
+                className="send-btn"
+                onClick={handleSend}
+                disabled={isLoading || !input.trim()}
+                style={
+                  isLoading || !input.trim()
+                    ? { opacity: 0.5, cursor: "not-allowed" }
+                    : {}
+                }
+              >
+                ↑
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="model-select">
+          <span>Claude 3 Haiku</span> ▼
         </div>
       </main>
     </div>
