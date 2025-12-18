@@ -155,7 +155,7 @@ export function useChats() {
       // Create the chat in UI with smart title
       const smartTitle = generateTitleFromText(input);
       const newChat: Chat = {
-        id: activeChatId,
+        id: activeChatId!,
         title: smartTitle,
         messages: [optimisticMessage],
         created_at: new Date().toISOString(),
