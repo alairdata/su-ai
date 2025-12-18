@@ -1,310 +1,153 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
-
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-};
-
-type Chat = {
-  id: string;
-  title: string;
-  messages: Message[];
-};
-
-type User = {
-  id: string;
-  email: string;
-  password: string;
-  name: string;
-  plan: "Free" | "Pro" | "Enterprise";
-  createdAt: number;
-};
+import React, { useState, useEffect } from "react";
+import { useSession, signIn, signOut } from "next-auth/react";
+import { useChats } from "./hooks/useChats";
+import { useTheme } from "./hooks/useTheme";
 
 type View = "login" | "signup" | "chat";
 
 export default function Home() {
-  const [currentView, setCurrentView] = useState<View>("login");
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [showAccountModal, setShowAccountModal] = useState(false);
+  const { data: session, status, update: updateSession } = useSession();
+  const { theme, toggleTheme } = useTheme();
   
+  const [currentView, setCurrentView] = useState<View>("login");
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showChatActionsModal, setShowChatActionsModal] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState<string | null>(null);
+  const [selectedChatForActions, setSelectedChatForActions] = useState<{id: string, title: string} | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
+  const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
+
   // Auth form states
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
   const [authError, setAuthError] = useState("");
 
-  // Chat states
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [input, setInput] = useState("");
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const {
+    chats,
+    currentChat,
+    currentChatId,
+    isLoading: chatLoading,
+    messagesEndRef,
+    sendMessage,
+    createNewChat,
+    selectChat,
+    renameChat,
+    deleteChat,
+    canSendMessage,
+    getRemainingMessages,
+  } = useChats();
 
-  // Ref for auto-scrolling
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isAuthLoading = status === "loading";
+  const isAuthenticated = !!session?.user;
 
-  // Auto-scroll to bottom when messages change
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
+  // Detect mobile
   useEffect(() => {
-    scrollToBottom();
-  }, [chats, isLoading, currentChatId]);
-
-  // Load user session on mount
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    try {
-      const savedUserId = window.localStorage.getItem("currentUserId");
-      if (savedUserId) {
-        const users = getUsers();
-        const user = users.find((u) => u.id === savedUserId);
-        if (user) {
-          setCurrentUser(user);
-          setCurrentView("chat");
-          loadUserData(savedUserId);
-        }
-      }
-    } catch {
-      // ignore errors
-    }
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Persist theme
+  // Apply theme to body
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("theme", theme);
-    document.documentElement.setAttribute("data-theme", theme);
+    document.body.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // User management functions
-  const getUsers = (): User[] => {
-    if (typeof window === "undefined") return [];
-    const users = window.localStorage.getItem("users");
-    return users ? JSON.parse(users) : [];
-  };
-
-  const saveUsers = (users: User[]) => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("users", JSON.stringify(users));
-  };
-
-  const loadUserData = (userId: string) => {
-    if (typeof window === "undefined") return;
-    const savedChats = window.localStorage.getItem(`chats_${userId}`);
-    const savedCurrentId = window.localStorage.getItem(`currentChatId_${userId}`);
-    const savedTheme = window.localStorage.getItem("theme") as "light" | "dark" | null;
-
-    if (savedChats) {
-      setChats(JSON.parse(savedChats));
+  // Show chat view when authenticated
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      setCurrentView("chat");
+    } else if (!isAuthLoading) {
+      setCurrentView("login");
     }
-    if (savedCurrentId) {
-      setCurrentChatId(savedCurrentId);
-    }
-    if (savedTheme) {
-      setTheme(savedTheme);
-    }
-  };
+  }, [isAuthenticated, isAuthLoading]);
 
-  // Persist chats for current user
-  useEffect(() => {
-    if (typeof window === "undefined" || !currentUser) return;
-    window.localStorage.setItem(`chats_${currentUser.id}`, JSON.stringify(chats));
-  }, [chats, currentUser]);
-
-  // Persist current chat id for current user
-  useEffect(() => {
-    if (typeof window === "undefined" || !currentUser) return;
-    if (currentChatId) {
-      window.localStorage.setItem(`currentChatId_${currentUser.id}`, currentChatId);
-    } else {
-      window.localStorage.removeItem(`currentChatId_${currentUser.id}`);
-    }
-  }, [currentChatId, currentUser]);
+  const messages = currentChat?.messages ?? [];
+  const showGreeting = !currentChat || messages.length === 0;
+  const remainingMessages = getRemainingMessages();
 
   // Auth handlers
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
-
-    const users = getUsers();
-    const user = users.find(
-      (u) => u.email === authEmail && u.password === authPassword
-    );
-
-    if (user) {
-      setCurrentUser(user);
-      window.localStorage.setItem("currentUserId", user.id);
-      setCurrentView("chat");
-      loadUserData(user.id);
-      setAuthEmail("");
-      setAuthPassword("");
-    } else {
-      setAuthError("Invalid email or password");
-    }
-  };
-
-  const handleSignup = (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError("");
-
-    if (authPassword.length < 6) {
-      setAuthError("Password must be at least 6 characters");
-      return;
-    }
-
-    const users = getUsers();
     
-    if (users.find((u) => u.email === authEmail)) {
-      setAuthError("Email already exists");
-      return;
-    }
-
-    const newUser: User = {
-      id: `user_${Date.now()}`,
+    const result = await signIn("credentials", {
       email: authEmail,
       password: authPassword,
-      name: authName,
-      plan: "Free",
-      createdAt: Date.now(),
-    };
+      redirect: false,
+    });
 
-    users.push(newUser);
-    saveUsers(users);
-    
-    setCurrentUser(newUser);
-    window.localStorage.setItem("currentUserId", newUser.id);
-    setCurrentView("chat");
-    setAuthEmail("");
-    setAuthPassword("");
-    setAuthName("");
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setChats([]);
-    setCurrentChatId(null);
-    setShowAccountModal(false);
-    window.localStorage.removeItem("currentUserId");
-    setCurrentView("login");
-  };
-
-  const toggleSidebar = () => {
-    setSidebarCollapsed((prev) => !prev);
-  };
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === "light" ? "dark" : "light"));
-  };
-
-  const upgradePlan = (newPlan: "Free" | "Pro" | "Enterprise") => {
-    if (!currentUser) return;
-    
-    const users = getUsers();
-    const updatedUsers = users.map((u) =>
-      u.id === currentUser.id ? { ...u, plan: newPlan } : u
-    );
-    saveUsers(updatedUsers);
-    setCurrentUser({ ...currentUser, plan: newPlan });
-  };
-
-  const currentChat = currentChatId
-    ? chats.find((c) => c.id === currentChatId) || null
-    : null;
-
-  const messages: Message[] = currentChat?.messages ?? [];
-  const showGreeting = !currentChat || messages.length === 0;
-
-  const generateTitleFromText = (text: string): string => {
-    const t = text.toLowerCase();
-
-    if (/\b(hi|hello|hey|heyy|hiii)\b/.test(t)) return "User greeting";
-    if (t.includes("sql") || t.includes("query")) return "SQL question";
-    if (t.includes("data") && t.includes("story")) return "Data storytelling";
-    if (t.includes("weight") || t.includes("gym") || t.includes("body"))
-      return "Body & wellness chat";
-
-    const trimmed = text.trim();
-    if (!trimmed) return `Chat ${chats.length + 1}`;
-    return trimmed.length > 30 ? trimmed.slice(0, 30) + "..." : trimmed;
-  };
-
-  const handleNewChat = () => {
-    setCurrentChatId(null);
-    setInput("");
-  };
-
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
-
-    const userMessage: Message = { role: "user", content: input };
-    setInput("");
-    setIsLoading(true);
-
-    let activeChatId: string;
-
-    if (!currentChat) {
-      activeChatId = Date.now().toString();
-      const title = generateTitleFromText(userMessage.content);
-      const newChat: Chat = {
-        id: activeChatId,
-        title,
-        messages: [userMessage],
-      };
-      setChats((prev) => [newChat, ...prev]);
-      setCurrentChatId(activeChatId);
+    if (result?.error) {
+      setAuthError("Invalid email or password");
     } else {
-      activeChatId = currentChat.id;
-      setChats((prev) =>
-        prev.map((c) =>
-          c.id === activeChatId
-            ? { ...c, messages: [...c.messages, userMessage] }
-            : c
-        )
-      );
+      setAuthEmail("");
+      setAuthPassword("");
     }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError("");
 
     try {
-      const res = await fetch("/api/chat", {
+      const res = await fetch("/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMessage.content }),
+        body: JSON.stringify({
+          name: authName,
+          email: authEmail,
+          password: authPassword,
+        }),
       });
 
       const data = await res.json();
-      const botMessage: Message = {
-        role: "assistant",
-        content: data.reply ?? "No reply from Claude.",
-      };
 
-      setChats((prev) =>
-        prev.map((c) =>
-          c.id === activeChatId
-            ? { ...c, messages: [...c.messages, botMessage] }
-            : c
-        )
-      );
-    } catch (err) {
-      console.error(err);
-      const errorMessage: Message = {
-        role: "assistant",
-        content: "Something went wrong talking to Claude.",
-      };
-      setChats((prev) =>
-        prev.map((c) =>
-          c.id === activeChatId
-            ? { ...c, messages: [...c.messages, errorMessage] }
-            : c
-        )
-      );
-    } finally {
-      setIsLoading(false);
+      if (!res.ok) {
+        setAuthError(data.error || "Signup failed");
+        return;
+      }
+
+      const result = await signIn("credentials", {
+        email: authEmail,
+        password: authPassword,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setAuthError("Account created but login failed. Please try logging in.");
+      } else {
+        setAuthEmail("");
+        setAuthPassword("");
+        setAuthName("");
+      }
+    } catch (error) {
+      setAuthError("Signup failed. Please try again.");
     }
+  };
+
+  const handleLogout = async () => {
+    setShowAccountModal(false);
+    await signOut({ redirect: false });
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() || chatLoading || !canSendMessage()) return;
+    
+    const messageToSend = input; // Save message
+    setInput(""); // Clear input IMMEDIATELY!
+    
+    await sendMessage(messageToSend); // Then send
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -314,54 +157,134 @@ export default function Home() {
     }
   };
 
-  const handleSelectChat = (id: string) => {
-    setCurrentChatId(id);
+  const handleRenameStart = (chatId: string, currentTitle: string) => {
+    setRenamingChatId(chatId);
+    setRenameValue(currentTitle);
+    setShowChatActionsModal(false);
   };
 
-  // Render login view
+  const handleRenameSubmit = async (chatId: string) => {
+    if (renameValue.trim()) {
+      await renameChat(chatId, renameValue.trim());
+    }
+    setRenamingChatId(null);
+    setRenameValue("");
+  };
+
+  const handleRenameCancel = () => {
+    setRenamingChatId(null);
+    setRenameValue("");
+  };
+
+  const handleDeleteClick = (chatId: string) => {
+    setChatToDelete(chatId);
+    setShowDeleteModal(true);
+    setShowChatActionsModal(false);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (chatToDelete) {
+      await deleteChat(chatToDelete);
+      setShowDeleteModal(false);
+      setChatToDelete(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setChatToDelete(null);
+  };
+
+  const toggleSidebar = () => {
+    if (isMobile) {
+      setSidebarOpen(!sidebarOpen);
+    } else {
+      setSidebarCollapsed(!sidebarCollapsed);
+    }
+  };
+
+  const handleSelectChat = (id: string) => {
+    selectChat(id);
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  };
+
+  const upgradePlan = async (newPlan: "Free" | "Pro" | "Enterprise") => {
+    if (!session?.user) return;
+    
+    try {
+      const res = await fetch("/api/upgrade-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: newPlan }),
+      });
+
+      if (res.ok) {
+        await updateSession();
+        setShowAccountModal(false);
+      }
+    } catch (error) {
+      console.error("Failed to upgrade plan:", error);
+    }
+  };
+
+  const currentStyles = theme === 'dark' ? darkStyles : lightStyles;
+
+  if (isAuthLoading) {
+    return (
+      <div style={currentStyles.loadingContainer}>
+        <div style={currentStyles.loadingSpinner}>Loading...</div>
+      </div>
+    );
+  }
+
   if (currentView === "login") {
     return (
-      <div style={styles.authContainer}>
-        <div style={styles.authCard}>
-          <div style={styles.authLogo}>
-            <div style={styles.logoIcon}></div>
-            <h1 style={styles.authTitle}>UnFiltered-AI</h1>
-            <p style={styles.authSubtitle}>Sign in to continue</p>
+      <div style={currentStyles.authContainer}>
+        <div style={currentStyles.authCard}>
+          <div style={currentStyles.authLogo}>
+            <div style={currentStyles.logoIcon}></div>
+            <h1 style={currentStyles.authTitle}>UnFiltered-AI</h1>
+            <p style={currentStyles.authSubtitle}>Sign in to continue</p>
           </div>
 
-          {authError && <div style={styles.authError}>{authError}</div>}
+          {authError && <div style={currentStyles.authError}>{authError}</div>}
 
           <form onSubmit={handleLogin}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Email</label>
+            <div style={currentStyles.formGroup}>
+              <label style={currentStyles.label}>Email</label>
               <input
                 type="email"
                 value={authEmail}
                 onChange={(e) => setAuthEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
-                style={styles.input}
+                style={currentStyles.input}
               />
             </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Password</label>
+            <div style={currentStyles.formGroup}>
+              <label style={currentStyles.label}>Password</label>
               <input
                 type="password"
                 value={authPassword}
                 onChange={(e) => setAuthPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                style={styles.input}
+                style={currentStyles.input}
               />
             </div>
-            <button type="submit" style={styles.authBtn}>
+            <button type="submit" style={currentStyles.authBtn}>
               Sign In
             </button>
           </form>
 
-          <div style={styles.authSwitch}>
+          <div style={currentStyles.authSwitch}>
             Don't have an account?{" "}
-            <a onClick={() => setCurrentView("signup")} style={styles.authLink}>
+            <a onClick={() => {
+              setCurrentView("signup");
+              setAuthError("");
+            }} style={currentStyles.authLink}>
               Sign up
             </a>
           </div>
@@ -370,44 +293,43 @@ export default function Home() {
     );
   }
 
-  // Render signup view
   if (currentView === "signup") {
     return (
-      <div style={styles.authContainer}>
-        <div style={styles.authCard}>
-          <div style={styles.authLogo}>
-            <div style={styles.logoIcon}></div>
-            <h1 style={styles.authTitle}>UnFiltered-AI</h1>
-            <p style={styles.authSubtitle}>Create your account</p>
+      <div style={currentStyles.authContainer}>
+        <div style={currentStyles.authCard}>
+          <div style={currentStyles.authLogo}>
+            <div style={currentStyles.logoIcon}></div>
+            <h1 style={currentStyles.authTitle}>UnFiltered-AI</h1>
+            <p style={currentStyles.authSubtitle}>Create your account</p>
           </div>
 
-          {authError && <div style={styles.authError}>{authError}</div>}
+          {authError && <div style={currentStyles.authError}>{authError}</div>}
 
           <form onSubmit={handleSignup}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Name</label>
+            <div style={currentStyles.formGroup}>
+              <label style={currentStyles.label}>Name</label>
               <input
                 type="text"
                 value={authName}
                 onChange={(e) => setAuthName(e.target.value)}
                 placeholder="Your name"
                 required
-                style={styles.input}
+                style={currentStyles.input}
               />
             </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Email</label>
+            <div style={currentStyles.formGroup}>
+              <label style={currentStyles.label}>Email</label>
               <input
                 type="email"
                 value={authEmail}
                 onChange={(e) => setAuthEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
-                style={styles.input}
+                style={currentStyles.input}
               />
             </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Password</label>
+            <div style={currentStyles.formGroup}>
+              <label style={currentStyles.label}>Password</label>
               <input
                 type="password"
                 value={authPassword}
@@ -415,17 +337,20 @@ export default function Home() {
                 placeholder="••••••••"
                 minLength={6}
                 required
-                style={styles.input}
+                style={currentStyles.input}
               />
             </div>
-            <button type="submit" style={styles.authBtn}>
+            <button type="submit" style={currentStyles.authBtn}>
               Create Account
             </button>
           </form>
 
-          <div style={styles.authSwitch}>
+          <div style={currentStyles.authSwitch}>
             Already have an account?{" "}
-            <a onClick={() => setCurrentView("login")} style={styles.authLink}>
+            <a onClick={() => {
+              setCurrentView("login");
+              setAuthError("");
+            }} style={currentStyles.authLink}>
               Sign in
             </a>
           </div>
@@ -434,146 +359,290 @@ export default function Home() {
     );
   }
 
-  // Render chat view
   return (
     <>
-      <div style={styles.app}>
-        <aside style={{...styles.sidebar, ...(sidebarCollapsed ? styles.sidebarCollapsed : {})}}>
-          <div style={styles.sidebarTop}>
-            <div style={styles.sidebarHeader}>
+      <div style={currentStyles.app}>
+        {isMobile && sidebarOpen && (
+          <div 
+            style={currentStyles.mobileOverlay} 
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        <aside style={{
+          ...currentStyles.sidebar,
+          ...(sidebarCollapsed && !isMobile ? currentStyles.sidebarCollapsed : {}),
+          ...(isMobile ? {
+            position: 'fixed' as const,
+            left: sidebarOpen ? 0 : '-260px',
+            top: 0,
+            bottom: 0,
+            zIndex: 1000,
+            width: '260px',
+          } : {})
+        }}>
+          <div style={currentStyles.sidebarTop}>
+            <div style={currentStyles.sidebarHeader}>
               <button
-                style={styles.sidebarToggle}
+                style={currentStyles.sidebarToggle}
                 onClick={toggleSidebar}
                 aria-label="Toggle sidebar"
               >
                 ☰
               </button>
-              <div style={{...styles.brand, ...(sidebarCollapsed ? {display: 'none'} : {})}}>UnFiltered-AI</div>
-            </div>
-
-            <div style={styles.section}>
-              <div style={styles.navItem} onClick={handleNewChat}>
-                <div style={styles.navIcon}>+</div>
-                <div style={{...styles.navText, ...(sidebarCollapsed ? {display: 'none'} : {})}}>New chat</div>
+              <div style={{...currentStyles.brand, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
+                UnFiltered-AI
               </div>
             </div>
 
-            <div style={{...styles.sectionLabel, ...(sidebarCollapsed ? {display: 'none'} : {})}}>Recent chats</div>
-            <div style={{...styles.recentsList, ...(sidebarCollapsed ? {display: 'none'} : {})}}>
+            <div style={currentStyles.section}>
+              <div style={currentStyles.navItem} onClick={() => {
+                createNewChat();
+                if (isMobile) setSidebarOpen(false);
+              }}>
+                <div style={currentStyles.navIcon}>+</div>
+                <div style={{...currentStyles.navText, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
+                  New chat
+                </div>
+              </div>
+            </div>
+
+            <div style={{...currentStyles.sectionLabel, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
+              Recent chats
+            </div>
+            <div style={{...currentStyles.recentsList, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
               {chats.length === 0 && (
-                <div style={{...styles.recentItem, opacity: 0.6}}>
+                <div style={{...currentStyles.recentItem, opacity: 0.6}}>
                   No chats yet
                 </div>
               )}
               {chats.map((chat) => (
                 <div
                   key={chat.id}
-                  style={{
-                    ...styles.recentItem,
-                    ...(chat.id === currentChatId ? styles.recentItemActive : {})
-                  }}
-                  onClick={() => handleSelectChat(chat.id)}
+                  style={currentStyles.chatItemWrapper}
+                  onMouseEnter={() => !isMobile && setHoveredChatId(chat.id)}
+                  onMouseLeave={() => !isMobile && setHoveredChatId(null)}
                 >
-                  {chat.title}
+                  {renamingChatId === chat.id ? (
+                    <div style={currentStyles.renameWrapper}>
+                      <input
+                        type="text"
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleRenameSubmit(chat.id);
+                          } else if (e.key === 'Escape') {
+                            handleRenameCancel();
+                          }
+                        }}
+                        style={currentStyles.renameInput}
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleRenameSubmit(chat.id)}
+                        style={currentStyles.renameBtn}
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={handleRenameCancel}
+                        style={currentStyles.cancelBtn}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div
+                        style={{
+                          ...currentStyles.recentItem,
+                          ...(chat.id === currentChatId ? currentStyles.recentItemActive : {})
+                        }}
+                        onClick={() => handleSelectChat(chat.id)}
+                        onContextMenu={(e) => {
+                          if (isMobile) {
+                            e.preventDefault();
+                            setSelectedChatForActions({id: chat.id, title: chat.title});
+                            setShowChatActionsModal(true);
+                          }
+                        }}
+                      >
+                        {chat.title}
+                        {isMobile && (
+                          <span 
+                            style={currentStyles.mobileMenuDots}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedChatForActions({id: chat.id, title: chat.title});
+                              setShowChatActionsModal(true);
+                            }}
+                          >
+                            ⋮
+                          </span>
+                        )}
+                      </div>
+                      {hoveredChatId === chat.id && !isMobile && (
+                        <div style={currentStyles.chatActions}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRenameStart(chat.id, chat.title);
+                            }}
+                            style={currentStyles.actionBtn}
+                            title="Rename"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClick(chat.id);
+                            }}
+                            style={currentStyles.actionBtn}
+                            title="Delete"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               ))}
             </div>
           </div>
 
-          <div style={styles.sidebarFooter} onClick={() => setShowAccountModal(true)}>
-            <div style={styles.avatar}>
-              {currentUser?.name.substring(0, 2).toUpperCase()}
+          <div style={currentStyles.sidebarFooter} onClick={() => setShowAccountModal(true)}>
+            <div style={currentStyles.avatar}>
+              {session?.user?.name?.substring(0, 2).toUpperCase()}
             </div>
-            <div style={{...styles.userInfo, ...(sidebarCollapsed ? {display: 'none'} : {})}}>
-              <div style={{ fontSize: 13 }}>{currentUser?.name}</div>
-              <div style={{ fontSize: 11, color: "#666" }}>
-                {currentUser?.plan} plan
+            <div style={{...currentStyles.userInfo, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
+              <div style={{ fontSize: 13 }}>{session?.user?.name}</div>
+              <div style={{ fontSize: 11, color: theme === 'dark' ? '#999' : '#666' }}>
+                {session?.user?.plan} plan
               </div>
             </div>
           </div>
         </aside>
 
-        <main style={styles.main}>
-          <div style={styles.topBar}>
-            <div style={styles.topBarLeft}>
-              <div style={styles.modelBadge}>UnFiltered-AI 5.2</div>
+        <main style={currentStyles.main}>
+          <div style={currentStyles.topBar}>
+            <div style={currentStyles.topBarLeft}>
+              {isMobile && (
+                <button
+                  style={currentStyles.mobileMenuBtn}
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  ☰
+                </button>
+              )}
+              <div style={currentStyles.modelBadge}>UnFiltered-AI 5.2</div>
             </div>
-            <div style={styles.topBarRight}>
-              <button style={styles.iconBtn} onClick={toggleTheme} title="Toggle theme">
+            <div style={currentStyles.topBarRight}>
+              <button style={currentStyles.iconBtn} onClick={toggleTheme} title="Toggle theme">
                 {theme === "light" ? "🌙" : "☀️"}
               </button>
             </div>
           </div>
 
-          <div style={styles.chatWrapper}>
-            <div style={styles.messagesArea}>
+          <div style={currentStyles.chatWrapper}>
+            <div style={currentStyles.messagesArea}>
               {showGreeting && (
-                <div style={styles.emptyState}>
-                  <div style={styles.greetingLogo}></div>
-                  <div style={styles.greetingText}>What's good?</div>
+                <div style={currentStyles.emptyState}>
+                  <div style={currentStyles.greetingLogo}></div>
+                  <div style={currentStyles.greetingText}>What's good?</div>
+                  {remainingMessages !== Infinity && (
+                    <div style={currentStyles.messageLimitInfo}>
+                      {remainingMessages} messages remaining today
+                    </div>
+                  )}
                 </div>
               )}
 
               {!showGreeting && (
-                <div style={styles.chatMessages}>
+                <div style={{
+                  ...currentStyles.chatMessages,
+                  ...(isMobile ? currentStyles.chatMessagesMobile : {})
+                }}>
                   {messages.map((m, idx) => (
                     <div
-                      key={idx}
-                      style={m.role === "user" ? styles.messageRowUser : styles.messageRowAssistant}
+                      key={m.id || idx}
+                      style={m.role === "user" ? currentStyles.messageRowUser : currentStyles.messageRowAssistant}
                     >
                       <div
-                        style={m.role === "user" ? styles.messageBubbleUser : styles.messageBubbleAssistant}
+                        style={m.role === "user" ? currentStyles.messageBubbleUser : currentStyles.messageBubbleAssistant}
                       >
-                        <div style={styles.messageText}>{m.content}</div>
+                        <div style={currentStyles.messageText}>{m.content}</div>
                       </div>
                     </div>
                   ))}
 
-                  {isLoading && (
-                    <div style={styles.messageRowAssistant}>
-                      <div style={styles.messageBubbleAssistant}>
-                        <div style={styles.typingIndicator}>
-                          <span style={styles.typingDot} />
-                          <span style={{...styles.typingDot, animationDelay: '0.2s'}} />
-                          <span style={{...styles.typingDot, animationDelay: '0.4s'}} />
+                  {chatLoading && (
+                    <div style={currentStyles.messageRowAssistant}>
+                      <div style={currentStyles.messageBubbleAssistant}>
+                        <div style={currentStyles.typingIndicator}>
+                          <span style={currentStyles.typingDot} />
+                          <span style={{...currentStyles.typingDot, animationDelay: '0.2s'}} />
+                          <span style={{...currentStyles.typingDot, animationDelay: '0.4s'}} />
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Invisible element at the bottom for auto-scroll */}
                   <div ref={messagesEndRef} />
                 </div>
               )}
             </div>
 
-            <div style={styles.inputArea}>
-              <div style={styles.inputWrapper}>
-                <div style={styles.inputCard}>
-                  <div style={styles.inputRow}>
+            <div style={currentStyles.inputArea}>
+              <div style={{
+                ...currentStyles.inputWrapper,
+                ...(isMobile ? currentStyles.inputWrapperMobile : {})
+              }}>
+                {!canSendMessage() && (
+                  <div style={currentStyles.limitWarning}>
+                    <strong>Daily limit reached!</strong> You've used all your messages for today.
+                    {" "}
+                    <span 
+                      style={currentStyles.upgradeLink} 
+                      onClick={() => setShowAccountModal(true)}
+                    >
+                      Upgrade your plan
+                    </span> for more messages.
+                  </div>
+                )}
+
+                <div style={currentStyles.inputCard}>
+                  <div style={currentStyles.inputRow}>
                     <textarea
                       rows={1}
-                      placeholder="What's up? Time to spill it..."
+                      placeholder={canSendMessage() ? "What's up? Time to spill it..." : "Daily limit reached. Upgrade to continue."}
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={handleKeyDown}
-                      disabled={isLoading}
-                      style={styles.textarea}
+                      disabled={chatLoading || !canSendMessage()}
+                      style={currentStyles.textarea}
                     />
                     <button
                       style={{
-                        ...styles.sendBtn,
-                        ...(isLoading || !input.trim() ? styles.sendBtnDisabled : {})
+                        ...currentStyles.sendBtn,
+                        ...(chatLoading || !input.trim() || !canSendMessage() ? currentStyles.sendBtnDisabled : {})
                       }}
                       onClick={handleSend}
-                      disabled={isLoading || !input.trim()}
+                      disabled={chatLoading || !input.trim() || !canSendMessage()}
                     >
                       ↑
                     </button>
                   </div>
                 </div>
-                <div style={styles.modelSelect}>
+                <div style={currentStyles.modelSelect}>
                   <span>UnFiltered-AI can make mistakes. Check important info.</span>
+                  {remainingMessages !== Infinity && canSendMessage() && !isMobile && (
+                    <span style={currentStyles.remainingMessages}>
+                      {" "}· {remainingMessages} messages left today
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -581,129 +650,183 @@ export default function Home() {
         </main>
       </div>
 
-      {/* Account Modal - Only closes on X button click */}
+      {/* Account Modal */}
       {showAccountModal && (
         <>
-          <div style={styles.modalOverlay} />
-          <div style={styles.modalContainer}>
-            <div style={styles.modalContent}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Account Settings</h2>
-                <button style={styles.modalCloseBtn} onClick={() => setShowAccountModal(false)}>
+          <div style={currentStyles.modalOverlay} onClick={() => setShowAccountModal(false)} />
+          <div style={currentStyles.modalContainer}>
+            <div style={currentStyles.modalContent}>
+              <div style={currentStyles.modalHeader}>
+                <h2 style={currentStyles.modalTitle}>Account Settings</h2>
+                <button style={currentStyles.modalCloseBtn} onClick={() => setShowAccountModal(false)}>
                   ×
                 </button>
               </div>
 
-              <div style={styles.modalBody}>
-                <div style={styles.modalSection}>
-                  <h3 style={styles.modalSectionTitle}>Profile Information</h3>
-                  <div style={styles.modalInfoRow}>
-                    <span style={styles.modalLabel}>Name:</span>
-                    <span style={styles.modalValue}>{currentUser?.name}</span>
+              <div style={currentStyles.modalBody}>
+                <div style={currentStyles.modalSection}>
+                  <h3 style={currentStyles.modalSectionTitle}>Profile Information</h3>
+                  <div style={currentStyles.modalInfoRow}>
+                    <span style={currentStyles.modalLabel}>Name:</span>
+                    <span style={currentStyles.modalValue}>{session?.user?.name}</span>
                   </div>
-                  <div style={styles.modalInfoRow}>
-                    <span style={styles.modalLabel}>Email:</span>
-                    <span style={styles.modalValue}>{currentUser?.email}</span>
-                  </div>
-                  <div style={styles.modalInfoRow}>
-                    <span style={styles.modalLabel}>Member since:</span>
-                    <span style={styles.modalValue}>
-                      {currentUser && new Date(currentUser.createdAt).toLocaleDateString()}
-                    </span>
+                  <div style={currentStyles.modalInfoRow}>
+                    <span style={currentStyles.modalLabel}>Email:</span>
+                    <span style={currentStyles.modalValue}>{session?.user?.email}</span>
                   </div>
                 </div>
 
-                <div style={styles.modalSection}>
-                  <h3 style={styles.modalSectionTitle}>Current Plan</h3>
-                  <div style={styles.planCurrentBadge}>
-                    <div style={styles.planBadgeLarge}>{currentUser?.plan}</div>
-                    <div style={styles.planDescription}>
-                      {currentUser?.plan === "Free" && "10 messages per day"}
-                      {currentUser?.plan === "Pro" && "100 messages per day"}
-                      {currentUser?.plan === "Enterprise" && "Unlimited messages"}
+                <div style={currentStyles.modalSection}>
+                  <h3 style={currentStyles.modalSectionTitle}>Current Plan</h3>
+                  <div style={currentStyles.planCurrentBadge}>
+                    <div style={currentStyles.planBadgeLarge}>{session?.user?.plan}</div>
+                    <div style={currentStyles.planDescription}>
+                      {session?.user?.plan === "Free" && `${session.user.messagesUsedToday}/10 messages used today`}
+                      {session?.user?.plan === "Pro" && `${session.user.messagesUsedToday}/100 messages used today`}
+                      {session?.user?.plan === "Enterprise" && "Unlimited messages"}
                     </div>
                   </div>
 
-                  <h4 style={styles.modalSubsectionTitle}>Upgrade Your Plan</h4>
-                  <div style={styles.plansGrid}>
-                    <div style={{...styles.planCard, ...(currentUser?.plan === "Free" ? styles.planCardActive : {})}}>
-                      <h5 style={styles.planCardTitle}>Free</h5>
-                      <div style={styles.planPrice}>$0<span style={styles.planPricePeriod}>/mo</span></div>
-                      <ul style={styles.planFeatures}>
-                        <li style={styles.planFeature}>✓ 10 messages/day</li>
-                        <li style={styles.planFeature}>✓ Basic support</li>
+                  <h4 style={currentStyles.modalSubsectionTitle}>Upgrade Your Plan</h4>
+                  <div style={currentStyles.plansGrid}>
+                    <div style={{...currentStyles.planCard, ...(session?.user?.plan === "Free" ? currentStyles.planCardActive : {})}}>
+                      <h5 style={currentStyles.planCardTitle}>Free</h5>
+                      <div style={currentStyles.planPrice}>$0<span style={currentStyles.planPricePeriod}>/mo</span></div>
+                      <ul style={currentStyles.planFeatures}>
+                        <li style={currentStyles.planFeature}>✓ 10 messages/day</li>
+                        <li style={currentStyles.planFeature}>✓ Basic support</li>
                       </ul>
-                      {currentUser?.plan !== "Free" && (
+                      {session?.user?.plan !== "Free" && (
                         <button
-                          style={styles.planBtn}
-                          onClick={() => {
-                            upgradePlan("Free");
-                            setShowAccountModal(false);
-                          }}
+                          style={currentStyles.planBtn}
+                          onClick={() => upgradePlan("Free")}
                         >
                           Downgrade to Free
                         </button>
                       )}
-                      {currentUser?.plan === "Free" && (
-                        <div style={styles.planBtnCurrent}>Current Plan</div>
+                      {session?.user?.plan === "Free" && (
+                        <div style={currentStyles.planBtnCurrent}>Current Plan</div>
                       )}
                     </div>
 
-                    <div style={{...styles.planCard, ...(currentUser?.plan === "Pro" ? styles.planCardActive : {})}}>
-                      <h5 style={styles.planCardTitle}>Pro</h5>
-                      <div style={styles.planPrice}>$19<span style={styles.planPricePeriod}>/mo</span></div>
-                      <ul style={styles.planFeatures}>
-                        <li style={styles.planFeature}>✓ 100 messages/day</li>
-                        <li style={styles.planFeature}>✓ Priority support</li>
-                        <li style={styles.planFeature}>✓ Advanced features</li>
+                    <div style={{...currentStyles.planCard, ...(session?.user?.plan === "Pro" ? currentStyles.planCardActive : {})}}>
+                      <h5 style={currentStyles.planCardTitle}>Pro</h5>
+                      <div style={currentStyles.planPrice}>$19<span style={currentStyles.planPricePeriod}>/mo</span></div>
+                      <ul style={currentStyles.planFeatures}>
+                        <li style={currentStyles.planFeature}>✓ 100 messages/day</li>
+                        <li style={currentStyles.planFeature}>✓ Priority support</li>
+                        <li style={currentStyles.planFeature}>✓ Advanced features</li>
                       </ul>
-                      {currentUser?.plan !== "Pro" && (
+                      {session?.user?.plan !== "Pro" && (
                         <button
-                          style={styles.planBtn}
-                          onClick={() => {
-                            upgradePlan("Pro");
-                            setShowAccountModal(false);
-                          }}
+                          style={currentStyles.planBtn}
+                          onClick={() => upgradePlan("Pro")}
                         >
-                          {currentUser?.plan === "Free" ? "Upgrade to Pro" : "Switch to Pro"}
+                          {session?.user?.plan === "Free" ? "Upgrade to Pro" : "Switch to Pro"}
                         </button>
                       )}
-                      {currentUser?.plan === "Pro" && (
-                        <div style={styles.planBtnCurrent}>Current Plan</div>
+                      {session?.user?.plan === "Pro" && (
+                        <div style={currentStyles.planBtnCurrent}>Current Plan</div>
                       )}
                     </div>
 
-                    <div style={{...styles.planCard, ...(currentUser?.plan === "Enterprise" ? styles.planCardActive : {})}}>
-                      <h5 style={styles.planCardTitle}>Enterprise</h5>
-                      <div style={styles.planPrice}>$99<span style={styles.planPricePeriod}>/mo</span></div>
-                      <ul style={styles.planFeatures}>
-                        <li style={styles.planFeature}>✓ Unlimited messages</li>
-                        <li style={styles.planFeature}>✓ 24/7 support</li>
-                        <li style={styles.planFeature}>✓ Custom integrations</li>
+                    <div style={{...currentStyles.planCard, ...(session?.user?.plan === "Enterprise" ? currentStyles.planCardActive : {})}}>
+                      <h5 style={currentStyles.planCardTitle}>Enterprise</h5>
+                      <div style={currentStyles.planPrice}>$99<span style={currentStyles.planPricePeriod}>/mo</span></div>
+                      <ul style={currentStyles.planFeatures}>
+                        <li style={currentStyles.planFeature}>✓ Unlimited messages</li>
+                        <li style={currentStyles.planFeature}>✓ 24/7 support</li>
+                        <li style={currentStyles.planFeature}>✓ Custom integrations</li>
                       </ul>
-                      {currentUser?.plan !== "Enterprise" && (
+                      {session?.user?.plan !== "Enterprise" && (
                         <button
-                          style={styles.planBtn}
-                          onClick={() => {
-                            upgradePlan("Enterprise");
-                            setShowAccountModal(false);
-                          }}
+                          style={currentStyles.planBtn}
+                          onClick={() => upgradePlan("Enterprise")}
                         >
                           Upgrade to Enterprise
                         </button>
                       )}
-                      {currentUser?.plan === "Enterprise" && (
-                        <div style={styles.planBtnCurrent}>Current Plan</div>
+                      {session?.user?.plan === "Enterprise" && (
+                        <div style={currentStyles.planBtnCurrent}>Current Plan</div>
                       )}
                     </div>
                   </div>
                 </div>
 
-                <div style={styles.modalSection}>
-                  <button style={styles.logoutBtn} onClick={handleLogout}>
+                <div style={currentStyles.modalSection}>
+                  <button style={currentStyles.logoutBtn} onClick={handleLogout}>
                     Logout
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Mobile Chat Actions Modal */}
+      {showChatActionsModal && selectedChatForActions && (
+        <>
+          <div style={currentStyles.modalOverlay} onClick={() => setShowChatActionsModal(false)} />
+          <div style={currentStyles.actionsModalContainer}>
+            <div style={currentStyles.actionsModalContent}>
+              <div style={currentStyles.actionsModalHeader}>
+                <h3 style={currentStyles.actionsModalTitle}>{selectedChatForActions.title}</h3>
+              </div>
+              <div style={currentStyles.actionsModalBody}>
+                <button
+                  style={currentStyles.actionMenuItem}
+                  onClick={() => handleRenameStart(selectedChatForActions.id, selectedChatForActions.title)}
+                >
+                  <span style={currentStyles.actionMenuIcon}>✏️</span>
+                  Rename
+                </button>
+                <button
+                  style={{...currentStyles.actionMenuItem, ...currentStyles.actionMenuItemDanger}}
+                  onClick={() => handleDeleteClick(selectedChatForActions.id)}
+                >
+                  <span style={currentStyles.actionMenuIcon}>🗑️</span>
+                  Delete
+                </button>
+                <button
+                  style={currentStyles.actionMenuItem}
+                  onClick={() => setShowChatActionsModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <>
+          <div style={currentStyles.modalOverlay} />
+          <div style={currentStyles.deleteModalContainer}>
+            <div style={currentStyles.deleteModalContent}>
+              <div style={currentStyles.deleteModalHeader}>
+                <h3 style={currentStyles.deleteModalTitle}>Delete Chat?</h3>
+              </div>
+              <div style={currentStyles.deleteModalBody}>
+                <p style={currentStyles.deleteModalText}>
+                  Are you sure you want to delete this chat? This action cannot be undone.
+                </p>
+              </div>
+              <div style={currentStyles.deleteModalFooter}>
+                <button
+                  onClick={handleDeleteCancel}
+                  style={currentStyles.deleteCancelBtn}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  style={currentStyles.deleteConfirmBtn}
+                >
+                  Delete
+                </button>
               </div>
             </div>
           </div>
@@ -713,9 +836,43 @@ export default function Home() {
   );
 }
 
-// Inline styles object
-const styles: { [key: string]: React.CSSProperties } = {
-  // Auth styles
+// Light Mode Styles
+const lightStyles: { [key: string]: React.CSSProperties } = {
+  loadingContainer: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#f9f9f9',
+  },
+  loadingSpinner: {
+    fontSize: '18px',
+    color: '#666',
+  },
+  limitWarning: {
+    padding: '12px 16px',
+    background: 'rgba(245, 158, 11, 0.1)',
+    border: '1px solid rgba(245, 158, 11, 0.3)',
+    borderRadius: '8px',
+    marginBottom: '12px',
+    fontSize: '14px',
+    color: '#f59e0b',
+  },
+  upgradeLink: {
+    color: '#667eea',
+    cursor: 'pointer',
+    fontWeight: 600,
+    textDecoration: 'underline',
+  },
+  messageLimitInfo: {
+    fontSize: '14px',
+    color: '#666',
+    marginTop: '16px',
+  },
+  remainingMessages: {
+    color: '#999',
+    fontSize: '11px',
+  },
   authContainer: {
     minHeight: '100vh',
     display: 'flex',
@@ -803,11 +960,38 @@ const styles: { [key: string]: React.CSSProperties } = {
     cursor: 'pointer',
     fontWeight: 600,
   },
-  // App styles
   app: {
     display: 'flex',
     height: '100vh',
     overflow: 'hidden',
+    position: 'relative' as const,
+  },
+  mobileOverlay: {
+    position: 'fixed' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 999,
+  },
+  mobileMenuBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: '20px',
+    cursor: 'pointer',
+    padding: '4px 8px',
+    color: '#000',
+    marginRight: '12px',
+  },
+  mobileMenuDots: {
+    position: 'absolute' as const,
+    right: '8px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    fontSize: '18px',
+    padding: '4px 8px',
+    color: '#666',
   },
   sidebar: {
     width: '260px',
@@ -815,7 +999,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     borderRight: '1px solid #e0e0e0',
     display: 'flex',
     flexDirection: 'column' as const,
-    transition: 'width 0.3s ease',
+    transition: 'all 0.3s ease',
   },
   sidebarCollapsed: {
     width: '70px',
@@ -845,7 +1029,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontWeight: 600,
     fontSize: '16px',
     color: '#000',
-    transition: 'opacity 0.3s ease',
   },
   section: {
     padding: '12px',
@@ -870,7 +1053,6 @@ const styles: { [key: string]: React.CSSProperties } = {
   navText: {
     fontSize: '14px',
     color: '#000',
-    transition: 'opacity 0.3s ease',
   },
   sectionLabel: {
     padding: '12px 16px 8px',
@@ -879,17 +1061,21 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: '#666',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
-    transition: 'opacity 0.3s ease',
   },
   recentsList: {
     flex: 1,
     overflowY: 'auto' as const,
     padding: '0 12px',
-    transition: 'opacity 0.3s ease',
+  },
+  chatItemWrapper: {
+    position: 'relative' as const,
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '4px',
   },
   recentItem: {
+    flex: 1,
     padding: '10px 12px',
-    marginBottom: '4px',
     borderRadius: '8px',
     cursor: 'pointer',
     fontSize: '14px',
@@ -897,10 +1083,59 @@ const styles: { [key: string]: React.CSSProperties } = {
     whiteSpace: 'nowrap' as const,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+    position: 'relative' as const,
   },
   recentItemActive: {
     background: '#e8e8e8',
     fontWeight: 500,
+  },
+  chatActions: {
+    display: 'flex',
+    gap: '4px',
+    marginLeft: '4px',
+  },
+  actionBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: '14px',
+    cursor: 'pointer',
+    padding: '4px 6px',
+    borderRadius: '4px',
+    opacity: 0.7,
+  },
+  renameWrapper: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    width: '100%',
+    padding: '4px',
+  },
+  renameInput: {
+    flex: 1,
+    padding: '6px 8px',
+    border: '1px solid #667eea',
+    borderRadius: '4px',
+    fontSize: '13px',
+    outline: 'none',
+    fontFamily: 'inherit',
+  },
+  renameBtn: {
+    background: '#10b981',
+    border: 'none',
+    color: 'white',
+    padding: '6px 10px',
+    borderRadius: '4px',
+    fontSize: '14px',
+    cursor: 'pointer',
+  },
+  cancelBtn: {
+    background: '#ef4444',
+    border: 'none',
+    color: 'white',
+    padding: '6px 10px',
+    borderRadius: '4px',
+    fontSize: '14px',
+    cursor: 'pointer',
   },
   sidebarFooter: {
     padding: '16px',
@@ -909,7 +1144,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     alignItems: 'center',
     gap: '12px',
     cursor: 'pointer',
-    transition: 'background 0.2s',
   },
   avatar: {
     width: '36px',
@@ -927,7 +1161,6 @@ const styles: { [key: string]: React.CSSProperties } = {
   userInfo: {
     flex: 1,
     overflow: 'hidden',
-    transition: 'opacity 0.3s ease',
   },
   main: {
     flex: 1,
@@ -946,7 +1179,6 @@ const styles: { [key: string]: React.CSSProperties } = {
   topBarLeft: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
   },
   modelBadge: {
     fontSize: '14px',
@@ -956,7 +1188,6 @@ const styles: { [key: string]: React.CSSProperties } = {
   topBarRight: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
   },
   iconBtn: {
     background: 'none',
@@ -1007,6 +1238,10 @@ const styles: { [key: string]: React.CSSProperties } = {
     flexDirection: 'column' as const,
     gap: '24px',
   },
+  chatMessagesMobile: {
+    padding: '20px 5px', // Better mobile padding!
+    maxWidth: '100%',
+  },
   messageRowUser: {
     display: 'flex',
     width: '100%',
@@ -1018,7 +1253,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     justifyContent: 'flex-start',
   },
   messageBubbleUser: {
-    maxWidth: '80%',
+    maxWidth: '85%',
     padding: '12px 16px',
     borderRadius: '16px',
     fontSize: '15px',
@@ -1028,7 +1263,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: '#fff',
   },
   messageBubbleAssistant: {
-    maxWidth: '80%',
+    maxWidth: '85%',
     padding: '12px 16px',
     borderRadius: '16px',
     fontSize: '15px',
@@ -1062,6 +1297,9 @@ const styles: { [key: string]: React.CSSProperties } = {
     margin: '0 auto',
     padding: '16px 24px',
   },
+  inputWrapperMobile: {
+    padding: '12px 20px', // More padding on mobile
+  },
   inputCard: {
     width: '100%',
     background: 'white',
@@ -1080,6 +1318,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     border: 'none',
     background: 'transparent',
     fontSize: '15px',
+    fontFamily: 'inherit',
     resize: 'none' as const,
     outline: 'none',
     color: '#000',
@@ -1110,7 +1349,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: '12px',
     color: '#666',
   },
-  // Centered Modal Window - Stays open until X is clicked
   modalOverlay: {
     position: 'fixed' as const,
     top: 0,
@@ -1126,9 +1364,9 @@ const styles: { [key: string]: React.CSSProperties } = {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     zIndex: 1000,
-    maxWidth: '900px',
+    maxWidth: '750px',
     width: '90%',
-    maxHeight: '90vh',
+    maxHeight: '85vh',
     overflowY: 'auto' as const,
   },
   modalContent: {
@@ -1137,14 +1375,14 @@ const styles: { [key: string]: React.CSSProperties } = {
     boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
   },
   modalHeader: {
-    padding: '24px 32px',
+    padding: '24px 28px',
     borderBottom: '1px solid #e0e0e0',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   modalTitle: {
-    fontSize: '24px',
+    fontSize: '22px',
     fontWeight: 700,
     color: '#000',
     margin: 0,
@@ -1159,29 +1397,30 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: 0,
   },
   modalBody: {
-    padding: '32px',
+    padding: '24px 28px',
   },
   modalSection: {
-    marginBottom: '32px',
+    marginBottom: '28px',
   },
   modalSectionTitle: {
-    fontSize: '18px',
+    fontSize: '17px',
     fontWeight: 600,
-    marginBottom: '16px',
+    marginBottom: '14px',
     color: '#000',
   },
   modalSubsectionTitle: {
-    fontSize: '16px',
+    fontSize: '15px',
     fontWeight: 600,
-    marginTop: '24px',
-    marginBottom: '16px',
+    marginBottom: '14px',
+    marginTop: '20px',
     color: '#000',
   },
   modalInfoRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '12px 0',
+    padding: '10px 0',
     borderBottom: '1px solid #e0e0e0',
+    fontSize: '14px',
   },
   modalLabel: {
     fontWeight: 600,
@@ -1191,94 +1430,93 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: '#666',
   },
   planCurrentBadge: {
-    padding: '24px',
+    padding: '20px',
     background: '#f9f9f9',
     borderRadius: '12px',
     textAlign: 'center' as const,
-    marginBottom: '24px',
+    marginBottom: '20px',
   },
   planBadgeLarge: {
     display: 'inline-block',
-    padding: '8px 24px',
+    padding: '6px 20px',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
     borderRadius: '24px',
     fontWeight: 600,
-    fontSize: '18px',
-    marginBottom: '12px',
+    fontSize: '16px',
+    marginBottom: '10px',
   },
   planDescription: {
     color: '#666',
-    fontSize: '14px',
+    fontSize: '13px',
   },
   plansGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: '20px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '14px',
   },
   planCard: {
-    padding: '24px',
+    padding: '18px',
     background: '#f9f9f9',
     border: '2px solid #e0e0e0',
     borderRadius: '12px',
-    transition: 'all 0.2s',
   },
   planCardActive: {
     borderColor: '#667eea',
     background: 'rgba(102, 126, 234, 0.05)',
   },
   planCardTitle: {
-    fontSize: '18px',
+    fontSize: '16px',
     fontWeight: 700,
-    marginBottom: '8px',
+    marginBottom: '6px',
     color: '#000',
   },
   planPrice: {
-    fontSize: '28px',
+    fontSize: '24px',
     fontWeight: 700,
-    margin: '12px 0 20px',
+    margin: '10px 0 16px',
     color: '#000',
   },
   planPricePeriod: {
-    fontSize: '16px',
+    fontSize: '14px',
     fontWeight: 400,
     color: '#666',
   },
   planFeatures: {
     listStyle: 'none',
-    marginBottom: '20px',
+    marginBottom: '16px',
     padding: 0,
   },
   planFeature: {
-    padding: '6px 0',
-    fontSize: '14px',
+    padding: '5px 0',
+    fontSize: '13px',
     color: '#666',
   },
   planBtn: {
     width: '100%',
-    padding: '10px 20px',
+    padding: '9px 16px',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
     border: 'none',
     borderRadius: '8px',
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 600,
     cursor: 'pointer',
   },
   planBtnCurrent: {
     width: '100%',
-    padding: '10px 20px',
+    padding: '9px 16px',
     background: 'transparent',
     color: '#667eea',
     border: '2px solid #667eea',
     borderRadius: '8px',
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 600,
     textAlign: 'center' as const,
   },
   logoutBtn: {
     width: '100%',
-    padding: '12px 24px',
+    padding: '11px 22px',
     background: 'transparent',
     color: '#ef4444',
     border: '2px solid #ef4444',
@@ -1286,5 +1524,369 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
+  },
+  actionsModalContainer: {
+    position: 'fixed' as const,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+  },
+  actionsModalContent: {
+    background: 'white',
+    borderRadius: '16px 16px 0 0',
+    boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.2)',
+  },
+  actionsModalHeader: {
+    padding: '16px 20px',
+    borderBottom: '1px solid #e0e0e0',
+  },
+  actionsModalTitle: {
+    fontSize: '16px',
+    fontWeight: 600,
+    color: '#000',
+    margin: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+  },
+  actionsModalBody: {
+    padding: '8px',
+  },
+  actionMenuItem: {
+    width: '100%',
+    padding: '14px 20px',
+    background: 'none',
+    border: 'none',
+    fontSize: '15px',
+    cursor: 'pointer',
+    textAlign: 'left' as const,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    color: '#000',
+    borderRadius: '8px',
+  },
+  actionMenuItemDanger: {
+    color: '#ef4444',
+  },
+  actionMenuIcon: {
+    fontSize: '18px',
+    width: '24px',
+  },
+  deleteModalContainer: {
+    position: 'fixed' as const,
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    zIndex: 1000,
+    width: '90%',
+    maxWidth: '400px',
+  },
+  deleteModalContent: {
+    background: 'white',
+    borderRadius: '12px',
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+  },
+  deleteModalHeader: {
+    padding: '20px 24px',
+    borderBottom: '1px solid #e0e0e0',
+  },
+  deleteModalTitle: {
+    fontSize: '20px',
+    fontWeight: 700,
+    color: '#000',
+    margin: 0,
+  },
+  deleteModalBody: {
+    padding: '20px 24px',
+  },
+  deleteModalText: {
+    fontSize: '15px',
+    color: '#666',
+    lineHeight: 1.5,
+    margin: 0,
+  },
+  deleteModalFooter: {
+    padding: '16px 24px',
+    display: 'flex',
+    gap: '12px',
+    justifyContent: 'flex-end',
+  },
+  deleteCancelBtn: {
+    padding: '10px 20px',
+    background: 'transparent',
+    border: '1px solid #e0e0e0',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    color: '#000',
+  },
+  deleteConfirmBtn: {
+    padding: '10px 20px',
+    background: '#ef4444',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    color: 'white',
+  },
+};
+
+// Dark Mode Styles
+const darkStyles: { [key: string]: React.CSSProperties } = {
+  ...lightStyles,
+  loadingContainer: {
+    ...lightStyles.loadingContainer,
+    background: '#1a1a1a',
+  },
+  loadingSpinner: {
+    ...lightStyles.loadingSpinner,
+    color: '#999',
+  },
+  authContainer: {
+    ...lightStyles.authContainer,
+    background: '#1a1a1a',
+  },
+  authCard: {
+    ...lightStyles.authCard,
+    background: '#2a2a2a',
+  },
+  authTitle: {
+    ...lightStyles.authTitle,
+    color: '#fff',
+  },
+  authSubtitle: {
+    ...lightStyles.authSubtitle,
+    color: '#999',
+  },
+  label: {
+    ...lightStyles.label,
+    color: '#fff',
+  },
+  input: {
+    ...lightStyles.input,
+    background: '#1a1a1a',
+    border: '1px solid #3a3a3a',
+    color: '#fff',
+  },
+  authSwitch: {
+    ...lightStyles.authSwitch,
+    color: '#999',
+  },
+  mobileMenuBtn: {
+    ...lightStyles.mobileMenuBtn,
+    color: '#fff',
+  },
+  mobileMenuDots: {
+    ...lightStyles.mobileMenuDots,
+    color: '#999',
+  },
+  sidebar: {
+    ...lightStyles.sidebar,
+    background: '#1a1a1a',
+    borderRight: '1px solid #3a3a3a',
+  },
+  sidebarHeader: {
+    ...lightStyles.sidebarHeader,
+    borderBottom: '1px solid #3a3a3a',
+  },
+  sidebarToggle: {
+    ...lightStyles.sidebarToggle,
+    color: '#fff',
+  },
+  brand: {
+    ...lightStyles.brand,
+    color: '#fff',
+  },
+  section: {
+    ...lightStyles.section,
+    borderBottom: '1px solid #3a3a3a',
+  },
+  navText: {
+    ...lightStyles.navText,
+    color: '#fff',
+  },
+  sectionLabel: {
+    ...lightStyles.sectionLabel,
+    color: '#999',
+  },
+  recentItem: {
+    ...lightStyles.recentItem,
+    color: '#fff',
+  },
+  recentItemActive: {
+    ...lightStyles.recentItemActive,
+    background: '#3a3a3a',
+  },
+  renameInput: {
+    ...lightStyles.renameInput,
+    background: '#2a2a2a',
+    color: '#fff',
+    border: '1px solid #667eea',
+  },
+  sidebarFooter: {
+    ...lightStyles.sidebarFooter,
+    borderTop: '1px solid #3a3a3a',
+  },
+  main: {
+    ...lightStyles.main,
+    background: '#2a2a2a',
+  },
+  topBar: {
+    ...lightStyles.topBar,
+    borderBottom: '1px solid #3a3a3a',
+  },
+  modelBadge: {
+    ...lightStyles.modelBadge,
+    color: '#fff',
+  },
+  greetingText: {
+    ...lightStyles.greetingText,
+    color: '#fff',
+  },
+  messageLimitInfo: {
+    ...lightStyles.messageLimitInfo,
+    color: '#999',
+  },
+  messageBubbleUser: {
+    ...lightStyles.messageBubbleUser,
+    background: '#3a3a3a',
+  },
+  messageBubbleAssistant: {
+    ...lightStyles.messageBubbleAssistant,
+    background: '#1a1a1a',
+    color: '#fff',
+  },
+  inputArea: {
+    ...lightStyles.inputArea,
+    background: '#2a2a2a',
+    borderTop: '1px solid #3a3a3a',
+  },
+  inputCard: {
+    ...lightStyles.inputCard,
+    background: '#1a1a1a',
+    border: '1px solid #3a3a3a',
+  },
+  textarea: {
+    ...lightStyles.textarea,
+    color: '#fff',
+  },
+  sendBtn: {
+    ...lightStyles.sendBtn,
+    background: '#fff',
+    color: '#000',
+  },
+  modelSelect: {
+    ...lightStyles.modelSelect,
+    color: '#999',
+  },
+  remainingMessages: {
+    ...lightStyles.remainingMessages,
+    color: '#666',
+  },
+  modalContent: {
+    ...lightStyles.modalContent,
+    background: '#2a2a2a',
+  },
+  modalTitle: {
+    ...lightStyles.modalTitle,
+    color: '#fff',
+  },
+  modalCloseBtn: {
+    ...lightStyles.modalCloseBtn,
+    color: '#999',
+  },
+  modalHeader: {
+    ...lightStyles.modalHeader,
+    borderBottom: '1px solid #3a3a3a',
+  },
+  modalSectionTitle: {
+    ...lightStyles.modalSectionTitle,
+    color: '#fff',
+  },
+  modalSubsectionTitle: {
+    ...lightStyles.modalSubsectionTitle,
+    color: '#fff',
+  },
+  modalInfoRow: {
+    ...lightStyles.modalInfoRow,
+    borderBottom: '1px solid #3a3a3a',
+  },
+  modalLabel: {
+    ...lightStyles.modalLabel,
+    color: '#fff',
+  },
+  modalValue: {
+    ...lightStyles.modalValue,
+    color: '#999',
+  },
+  planCurrentBadge: {
+    ...lightStyles.planCurrentBadge,
+    background: '#1a1a1a',
+  },
+  planDescription: {
+    ...lightStyles.planDescription,
+    color: '#999',
+  },
+  planCard: {
+    ...lightStyles.planCard,
+    background: '#1a1a1a',
+    border: '2px solid #3a3a3a',
+  },
+  planCardTitle: {
+    ...lightStyles.planCardTitle,
+    color: '#fff',
+  },
+  planPrice: {
+    ...lightStyles.planPrice,
+    color: '#fff',
+  },
+  planPricePeriod: {
+    ...lightStyles.planPricePeriod,
+    color: '#999',
+  },
+  planFeature: {
+    ...lightStyles.planFeature,
+    color: '#999',
+  },
+  actionsModalContent: {
+    ...lightStyles.actionsModalContent,
+    background: '#2a2a2a',
+  },
+  actionsModalHeader: {
+    ...lightStyles.actionsModalHeader,
+    borderBottom: '1px solid #3a3a3a',
+  },
+  actionsModalTitle: {
+    ...lightStyles.actionsModalTitle,
+    color: '#fff',
+  },
+  actionMenuItem: {
+    ...lightStyles.actionMenuItem,
+    color: '#fff',
+  },
+  deleteModalContent: {
+    ...lightStyles.deleteModalContent,
+    background: '#2a2a2a',
+  },
+  deleteModalHeader: {
+    ...lightStyles.deleteModalHeader,
+    borderBottom: '1px solid #3a3a3a',
+  },
+  deleteModalTitle: {
+    ...lightStyles.deleteModalTitle,
+    color: '#fff',
+  },
+  deleteModalText: {
+    ...lightStyles.deleteModalText,
+    color: '#999',
+  },
+  deleteCancelBtn: {
+    ...lightStyles.deleteCancelBtn,
+    border: '1px solid #3a3a3a',
+    color: '#fff',
   },
 };
