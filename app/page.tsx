@@ -4,12 +4,14 @@ import React, { useState, useEffect } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useChats } from "./hooks/useChats";
 import { useTheme } from "./hooks/useTheme";
+import { useSearchParams } from "next/navigation";
 
 type View = "login" | "signup" | "chat";
 
 export default function Home() {
   const { data: session, status, update: updateSession } = useSession();
   const { theme, toggleTheme } = useTheme();
+  const searchParams = useSearchParams();
   
   const [currentView, setCurrentView] = useState<View>("login");
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -30,6 +32,7 @@ export default function Home() {
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
   const [authError, setAuthError] = useState("");
+  const [authSuccess, setAuthSuccess] = useState("");
 
   const {
     chats,
@@ -48,6 +51,23 @@ export default function Home() {
 
   const isAuthLoading = status === "loading";
   const isAuthenticated = !!session?.user;
+
+  // Check for verification status from URL
+  useEffect(() => {
+    const verified = searchParams.get('verified');
+    const error = searchParams.get('error');
+
+    if (verified === 'true') {
+      setAuthSuccess('Email verified! You can now log in.');
+      setCurrentView('login');
+    } else if (error === 'invalid-token') {
+      setAuthError('Invalid or expired verification link.');
+    } else if (error === 'token-expired') {
+      setAuthError('Verification link expired. Please sign up again.');
+    } else if (error === 'verification-failed') {
+      setAuthError('Verification failed. Please try again.');
+    }
+  }, [searchParams]);
 
   // Detect mobile
   useEffect(() => {
@@ -77,10 +97,20 @@ export default function Home() {
   const showGreeting = !currentChat || messages.length === 0;
   const remainingMessages = getRemainingMessages();
 
+  // Calculate progress percentage
+  const getProgressPercentage = () => {
+    if (!session?.user) return 0;
+    const limits = { Free: 10, Pro: 100, Enterprise: Infinity };
+    const limit = limits[session.user.plan as keyof typeof limits];
+    if (limit === Infinity) return 100;
+    return (session.user.messagesUsedToday / limit) * 100;
+  };
+
   // Auth handlers
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
+    setAuthSuccess("");
     
     const result = await signIn("credentials", {
       email: authEmail,
@@ -89,7 +119,7 @@ export default function Home() {
     });
 
     if (result?.error) {
-      setAuthError("Invalid email or password");
+      setAuthError(result.error);
     } else {
       setAuthEmail("");
       setAuthPassword("");
@@ -99,6 +129,7 @@ export default function Home() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
+    setAuthSuccess("");
 
     try {
       const res = await fetch("/api/signup", {
@@ -118,19 +149,17 @@ export default function Home() {
         return;
       }
 
-      const result = await signIn("credentials", {
-        email: authEmail,
-        password: authPassword,
-        redirect: false,
-      });
+      // Show success message and switch to login
+      setAuthSuccess(data.message || "Account created! Check your email to verify.");
+      setAuthEmail("");
+      setAuthPassword("");
+      setAuthName("");
+      
+      // Switch to login view after 2 seconds
+      setTimeout(() => {
+        setCurrentView("login");
+      }, 2000);
 
-      if (result?.error) {
-        setAuthError("Account created but login failed. Please try logging in.");
-      } else {
-        setAuthEmail("");
-        setAuthPassword("");
-        setAuthName("");
-      }
     } catch (error) {
       setAuthError("Signup failed. Please try again.");
     }
@@ -144,10 +173,10 @@ export default function Home() {
   const handleSend = async () => {
     if (!input.trim() || chatLoading || !canSendMessage()) return;
     
-    const messageToSend = input; // Save message
-    setInput(""); // Clear input IMMEDIATELY!
+    const messageToSend = input;
+    setInput("");
     
-    await sendMessage(messageToSend); // Then send
+    await sendMessage(messageToSend);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -211,8 +240,10 @@ export default function Home() {
   };
 
   const upgradePlan = async (newPlan: "Free" | "Pro" | "Enterprise") => {
-    if (!session?.user) return;
-    
+  if (!session?.user) return;
+  
+  // Downgrade to Free - no payment needed
+  if (newPlan === "Free") {
     try {
       const res = await fetch("/api/upgrade-plan", {
         method: "POST",
@@ -225,9 +256,32 @@ export default function Home() {
         setShowAccountModal(false);
       }
     } catch (error) {
-      console.error("Failed to upgrade plan:", error);
+      console.error("Failed to downgrade plan:", error);
     }
-  };
+    return;
+  }
+
+  // Upgrade to Pro or Enterprise - requires payment
+  try {
+    const res = await fetch("/api/payment/initialize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan: newPlan }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.authorizationUrl) {
+      // Redirect to Paystack checkout
+      window.location.href = data.authorizationUrl;
+    } else {
+      alert(data.error || 'Failed to initialize payment');
+    }
+  } catch (error) {
+    console.error("Failed to initialize payment:", error);
+    alert('Failed to initialize payment. Please try again.');
+  }
+};
 
   const currentStyles = theme === 'dark' ? darkStyles : lightStyles;
 
@@ -250,6 +304,7 @@ export default function Home() {
           </div>
 
           {authError && <div style={currentStyles.authError}>{authError}</div>}
+          {authSuccess && <div style={currentStyles.authSuccess}>{authSuccess}</div>}
 
           <form onSubmit={handleLogin}>
             <div style={currentStyles.formGroup}>
@@ -284,6 +339,7 @@ export default function Home() {
             <a onClick={() => {
               setCurrentView("signup");
               setAuthError("");
+              setAuthSuccess("");
             }} style={currentStyles.authLink}>
               Sign up
             </a>
@@ -304,6 +360,7 @@ export default function Home() {
           </div>
 
           {authError && <div style={currentStyles.authError}>{authError}</div>}
+          {authSuccess && <div style={currentStyles.authSuccess}>{authSuccess}</div>}
 
           <form onSubmit={handleSignup}>
             <div style={currentStyles.formGroup}>
@@ -350,6 +407,7 @@ export default function Home() {
             <a onClick={() => {
               setCurrentView("login");
               setAuthError("");
+              setAuthSuccess("");
             }} style={currentStyles.authLink}>
               Sign in
             </a>
@@ -460,13 +518,6 @@ export default function Home() {
                           ...(chat.id === currentChatId ? currentStyles.recentItemActive : {})
                         }}
                         onClick={() => handleSelectChat(chat.id)}
-                        onContextMenu={(e) => {
-                          if (isMobile) {
-                            e.preventDefault();
-                            setSelectedChatForActions({id: chat.id, title: chat.title});
-                            setShowChatActionsModal(true);
-                          }
-                        }}
                       >
                         {chat.title}
                         {isMobile && (
@@ -685,6 +736,18 @@ export default function Home() {
                       {session?.user?.plan === "Pro" && `${session.user.messagesUsedToday}/100 messages used today`}
                       {session?.user?.plan === "Enterprise" && "Unlimited messages"}
                     </div>
+                    
+                    {/* Progress Bar */}
+                    {session?.user?.plan !== "Enterprise" && (
+                      <div style={currentStyles.progressBarContainer}>
+                        <div 
+                          style={{
+                            ...currentStyles.progressBar,
+                            width: `${getProgressPercentage()}%`,
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <h4 style={currentStyles.modalSubsectionTitle}>Upgrade Your Plan</h4>
@@ -705,7 +768,7 @@ export default function Home() {
                         </button>
                       )}
                       {session?.user?.plan === "Free" && (
-                        <div style={currentStyles.planBtnCurrent}>Current Plan</div>
+                        <div style={currentStyles.planBtnSpacer} />
                       )}
                     </div>
 
@@ -726,7 +789,7 @@ export default function Home() {
                         </button>
                       )}
                       {session?.user?.plan === "Pro" && (
-                        <div style={currentStyles.planBtnCurrent}>Current Plan</div>
+                        <div style={currentStyles.planBtnSpacer} />
                       )}
                     </div>
 
@@ -747,7 +810,7 @@ export default function Home() {
                         </button>
                       )}
                       {session?.user?.plan === "Enterprise" && (
-                        <div style={currentStyles.planBtnCurrent}>Current Plan</div>
+                        <div style={currentStyles.planBtnSpacer} />
                       )}
                     </div>
                   </div>
@@ -919,6 +982,15 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     fontSize: '14px',
     marginBottom: '24px',
   },
+  authSuccess: {
+    padding: '12px 16px',
+    background: 'rgba(16, 185, 129, 0.1)',
+    borderLeft: '4px solid #10b981',
+    borderRadius: '8px',
+    color: '#10b981',
+    fontSize: '14px',
+    marginBottom: '24px',
+  },
   formGroup: {
     marginBottom: '20px',
   },
@@ -937,6 +1009,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     fontSize: '14px',
     background: 'white',
     color: '#000',
+    boxSizing: 'border-box' as const,
   },
   authBtn: {
     width: '100%',
@@ -963,6 +1036,8 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   app: {
     display: 'flex',
     height: '100vh',
+    width: '100vw',
+    maxWidth: '100%',
     overflow: 'hidden',
     position: 'relative' as const,
   },
@@ -1029,6 +1104,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     fontWeight: 600,
     fontSize: '16px',
     color: '#000',
+    whiteSpace: 'nowrap' as const,
   },
   section: {
     padding: '12px',
@@ -1168,22 +1244,26 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     flexDirection: 'column' as const,
     background: 'white',
     overflow: 'hidden',
+    maxWidth: '100%',
   },
   topBar: {
-    padding: '12px 24px',
+    padding: '12px 16px',
     borderBottom: '1px solid #e0e0e0',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    maxWidth: '100%',
   },
   topBarLeft: {
     display: 'flex',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   modelBadge: {
     fontSize: '14px',
     fontWeight: 600,
     color: '#000',
+    whiteSpace: 'nowrap' as const,
   },
   topBarRight: {
     display: 'flex',
@@ -1194,7 +1274,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     border: 'none',
     fontSize: '20px',
     cursor: 'pointer',
-    padding: '8px 12px',
+    padding: '8px',
     borderRadius: '8px',
   },
   chatWrapper: {
@@ -1202,12 +1282,15 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     flexDirection: 'column' as const,
     overflow: 'hidden',
+    maxWidth: '100%',
   },
   messagesArea: {
     flex: 1,
     overflowY: 'auto' as const,
+    overflowX: 'hidden' as const,
     display: 'flex',
     flexDirection: 'column' as const,
+    maxWidth: '100%',
   },
   emptyState: {
     flex: 1,
@@ -1215,6 +1298,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     flexDirection: 'column' as const,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: '20px',
   },
   greetingLogo: {
     width: '64px',
@@ -1224,10 +1308,11 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     marginBottom: '24px',
   },
   greetingText: {
-    fontSize: '32px',
+    fontSize: '28px',
     fontWeight: 600,
     color: '#000',
-    marginBottom: '48px',
+    marginBottom: '24px',
+    textAlign: 'center' as const,
   },
   chatMessages: {
     maxWidth: '768px',
@@ -1237,20 +1322,24 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '24px',
+    boxSizing: 'border-box' as const,
   },
   chatMessagesMobile: {
-    padding: '20px 5px', // Better mobile padding!
+    padding: '16px 24px',
     maxWidth: '100%',
+    boxSizing: 'border-box' as const,
   },
   messageRowUser: {
     display: 'flex',
     width: '100%',
     justifyContent: 'flex-end',
+    maxWidth: '100%',
   },
   messageRowAssistant: {
     display: 'flex',
     width: '100%',
     justifyContent: 'flex-start',
+    maxWidth: '100%',
   },
   messageBubbleUser: {
     maxWidth: '85%',
@@ -1261,6 +1350,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     wordWrap: 'break-word' as const,
     background: '#000',
     color: '#fff',
+    boxSizing: 'border-box' as const,
   },
   messageBubbleAssistant: {
     maxWidth: '85%',
@@ -1271,6 +1361,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     wordWrap: 'break-word' as const,
     background: '#f4f4f4',
     color: '#000',
+    boxSizing: 'border-box' as const,
   },
   messageText: {
     whiteSpace: 'pre-wrap' as const,
@@ -1290,28 +1381,35 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   inputArea: {
     borderTop: '1px solid #e0e0e0',
     background: 'white',
+    padding: '0',
+    maxWidth: '100%',
   },
   inputWrapper: {
     maxWidth: '768px',
     width: '100%',
     margin: '0 auto',
     padding: '16px 24px',
+    boxSizing: 'border-box' as const,
   },
   inputWrapperMobile: {
-    padding: '12px 20px', // More padding on mobile
+    padding: '12px 16px',
+    maxWidth: '100%',
+    boxSizing: 'border-box' as const,
   },
   inputCard: {
     width: '100%',
     background: 'white',
     border: '1px solid #e0e0e0',
     borderRadius: '24px',
-    padding: '8px 12px',
+    padding: '6px 8px',
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+    boxSizing: 'border-box' as const,
   },
   inputRow: {
     display: 'flex',
-    alignItems: 'flex-end',
-    gap: '8px',
+    alignItems: 'center',
+    gap: '6px',
+    width: '100%',
   },
   textarea: {
     flex: 1,
@@ -1322,17 +1420,22 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     resize: 'none' as const,
     outline: 'none',
     color: '#000',
-    padding: '8px',
-    maxHeight: '200px',
+    padding: '6px 8px',
+    maxHeight: '120px',
+    minHeight: '24px',
+    lineHeight: '1.5',
+    width: '100%',
   },
   sendBtn: {
     width: '32px',
     height: '32px',
+    minWidth: '32px',
+    minHeight: '32px',
     border: 'none',
     borderRadius: '50%',
     background: '#000',
     color: 'white',
-    fontSize: '18px',
+    fontSize: '16px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -1344,10 +1447,12 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     cursor: 'not-allowed',
   },
   modelSelect: {
-    padding: '12px 0 0',
+    padding: '8px 0 0',
     textAlign: 'center' as const,
-    fontSize: '12px',
+    fontSize: '11px',
     color: '#666',
+    maxWidth: '100%',
+    overflow: 'hidden',
   },
   modalOverlay: {
     position: 'fixed' as const,
@@ -1375,14 +1480,14 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
   },
   modalHeader: {
-    padding: '24px 28px',
+    padding: '20px 24px',
     borderBottom: '1px solid #e0e0e0',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   modalTitle: {
-    fontSize: '22px',
+    fontSize: '20px',
     fontWeight: 700,
     color: '#000',
     margin: 0,
@@ -1397,22 +1502,22 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     padding: 0,
   },
   modalBody: {
-    padding: '24px 28px',
+    padding: '20px 24px',
   },
   modalSection: {
-    marginBottom: '28px',
+    marginBottom: '24px',
   },
   modalSectionTitle: {
-    fontSize: '17px',
+    fontSize: '16px',
     fontWeight: 600,
-    marginBottom: '14px',
+    marginBottom: '12px',
     color: '#000',
   },
   modalSubsectionTitle: {
-    fontSize: '15px',
+    fontSize: '14px',
     fontWeight: 600,
-    marginBottom: '14px',
-    marginTop: '20px',
+    marginBottom: '12px',
+    marginTop: '16px',
     color: '#000',
   },
   modalInfoRow: {
@@ -1434,89 +1539,99 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     background: '#f9f9f9',
     borderRadius: '12px',
     textAlign: 'center' as const,
-    marginBottom: '20px',
+    marginBottom: '16px',
   },
   planBadgeLarge: {
     display: 'inline-block',
-    padding: '6px 20px',
+    padding: '6px 16px',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
     borderRadius: '24px',
     fontWeight: 600,
-    fontSize: '16px',
-    marginBottom: '10px',
+    fontSize: '14px',
+    marginBottom: '8px',
   },
   planDescription: {
     color: '#666',
     fontSize: '13px',
+    marginBottom: '12px',
+  },
+  progressBarContainer: {
+    width: '100%',
+    height: '8px',
+    background: '#e0e0e0',
+    borderRadius: '4px',
+    overflow: 'hidden',
+    marginTop: '8px',
+  },
+  progressBar: {
+    height: '100%',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    borderRadius: '4px',
+    transition: 'width 0.3s ease',
   },
   plansGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '14px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '12px',
   },
   planCard: {
-    padding: '18px',
+    padding: '16px',
     background: '#f9f9f9',
     border: '2px solid #e0e0e0',
     borderRadius: '12px',
+    minHeight: '220px',
   },
   planCardActive: {
     borderColor: '#667eea',
     background: 'rgba(102, 126, 234, 0.05)',
   },
   planCardTitle: {
-    fontSize: '16px',
+    fontSize: '15px',
     fontWeight: 700,
     marginBottom: '6px',
     color: '#000',
   },
   planPrice: {
-    fontSize: '24px',
+    fontSize: '22px',
     fontWeight: 700,
-    margin: '10px 0 16px',
+    margin: '8px 0 12px',
     color: '#000',
   },
   planPricePeriod: {
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 400,
     color: '#666',
   },
   planFeatures: {
     listStyle: 'none',
-    marginBottom: '16px',
+    marginBottom: '14px',
     padding: 0,
   },
   planFeature: {
-    padding: '5px 0',
-    fontSize: '13px',
+    padding: '4px 0',
+    fontSize: '12px',
     color: '#666',
   },
   planBtn: {
     width: '100%',
-    padding: '9px 16px',
+    padding: '8px 12px',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
     border: 'none',
     borderRadius: '8px',
-    fontSize: '13px',
+    fontSize: '12px',
     fontWeight: 600,
     cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
   },
-  planBtnCurrent: {
+  planBtnSpacer: {
     width: '100%',
-    padding: '9px 16px',
-    background: 'transparent',
-    color: '#667eea',
-    border: '2px solid #667eea',
-    borderRadius: '8px',
-    fontSize: '13px',
-    fontWeight: 600,
-    textAlign: 'center' as const,
+    height: '32px',
   },
   logoutBtn: {
     width: '100%',
-    padding: '11px 22px',
+    padding: '10px 20px',
     background: 'transparent',
     color: '#ef4444',
     border: '2px solid #ef4444',
@@ -1676,6 +1791,10 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
     ...lightStyles.authSwitch,
     color: '#999',
   },
+  authSuccess: {
+    ...lightStyles.authSuccess,
+    background: 'rgba(16, 185, 129, 0.2)',
+  },
   mobileMenuBtn: {
     ...lightStyles.mobileMenuBtn,
     color: '#fff',
@@ -1830,6 +1949,10 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   planDescription: {
     ...lightStyles.planDescription,
     color: '#999',
+  },
+  progressBarContainer: {
+    ...lightStyles.progressBarContainer,
+    background: '#3a3a3a',
   },
   planCard: {
     ...lightStyles.planCard,
