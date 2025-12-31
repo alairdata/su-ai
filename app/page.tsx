@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useChats } from "./hooks/useChats";
 import { useTheme } from "./hooks/useTheme";
@@ -8,7 +8,7 @@ import { useSearchParams } from "next/navigation";
 
 type View = "login" | "signup" | "chat";
 
-export default function Home() {
+function HomePage() {
   const { data: session, status, update: updateSession } = useSession();
   const { theme, toggleTheme } = useTheme();
   const searchParams = useSearchParams();
@@ -2013,3 +2013,22 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
     color: '#fff',
   },
 };
+
+// Wrap in Suspense for useSearchParams
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        background: '#f9f9f9'
+      }}>
+        <div style={{fontSize: '18px', color: '#666'}}>Loading...</div>
+      </div>
+    }>
+      <HomePage />
+    </Suspense>
+  );
+}
