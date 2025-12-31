@@ -24,7 +24,6 @@ Foster self-awareness and urgency while holding them accountable. Be real and re
 
 export async function POST(req: NextRequest) {
   try {
-    // Check if user is authenticated
     const session = await getServerSession(authOptions);
     
     if (!session?.user) {
@@ -45,100 +44,90 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify chat exists and belongs to user
-    if (chatId) {
-      const { data: chat } = await supabase
-        .from("chats")
-        .select("id, user_id")
-        .eq("id", chatId)
-        .single();
+    if (!chatId) {
+      return NextResponse.json(
+        { reply: "No chat ID provided." },
+        { status: 400 }
+      );
+    }
 
-      if (!chat || chat.user_id !== session.user.id) {
-        return NextResponse.json(
-          { reply: "Chat not found." },
-          { status: 404 }
-        );
-      }
+    // OPTIMIZATION 1: Single query to verify chat + get messages
+    const { data: chat } = await supabase
+      .from("chats")
+      .select(`
+        id, 
+        user_id,
+        messages (role, content, created_at)
+      `)
+      .eq("id", chatId)
+      .single();
 
-      // Save user message to database
-      await supabase
-        .from("messages")
-        .insert({
-          chat_id: chatId,
-          role: "user",
-          content: userMessage,
-        });
+    if (!chat || chat.user_id !== session.user.id) {
+      return NextResponse.json(
+        { reply: "Chat not found." },
+        { status: 404 }
+      );
+    }
 
-      // Get conversation history
-      const { data: allMessages } = await supabase
-        .from("messages")
-        .select("role, content")
-        .eq("chat_id", chatId)
-        .order("created_at", { ascending: true });
+    const allMessages = chat.messages as any[] || [];
+    const isFirstMessage = allMessages.length === 0;
 
-      // Call Claude with conversation history
-      const response = await anthropic.messages.create({
+    // OPTIMIZATION 2: Call Claude while saving user message (parallel)
+    const [claudeResponse] = await Promise.all([
+      // Claude API call
+      anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
         max_tokens: 1024,
         system: SYSTEM_PROMPT,
-        messages: allMessages || [{ role: "user", content: userMessage }],
-      });
+        messages: [
+          ...allMessages.map((m: any) => ({ role: m.role, content: m.content })),
+          { role: "user", content: userMessage }
+        ],
+      }),
+      // Save user message to database
+      supabase.from("messages").insert({
+        chat_id: chatId,
+        role: "user",
+        content: userMessage,
+      }),
+    ]);
 
-      const assistantMessage =
-        response.content
-          .map((block: any) => ("text" in block ? block.text : ""))
-          .join(" ")
-          .trim() || "No response from Claude.";
-
-      // Save assistant response
-      await supabase
-        .from("messages")
-        .insert({
-          chat_id: chatId,
-          role: "assistant",
-          content: assistantMessage,
-        });
-
-      // Increment message count
-      await supabase
-        .from("users")
-        .update({ 
-          messages_used_today: session.user.messagesUsedToday + 1 
-        })
-        .eq("id", session.user.id);
-
-      // Generate title if first message
-      if (allMessages && allMessages.length === 1) {
-        const title = userMessage.length > 30 
-          ? userMessage.substring(0, 30) + "..." 
-          : userMessage;
-        
-        await supabase
-          .from("chats")
-          .update({ title })
-          .eq("id", chatId);
-      }
-
-      return NextResponse.json({ 
-        reply: assistantMessage,
-      });
-    }
-
-    // No chatId provided - simple response (shouldn't happen but safe fallback)
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userMessage }],
-    });
-
-    const text =
-      response.content
+    const assistantMessage =
+      claudeResponse.content
         .map((block: any) => ("text" in block ? block.text : ""))
         .join(" ")
         .trim() || "No response from Claude.";
 
-    return NextResponse.json({ reply: text });
+    // OPTIMIZATION 3: Run all final operations in parallel
+    const updatePromises = [
+      // Save assistant response
+      supabase.from("messages").insert({
+        chat_id: chatId,
+        role: "assistant",
+        content: assistantMessage,
+      }),
+      // Increment message count
+      supabase.from("users").update({ 
+        messages_used_today: session.user.messagesUsedToday + 1 
+      }).eq("id", session.user.id),
+    ];
+
+    // Add title update for first message
+    if (isFirstMessage) {
+      const title = userMessage.length > 30 
+        ? userMessage.substring(0, 30) + "..." 
+        : userMessage;
+      
+      updatePromises.push(
+        supabase.from("chats").update({ title }).eq("id", chatId)
+      );
+    }
+
+    await Promise.all(updatePromises);
+
+    return NextResponse.json({ 
+      reply: assistantMessage,
+    });
 
   } catch (error) {
     console.error("Error in /api/chat:", error);
