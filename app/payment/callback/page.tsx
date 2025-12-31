@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
-export default function PaymentCallback() {
+function PaymentCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { update: updateSession } = useSession();
@@ -34,10 +34,8 @@ export default function PaymentCallback() {
           setStatus('success');
           setMessage('Payment successful! Upgrading your plan...');
           
-          // Update session
           await updateSession();
           
-          // Redirect to chat after 2 seconds
           setTimeout(() => {
             router.push('/');
           }, 2000);
@@ -87,6 +85,22 @@ export default function PaymentCallback() {
         )}
       </div>
     </div>
+  );
+}
+
+// Wrap in Suspense
+export default function PaymentCallback() {
+  return (
+    <Suspense fallback={
+      <div style={styles.container}>
+        <div style={styles.card}>
+          <div style={styles.spinner}>⏳</div>
+          <h2 style={styles.title}>Loading...</h2>
+        </div>
+      </div>
+    }>
+      <PaymentCallbackContent />
+    </Suspense>
   );
 }
 
