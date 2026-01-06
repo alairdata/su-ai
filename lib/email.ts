@@ -11,7 +11,7 @@ export async function sendVerificationEmail(
   
   try {
     await resend.emails.send({
-      from: 'UnFiltered-AI <onboarding@resend.dev>', // We'll update this later
+      from: 'UnFiltered-AI <noreply@app.so-unfiltered-ai.com>', // YOUR VERIFIED DOMAIN!
       to: email,
       subject: 'Verify your UnFiltered-AI account',
       html: `
