@@ -27,7 +27,6 @@ function HomePage() {
   const [renameValue, setRenameValue] = useState("");
   const [isMobile, setIsMobile] = useState(false);
 
-  // Auth form states
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
@@ -52,7 +51,6 @@ function HomePage() {
   const isAuthLoading = status === "loading";
   const isAuthenticated = !!session?.user;
 
-  // Check for verification status from URL
   useEffect(() => {
     const verified = searchParams.get('verified');
     const error = searchParams.get('error');
@@ -60,31 +58,22 @@ function HomePage() {
     if (verified === 'true') {
       setAuthSuccess('Email verified! You can now log in.');
       setCurrentView('login');
-    } else if (error === 'invalid-token') {
-      setAuthError('Invalid or expired verification link.');
-    } else if (error === 'token-expired') {
-      setAuthError('Verification link expired. Please sign up again.');
-    } else if (error === 'verification-failed') {
+    } else if (error) {
       setAuthError('Verification failed. Please try again.');
     }
   }, [searchParams]);
 
-  // Detect mobile
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Apply theme to body
   useEffect(() => {
     document.body.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Show chat view when authenticated
   React.useEffect(() => {
     if (isAuthenticated) {
       setCurrentView("chat");
@@ -97,7 +86,6 @@ function HomePage() {
   const showGreeting = !currentChat || messages.length === 0;
   const remainingMessages = getRemainingMessages();
 
-  // Calculate progress percentage
   const getProgressPercentage = () => {
     if (!session?.user) return 0;
     const limits = { Free: 10, Pro: 100, Enterprise: Infinity };
@@ -106,7 +94,6 @@ function HomePage() {
     return (session.user.messagesUsedToday / limit) * 100;
   };
 
-  // Auth handlers
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
@@ -135,11 +122,7 @@ function HomePage() {
       const res = await fetch("/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: authName,
-          email: authEmail,
-          password: authPassword,
-        }),
+        body: JSON.stringify({ name: authName, email: authEmail, password: authPassword }),
       });
 
       const data = await res.json();
@@ -149,17 +132,12 @@ function HomePage() {
         return;
       }
 
-      // Show success message and switch to login
       setAuthSuccess(data.message || "Account created! Check your email to verify.");
       setAuthEmail("");
       setAuthPassword("");
       setAuthName("");
       
-      // Switch to login view after 2 seconds
-      setTimeout(() => {
-        setCurrentView("login");
-      }, 2000);
-
+      setTimeout(() => setCurrentView("login"), 2000);
     } catch (error) {
       setAuthError("Signup failed. Please try again.");
     }
@@ -172,10 +150,8 @@ function HomePage() {
 
   const handleSend = async () => {
     if (!input.trim() || chatLoading || !canSendMessage()) return;
-    
     const messageToSend = input;
     setInput("");
-    
     await sendMessage(messageToSend);
   };
 
@@ -234,184 +210,169 @@ function HomePage() {
 
   const handleSelectChat = (id: string) => {
     selectChat(id);
-    if (isMobile) {
-      setSidebarOpen(false);
-    }
+    if (isMobile) setSidebarOpen(false);
   };
 
   const upgradePlan = async (newPlan: "Free" | "Pro" | "Enterprise") => {
-  if (!session?.user) return;
-  
-  // Downgrade to Free - no payment needed
-  if (newPlan === "Free") {
+    if (!session?.user) return;
+    
+    if (newPlan === "Free") {
+      try {
+        const res = await fetch("/api/upgrade-plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan: newPlan }),
+        });
+
+        if (res.ok) {
+          await updateSession();
+          setShowAccountModal(false);
+        }
+      } catch (error) {
+        console.error("Failed to downgrade:", error);
+      }
+      return;
+    }
+
     try {
-      const res = await fetch("/api/upgrade-plan", {
+      const res = await fetch("/api/payment/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan: newPlan }),
       });
 
-      if (res.ok) {
-        await updateSession();
-        setShowAccountModal(false);
+      const data = await res.json();
+
+      if (res.ok && data.authorizationUrl) {
+        window.location.href = data.authorizationUrl;
+      } else {
+        alert(data.error || 'Failed to initialize payment');
       }
     } catch (error) {
-      console.error("Failed to downgrade plan:", error);
+      console.error("Payment error:", error);
+      alert('Failed to initialize payment');
     }
-    return;
-  }
-
-  // Upgrade to Pro or Enterprise - requires payment
-  try {
-    const res = await fetch("/api/payment/initialize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan: newPlan }),
-    });
-
-    const data = await res.json();
-
-    if (res.ok && data.authorizationUrl) {
-      // Redirect to Paystack checkout
-      window.location.href = data.authorizationUrl;
-    } else {
-      alert(data.error || 'Failed to initialize payment');
-    }
-  } catch (error) {
-    console.error("Failed to initialize payment:", error);
-    alert('Failed to initialize payment. Please try again.');
-  }
-};
+  };
 
   const currentStyles = theme === 'dark' ? darkStyles : lightStyles;
 
   if (isAuthLoading) {
     return (
       <div style={currentStyles.loadingContainer}>
-        <div style={currentStyles.loadingSpinner}>Loading...</div>
+        <div style={currentStyles.loadingSpinner}>✦</div>
       </div>
     );
   }
 
-  if (currentView === "login") {
+  if (currentView === "login" || currentView === "signup") {
     return (
       <div style={currentStyles.authContainer}>
         <div style={currentStyles.authCard}>
-          <div style={currentStyles.authLogo}>
-            <div style={currentStyles.logoIcon}></div>
-            <h1 style={currentStyles.authTitle}>UnFiltered-AI</h1>
-            <p style={currentStyles.authSubtitle}>Sign in to continue</p>
-          </div>
+          <div style={currentStyles.authLogo}>✦</div>
+          <h1 style={currentStyles.authTitle}>
+            {currentView === "login" ? "Welcome back" : "Create account"}
+          </h1>
+          <p style={currentStyles.authSubtitle}>
+            {currentView === "login" ? "Sign in to your account" : "Get started in seconds"}
+          </p>
 
-          {authError && <div style={currentStyles.authError}>{authError}</div>}
-          {authSuccess && <div style={currentStyles.authSuccess}>{authSuccess}</div>}
-
-          <form onSubmit={handleLogin}>
-            <div style={currentStyles.formGroup}>
-              <label style={currentStyles.label}>Email</label>
-              <input
-                type="email"
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                style={currentStyles.input}
-              />
-            </div>
-            <div style={currentStyles.formGroup}>
-              <label style={currentStyles.label}>Password</label>
-              <input
-                type="password"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                style={currentStyles.input}
-              />
-            </div>
-            <button type="submit" style={currentStyles.authBtn}>
+          <div style={currentStyles.tabs}>
+            <button
+              style={{...currentStyles.tab, ...(currentView === "login" ? currentStyles.tabActive : {})}}
+              onClick={() => {
+                setCurrentView("login");
+                setAuthError("");
+                setAuthSuccess("");
+              }}
+            >
               Sign In
             </button>
-          </form>
-
-          <div style={currentStyles.authSwitch}>
-            Don't have an account?{" "}
-            <a onClick={() => {
-              setCurrentView("signup");
-              setAuthError("");
-              setAuthSuccess("");
-            }} style={currentStyles.authLink}>
-              Sign up
-            </a>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (currentView === "signup") {
-    return (
-      <div style={currentStyles.authContainer}>
-        <div style={currentStyles.authCard}>
-          <div style={currentStyles.authLogo}>
-            <div style={currentStyles.logoIcon}></div>
-            <h1 style={currentStyles.authTitle}>UnFiltered-AI</h1>
-            <p style={currentStyles.authSubtitle}>Create your account</p>
+            <button
+              style={{...currentStyles.tab, ...(currentView === "signup" ? currentStyles.tabActive : {})}}
+              onClick={() => {
+                setCurrentView("signup");
+                setAuthError("");
+                setAuthSuccess("");
+              }}
+            >
+              Sign Up
+            </button>
           </div>
 
           {authError && <div style={currentStyles.authError}>{authError}</div>}
           {authSuccess && <div style={currentStyles.authSuccess}>{authSuccess}</div>}
 
-          <form onSubmit={handleSignup}>
-            <div style={currentStyles.formGroup}>
-              <label style={currentStyles.label}>Name</label>
-              <input
-                type="text"
-                value={authName}
-                onChange={(e) => setAuthName(e.target.value)}
-                placeholder="Your name"
-                required
-                style={currentStyles.input}
-              />
-            </div>
-            <div style={currentStyles.formGroup}>
-              <label style={currentStyles.label}>Email</label>
-              <input
-                type="email"
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                style={currentStyles.input}
-              />
-            </div>
-            <div style={currentStyles.formGroup}>
-              <label style={currentStyles.label}>Password</label>
-              <input
-                type="password"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                placeholder="••••••••"
-                minLength={6}
-                required
-                style={currentStyles.input}
-              />
-            </div>
-            <button type="submit" style={currentStyles.authBtn}>
-              Create Account
-            </button>
-          </form>
+          {currentView === "login" && (
+            <form onSubmit={handleLogin}>
+              <div style={currentStyles.formGroup}>
+                <label style={currentStyles.label}>Email</label>
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  style={currentStyles.input}
+                />
+              </div>
+              <div style={currentStyles.formGroup}>
+                <label style={currentStyles.label}>Password</label>
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  style={currentStyles.input}
+                />
+              </div>
+              <button type="submit" style={currentStyles.authBtn}>
+                <span>Sign In</span>
+              </button>
+            </form>
+          )}
 
-          <div style={currentStyles.authSwitch}>
-            Already have an account?{" "}
-            <a onClick={() => {
-              setCurrentView("login");
-              setAuthError("");
-              setAuthSuccess("");
-            }} style={currentStyles.authLink}>
-              Sign in
-            </a>
-          </div>
+          {currentView === "signup" && (
+            <form onSubmit={handleSignup}>
+              <div style={currentStyles.formGroup}>
+                <label style={currentStyles.label}>Full Name</label>
+                <input
+                  type="text"
+                  value={authName}
+                  onChange={(e) => setAuthName(e.target.value)}
+                  placeholder="John Doe"
+                  required
+                  style={currentStyles.input}
+                />
+              </div>
+              <div style={currentStyles.formGroup}>
+                <label style={currentStyles.label}>Email</label>
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  style={currentStyles.input}
+                />
+              </div>
+              <div style={currentStyles.formGroup}>
+                <label style={currentStyles.label}>Password</label>
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="••••••••"
+                  minLength={6}
+                  required
+                  style={currentStyles.input}
+                />
+              </div>
+              <button type="submit" style={currentStyles.authBtn}>
+                <span>Create Account</span>
+              </button>
+            </form>
+          )}
         </div>
       </div>
     );
@@ -421,10 +382,7 @@ function HomePage() {
     <>
       <div style={currentStyles.app}>
         {isMobile && sidebarOpen && (
-          <div 
-            style={currentStyles.mobileOverlay} 
-            onClick={() => setSidebarOpen(false)}
-          />
+          <div style={currentStyles.mobileOverlay} onClick={() => setSidebarOpen(false)} />
         )}
 
         <aside style={{
@@ -441,15 +399,11 @@ function HomePage() {
         }}>
           <div style={currentStyles.sidebarTop}>
             <div style={currentStyles.sidebarHeader}>
-              <button
-                style={currentStyles.sidebarToggle}
-                onClick={toggleSidebar}
-                aria-label="Toggle sidebar"
-              >
+              <button style={currentStyles.sidebarToggle} onClick={toggleSidebar}>
                 ☰
               </button>
               <div style={{...currentStyles.brand, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
-                UnFiltered-AI
+                ✦ UnFiltered
               </div>
             </div>
 
@@ -466,11 +420,11 @@ function HomePage() {
             </div>
 
             <div style={{...currentStyles.sectionLabel, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
-              Recent chats
+              Chats
             </div>
             <div style={{...currentStyles.recentsList, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
               {chats.length === 0 && (
-                <div style={{...currentStyles.recentItem, opacity: 0.6}}>
+                <div style={{...currentStyles.recentItem, opacity: 0.5}}>
                   No chats yet
                 </div>
               )}
@@ -488,27 +442,14 @@ function HomePage() {
                         value={renameValue}
                         onChange={(e) => setRenameValue(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleRenameSubmit(chat.id);
-                          } else if (e.key === 'Escape') {
-                            handleRenameCancel();
-                          }
+                          if (e.key === 'Enter') handleRenameSubmit(chat.id);
+                          else if (e.key === 'Escape') handleRenameCancel();
                         }}
                         style={currentStyles.renameInput}
                         autoFocus
                       />
-                      <button
-                        onClick={() => handleRenameSubmit(chat.id)}
-                        style={currentStyles.renameBtn}
-                      >
-                        ✓
-                      </button>
-                      <button
-                        onClick={handleRenameCancel}
-                        style={currentStyles.cancelBtn}
-                      >
-                        ✕
-                      </button>
+                      <button onClick={() => handleRenameSubmit(chat.id)} style={currentStyles.renameBtn}>✓</button>
+                      <button onClick={handleRenameCancel} style={currentStyles.cancelBtn}>✕</button>
                     </div>
                   ) : (
                     <>
@@ -541,7 +482,6 @@ function HomePage() {
                               handleRenameStart(chat.id, chat.title);
                             }}
                             style={currentStyles.actionBtn}
-                            title="Rename"
                           >
                             ✏️
                           </button>
@@ -551,7 +491,6 @@ function HomePage() {
                               handleDeleteClick(chat.id);
                             }}
                             style={currentStyles.actionBtn}
-                            title="Delete"
                           >
                             🗑️
                           </button>
@@ -569,10 +508,8 @@ function HomePage() {
               {session?.user?.name?.substring(0, 2).toUpperCase()}
             </div>
             <div style={{...currentStyles.userInfo, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
-              <div style={{ fontSize: 13 }}>{session?.user?.name}</div>
-              <div style={{ fontSize: 11, color: theme === 'dark' ? '#999' : '#666' }}>
-                {session?.user?.plan} plan
-              </div>
+              <div style={{fontSize: 13, fontWeight: 500}}>{session?.user?.name}</div>
+              <div style={{fontSize: 11, opacity: 0.6}}>{session?.user?.plan}</div>
             </div>
           </div>
         </aside>
@@ -581,31 +518,24 @@ function HomePage() {
           <div style={currentStyles.topBar}>
             <div style={currentStyles.topBarLeft}>
               {isMobile && (
-                <button
-                  style={currentStyles.mobileMenuBtn}
-                  onClick={() => setSidebarOpen(true)}
-                >
-                  ☰
-                </button>
+                <button style={currentStyles.mobileMenuBtn} onClick={() => setSidebarOpen(true)}>☰</button>
               )}
-              <div style={currentStyles.modelBadge}>UnFiltered-AI 5.2</div>
+              <div style={currentStyles.modelBadge}>✦ UnFiltered AI</div>
             </div>
-            <div style={currentStyles.topBarRight}>
-              <button style={currentStyles.iconBtn} onClick={toggleTheme} title="Toggle theme">
-                {theme === "light" ? "🌙" : "☀️"}
-              </button>
-            </div>
+            <button style={currentStyles.iconBtn} onClick={toggleTheme}>
+              {theme === "light" ? "🌙" : "☀️"}
+            </button>
           </div>
 
           <div style={currentStyles.chatWrapper}>
             <div style={currentStyles.messagesArea}>
               {showGreeting && (
                 <div style={currentStyles.emptyState}>
-                  <div style={currentStyles.greetingLogo}></div>
+                  <div style={currentStyles.greetingLogo}>✦</div>
                   <div style={currentStyles.greetingText}>What's good?</div>
                   {remainingMessages !== Infinity && (
                     <div style={currentStyles.messageLimitInfo}>
-                      {remainingMessages} messages remaining today
+                      {remainingMessages} messages remaining
                     </div>
                   )}
                 </div>
@@ -621,9 +551,7 @@ function HomePage() {
                       key={m.id || idx}
                       style={m.role === "user" ? currentStyles.messageRowUser : currentStyles.messageRowAssistant}
                     >
-                      <div
-                        style={m.role === "user" ? currentStyles.messageBubbleUser : currentStyles.messageBubbleAssistant}
-                      >
+                      <div style={m.role === "user" ? currentStyles.messageBubbleUser : currentStyles.messageBubbleAssistant}>
                         <div style={currentStyles.messageText}>{m.content}</div>
                       </div>
                     </div>
@@ -640,59 +568,41 @@ function HomePage() {
                       </div>
                     </div>
                   )}
-
                   <div ref={messagesEndRef} />
                 </div>
               )}
             </div>
 
             <div style={currentStyles.inputArea}>
-              <div style={{
-                ...currentStyles.inputWrapper,
-                ...(isMobile ? currentStyles.inputWrapperMobile : {})
-              }}>
+              <div style={{...currentStyles.inputWrapper, ...(isMobile ? currentStyles.inputWrapperMobile : {})}}>
                 {!canSendMessage() && (
                   <div style={currentStyles.limitWarning}>
-                    <strong>Daily limit reached!</strong> You've used all your messages for today.
-                    {" "}
-                    <span 
-                      style={currentStyles.upgradeLink} 
-                      onClick={() => setShowAccountModal(true)}
-                    >
-                      Upgrade your plan
-                    </span> for more messages.
+                    Daily limit reached. <span style={currentStyles.upgradeLink} onClick={() => setShowAccountModal(true)}>Upgrade</span> to continue.
                   </div>
                 )}
 
                 <div style={currentStyles.inputCard}>
-                  <div style={currentStyles.inputRow}>
-                    <textarea
-                      rows={1}
-                      placeholder={canSendMessage() ? "What's up? Time to spill it..." : "Daily limit reached. Upgrade to continue."}
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      disabled={chatLoading || !canSendMessage()}
-                      style={currentStyles.textarea}
-                    />
-                    <button
-                      style={{
-                        ...currentStyles.sendBtn,
-                        ...(chatLoading || !input.trim() || !canSendMessage() ? currentStyles.sendBtnDisabled : {})
-                      }}
-                      onClick={handleSend}
-                      disabled={chatLoading || !input.trim() || !canSendMessage()}
-                    >
-                      ↑
-                    </button>
-                  </div>
+                  <textarea
+                    rows={1}
+                    placeholder={canSendMessage() ? "What's on your mind..." : "Daily limit reached"}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={chatLoading || !canSendMessage()}
+                    style={currentStyles.textarea}
+                  />
+                  <button
+                    style={{...currentStyles.sendBtn, ...(chatLoading || !input.trim() || !canSendMessage() ? currentStyles.sendBtnDisabled : {})}}
+                    onClick={handleSend}
+                    disabled={chatLoading || !input.trim() || !canSendMessage()}
+                  >
+                    ↑
+                  </button>
                 </div>
                 <div style={currentStyles.modelSelect}>
-                  <span>UnFiltered-AI can make mistakes. Check important info.</span>
+                  AI can make mistakes. Verify important info.
                   {remainingMessages !== Infinity && canSendMessage() && !isMobile && (
-                    <span style={currentStyles.remainingMessages}>
-                      {" "}· {remainingMessages} messages left today
-                    </span>
+                    <span style={currentStyles.remainingMessages}> · {remainingMessages} left</span>
                   )}
                 </div>
               </div>
@@ -701,133 +611,105 @@ function HomePage() {
         </main>
       </div>
 
-      {/* Account Modal */}
       {showAccountModal && (
         <>
           <div style={currentStyles.modalOverlay} onClick={() => setShowAccountModal(false)} />
           <div style={currentStyles.modalContainer}>
             <div style={currentStyles.modalContent}>
               <div style={currentStyles.modalHeader}>
-                <h2 style={currentStyles.modalTitle}>Account Settings</h2>
-                <button style={currentStyles.modalCloseBtn} onClick={() => setShowAccountModal(false)}>
-                  ×
-                </button>
+                <h2 style={currentStyles.modalTitle}>Account</h2>
+                <button style={currentStyles.modalCloseBtn} onClick={() => setShowAccountModal(false)}>×</button>
               </div>
 
               <div style={currentStyles.modalBody}>
                 <div style={currentStyles.modalSection}>
-                  <h3 style={currentStyles.modalSectionTitle}>Profile Information</h3>
-                  <div style={currentStyles.modalInfoRow}>
-                    <span style={currentStyles.modalLabel}>Name:</span>
-                    <span style={currentStyles.modalValue}>{session?.user?.name}</span>
-                  </div>
-                  <div style={currentStyles.modalInfoRow}>
-                    <span style={currentStyles.modalLabel}>Email:</span>
-                    <span style={currentStyles.modalValue}>{session?.user?.email}</span>
+                  <div style={currentStyles.infoGrid}>
+                    <div>
+                      <div style={currentStyles.infoLabel}>Name</div>
+                      <div style={currentStyles.infoValue}>{session?.user?.name}</div>
+                    </div>
+                    <div>
+                      <div style={currentStyles.infoLabel}>Email</div>
+                      <div style={currentStyles.infoValue}>{session?.user?.email}</div>
+                    </div>
                   </div>
                 </div>
 
                 <div style={currentStyles.modalSection}>
-                  <h3 style={currentStyles.modalSectionTitle}>Current Plan</h3>
+                  <h3 style={currentStyles.sectionTitle}>Current Plan</h3>
                   <div style={currentStyles.planCurrentBadge}>
                     <div style={currentStyles.planBadgeLarge}>{session?.user?.plan}</div>
                     <div style={currentStyles.planDescription}>
-                      {session?.user?.plan === "Free" && `${session.user.messagesUsedToday}/10 messages used today`}
-                      {session?.user?.plan === "Pro" && `${session.user.messagesUsedToday}/100 messages used today`}
+                      {session?.user?.plan === "Free" && `${session.user.messagesUsedToday}/10 messages today`}
+                      {session?.user?.plan === "Pro" && `${session.user.messagesUsedToday}/100 messages today`}
                       {session?.user?.plan === "Enterprise" && "Unlimited messages"}
                     </div>
                     
-                    {/* Progress Bar */}
                     {session?.user?.plan !== "Enterprise" && (
                       <div style={currentStyles.progressBarContainer}>
-                        <div 
-                          style={{
-                            ...currentStyles.progressBar,
-                            width: `${getProgressPercentage()}%`,
-                          }}
-                        />
+                        <div style={{...currentStyles.progressBar, width: `${getProgressPercentage()}%`}} />
                       </div>
                     )}
                   </div>
 
-                  <h4 style={currentStyles.modalSubsectionTitle}>Upgrade Your Plan</h4>
                   <div style={currentStyles.plansGrid}>
                     <div style={{...currentStyles.planCard, ...(session?.user?.plan === "Free" ? currentStyles.planCardActive : {})}}>
                       <h5 style={currentStyles.planCardTitle}>Free</h5>
-                      <div style={currentStyles.planPrice}>$0<span style={currentStyles.planPricePeriod}>/mo</span></div>
+                      <div style={currentStyles.planPrice}>GHS 0<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
-                        <li style={currentStyles.planFeature}>✓ 10 messages/day</li>
-                        <li style={currentStyles.planFeature}>✓ Basic support</li>
+                        <li style={currentStyles.planFeature}>10 messages/day</li>
+                        <li style={currentStyles.planFeature}>Basic support</li>
                       </ul>
-                      {session?.user?.plan !== "Free" && (
-                        <button
-                          style={currentStyles.planBtn}
-                          onClick={() => upgradePlan("Free")}
-                        >
-                          Downgrade to Free
-                        </button>
-                      )}
-                      {session?.user?.plan === "Free" && (
+                      {session?.user?.plan !== "Free" ? (
+                        <button style={currentStyles.planBtn} onClick={() => upgradePlan("Free")}>Downgrade</button>
+                      ) : (
                         <div style={currentStyles.planBtnSpacer} />
                       )}
                     </div>
 
                     <div style={{...currentStyles.planCard, ...(session?.user?.plan === "Pro" ? currentStyles.planCardActive : {})}}>
                       <h5 style={currentStyles.planCardTitle}>Pro</h5>
-                      <div style={currentStyles.planPrice}>$19<span style={currentStyles.planPricePeriod}>/mo</span></div>
+                      <div style={currentStyles.planPrice}>GHS 70<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
-                        <li style={currentStyles.planFeature}>✓ 100 messages/day</li>
-                        <li style={currentStyles.planFeature}>✓ Priority support</li>
-                        <li style={currentStyles.planFeature}>✓ Advanced features</li>
+                        <li style={currentStyles.planFeature}>100 messages/day</li>
+                        <li style={currentStyles.planFeature}>Priority support</li>
+                        <li style={currentStyles.planFeature}>Advanced features</li>
                       </ul>
-                      {session?.user?.plan !== "Pro" && (
-                        <button
-                          style={currentStyles.planBtn}
-                          onClick={() => upgradePlan("Pro")}
-                        >
-                          {session?.user?.plan === "Free" ? "Upgrade to Pro" : "Switch to Pro"}
+                      {session?.user?.plan !== "Pro" ? (
+                        <button style={currentStyles.planBtn} onClick={() => upgradePlan("Pro")}>
+                          {session?.user?.plan === "Free" ? "Upgrade" : "Switch to Pro"}
                         </button>
-                      )}
-                      {session?.user?.plan === "Pro" && (
+                      ) : (
                         <div style={currentStyles.planBtnSpacer} />
                       )}
                     </div>
 
                     <div style={{...currentStyles.planCard, ...(session?.user?.plan === "Enterprise" ? currentStyles.planCardActive : {})}}>
                       <h5 style={currentStyles.planCardTitle}>Enterprise</h5>
-                      <div style={currentStyles.planPrice}>$99<span style={currentStyles.planPricePeriod}>/mo</span></div>
+                      <div style={currentStyles.planPrice}>GHS 370<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
-                        <li style={currentStyles.planFeature}>✓ Unlimited messages</li>
-                        <li style={currentStyles.planFeature}>✓ 24/7 support</li>
-                        <li style={currentStyles.planFeature}>✓ Custom integrations</li>
+                        <li style={currentStyles.planFeature}>Unlimited messages</li>
+                        <li style={currentStyles.planFeature}>24/7 support</li>
+                        <li style={currentStyles.planFeature}>Custom integrations</li>
                       </ul>
-                      {session?.user?.plan !== "Enterprise" && (
-                        <button
-                          style={currentStyles.planBtn}
-                          onClick={() => upgradePlan("Enterprise")}
-                        >
-                          Upgrade to Enterprise
-                        </button>
-                      )}
-                      {session?.user?.plan === "Enterprise" && (
+                      {session?.user?.plan !== "Enterprise" ? (
+                        <button style={currentStyles.planBtn} onClick={() => upgradePlan("Enterprise")}>Upgrade</button>
+                      ) : (
                         <div style={currentStyles.planBtnSpacer} />
                       )}
                     </div>
                   </div>
                 </div>
 
-                <div style={currentStyles.modalSection}>
-                  <button style={currentStyles.logoutBtn} onClick={handleLogout}>
-                    Logout
-                  </button>
-                </div>
+                <button style={currentStyles.logoutBtn} onClick={handleLogout}>
+                  Sign Out
+                </button>
               </div>
             </div>
           </div>
         </>
       )}
 
-      {/* Mobile Chat Actions Modal */}
       {showChatActionsModal && selectedChatForActions && (
         <>
           <div style={currentStyles.modalOverlay} onClick={() => setShowChatActionsModal(false)} />
@@ -837,59 +719,29 @@ function HomePage() {
                 <h3 style={currentStyles.actionsModalTitle}>{selectedChatForActions.title}</h3>
               </div>
               <div style={currentStyles.actionsModalBody}>
-                <button
-                  style={currentStyles.actionMenuItem}
-                  onClick={() => handleRenameStart(selectedChatForActions.id, selectedChatForActions.title)}
-                >
-                  <span style={currentStyles.actionMenuIcon}>✏️</span>
-                  Rename
+                <button style={currentStyles.actionMenuItem} onClick={() => handleRenameStart(selectedChatForActions.id, selectedChatForActions.title)}>
+                  <span>✏️</span> Rename
                 </button>
-                <button
-                  style={{...currentStyles.actionMenuItem, ...currentStyles.actionMenuItemDanger}}
-                  onClick={() => handleDeleteClick(selectedChatForActions.id)}
-                >
-                  <span style={currentStyles.actionMenuIcon}>🗑️</span>
-                  Delete
+                <button style={{...currentStyles.actionMenuItem, color: '#ef4444'}} onClick={() => handleDeleteClick(selectedChatForActions.id)}>
+                  <span>🗑️</span> Delete
                 </button>
-                <button
-                  style={currentStyles.actionMenuItem}
-                  onClick={() => setShowChatActionsModal(false)}
-                >
-                  Cancel
-                </button>
+                <button style={currentStyles.actionMenuItem} onClick={() => setShowChatActionsModal(false)}>Cancel</button>
               </div>
             </div>
           </div>
         </>
       )}
 
-      {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <>
           <div style={currentStyles.modalOverlay} />
           <div style={currentStyles.deleteModalContainer}>
             <div style={currentStyles.deleteModalContent}>
-              <div style={currentStyles.deleteModalHeader}>
-                <h3 style={currentStyles.deleteModalTitle}>Delete Chat?</h3>
-              </div>
-              <div style={currentStyles.deleteModalBody}>
-                <p style={currentStyles.deleteModalText}>
-                  Are you sure you want to delete this chat? This action cannot be undone.
-                </p>
-              </div>
+              <h3 style={currentStyles.deleteModalTitle}>Delete Chat?</h3>
+              <p style={currentStyles.deleteModalText}>This action cannot be undone.</p>
               <div style={currentStyles.deleteModalFooter}>
-                <button
-                  onClick={handleDeleteCancel}
-                  style={currentStyles.deleteCancelBtn}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteConfirm}
-                  style={currentStyles.deleteConfirmBtn}
-                >
-                  Delete
-                </button>
+                <button onClick={handleDeleteCancel} style={currentStyles.deleteCancelBtn}>Cancel</button>
+                <button onClick={handleDeleteConfirm} style={currentStyles.deleteConfirmBtn}>Delete</button>
               </div>
             </div>
           </div>
@@ -899,139 +751,150 @@ function HomePage() {
   );
 }
 
-// Light Mode Styles
+export default function Home() {
+  return (
+    <Suspense fallback={<div style={{minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>Loading...</div>}>
+      <HomePage />
+    </Suspense>
+  );
+}
+
+// Minimal Light Theme
 const lightStyles: { [key: string]: React.CSSProperties } = {
   loadingContainer: {
     minHeight: '100vh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#f9f9f9',
+    background: '#f8f9fa',
   },
   loadingSpinner: {
-    fontSize: '18px',
-    color: '#666',
-  },
-  limitWarning: {
-    padding: '12px 16px',
-    background: 'rgba(245, 158, 11, 0.1)',
-    border: '1px solid rgba(245, 158, 11, 0.3)',
-    borderRadius: '8px',
-    marginBottom: '12px',
-    fontSize: '14px',
-    color: '#f59e0b',
-  },
-  upgradeLink: {
-    color: '#667eea',
-    cursor: 'pointer',
-    fontWeight: 600,
-    textDecoration: 'underline',
-  },
-  messageLimitInfo: {
-    fontSize: '14px',
-    color: '#666',
-    marginTop: '16px',
-  },
-  remainingMessages: {
+    fontSize: '48px',
     color: '#999',
-    fontSize: '11px',
+    animation: 'spin 2s linear infinite',
   },
   authContainer: {
     minHeight: '100vh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '24px',
-    background: '#f9f9f9',
+    padding: '20px',
+    background: '#f8f9fa',
+    position: 'relative' as const,
   },
   authCard: {
+    background: 'rgba(255, 255, 255, 0.95)',
+    backdropFilter: 'blur(20px)',
+    border: '1px solid rgba(0, 0, 0, 0.08)',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
+    borderRadius: '24px',
     width: '100%',
-    maxWidth: '420px',
-    padding: '48px 40px',
-    background: 'white',
-    borderRadius: '16px',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+    maxWidth: '400px',
+    padding: '36px 32px',
   },
   authLogo: {
-    textAlign: 'center' as const,
-    marginBottom: '32px',
-  },
-  logoIcon: {
-    width: '64px',
-    height: '64px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: '16px',
-    margin: '0 auto 16px',
+    width: '48px',
+    height: '48px',
+    background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%)',
+    border: '2px solid #d0d0d0',
+    borderRadius: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '24px',
+    margin: '0 auto 20px',
+    color: '#666',
   },
   authTitle: {
-    fontSize: '28px',
-    fontWeight: 700,
-    marginBottom: '8px',
-    color: '#000',
+    fontSize: '26px',
+    fontWeight: 600,
+    textAlign: 'center' as const,
+    color: '#1a1a1a',
+    marginBottom: '6px',
+    letterSpacing: '-0.02em',
   },
   authSubtitle: {
-    fontSize: '14px',
+    textAlign: 'center' as const,
     color: '#666',
+    marginBottom: '24px',
+    fontSize: '14px',
+  },
+  tabs: {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '24px',
+    background: '#f5f5f5',
+    padding: '4px',
+    borderRadius: '12px',
+  },
+  tab: {
+    flex: 1,
+    padding: '10px',
+    background: 'transparent',
+    border: 'none',
+    borderRadius: '10px',
+    color: '#666',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.3s',
+  },
+  tabActive: {
+    background: '#fff',
+    color: '#1a1a1a',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
   },
   authError: {
     padding: '12px 16px',
     background: 'rgba(239, 68, 68, 0.1)',
-    borderLeft: '4px solid #ef4444',
-    borderRadius: '8px',
+    border: '1px solid rgba(239, 68, 68, 0.2)',
+    borderRadius: '10px',
     color: '#ef4444',
-    fontSize: '14px',
-    marginBottom: '24px',
+    fontSize: '13px',
+    marginBottom: '16px',
   },
   authSuccess: {
     padding: '12px 16px',
     background: 'rgba(16, 185, 129, 0.1)',
-    borderLeft: '4px solid #10b981',
-    borderRadius: '8px',
+    border: '1px solid rgba(16, 185, 129, 0.2)',
+    borderRadius: '10px',
     color: '#10b981',
-    fontSize: '14px',
-    marginBottom: '24px',
+    fontSize: '13px',
+    marginBottom: '16px',
   },
   formGroup: {
-    marginBottom: '20px',
+    marginBottom: '16px',
   },
   label: {
     display: 'block',
-    marginBottom: '8px',
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 500,
-    color: '#000',
+    color: '#444',
+    marginBottom: '8px',
   },
   input: {
     width: '100%',
     padding: '12px 16px',
+    background: '#fafafa',
     border: '1px solid #e0e0e0',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '14px',
-    background: 'white',
-    color: '#000',
-    boxSizing: 'border-box' as const,
+    color: '#1a1a1a',
+    transition: 'all 0.3s',
+    outline: 'none',
   },
   authBtn: {
     width: '100%',
-    padding: '12px 24px',
-    border: 'none',
-    borderRadius: '8px',
+    padding: '13px',
+    background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%)',
+    color: '#1a1a1a',
+    border: '1px solid #d0d0d0',
+    borderRadius: '10px',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
-  },
-  authSwitch: {
-    textAlign: 'center' as const,
-    marginTop: '24px',
-    fontSize: '14px',
-    color: '#666',
-  },
-  authLink: {
-    color: '#667eea',
-    cursor: 'pointer',
-    fontWeight: 600,
+    marginTop: '20px',
+    transition: 'all 0.3s',
   },
   app: {
     display: 'flex',
@@ -1039,7 +902,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     width: '100vw',
     maxWidth: '100%',
     overflow: 'hidden',
-    position: 'relative' as const,
+    background: '#fafafa',
   },
   mobileOverlay: {
     position: 'fixed' as const,
@@ -1047,31 +910,15 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(0, 0, 0, 0.5)',
+    background: 'rgba(0, 0, 0, 0.3)',
+    backdropFilter: 'blur(4px)',
     zIndex: 999,
-  },
-  mobileMenuBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '20px',
-    cursor: 'pointer',
-    padding: '4px 8px',
-    color: '#000',
-    marginRight: '12px',
-  },
-  mobileMenuDots: {
-    position: 'absolute' as const,
-    right: '8px',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    fontSize: '18px',
-    padding: '4px 8px',
-    color: '#666',
   },
   sidebar: {
     width: '260px',
-    background: '#f9f9f9',
-    borderRight: '1px solid #e0e0e0',
+    background: 'rgba(255, 255, 255, 0.7)',
+    backdropFilter: 'blur(20px)',
+    borderRight: '1px solid rgba(0, 0, 0, 0.06)',
     display: 'flex',
     flexDirection: 'column' as const,
     transition: 'all 0.3s ease',
@@ -1090,7 +937,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    borderBottom: '1px solid #e0e0e0',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
   },
   sidebarToggle: {
     background: 'none',
@@ -1098,26 +945,27 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     fontSize: '18px',
     cursor: 'pointer',
     padding: '4px',
-    color: '#000',
+    color: '#666',
   },
   brand: {
     fontWeight: 600,
-    fontSize: '16px',
-    color: '#000',
-    whiteSpace: 'nowrap' as const,
+    fontSize: '15px',
+    color: '#1a1a1a',
+    letterSpacing: '-0.01em',
   },
   section: {
     padding: '12px',
-    borderBottom: '1px solid #e0e0e0',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
   },
   navItem: {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
     padding: '10px 12px',
-    borderRadius: '8px',
+    borderRadius: '10px',
     cursor: 'pointer',
-    marginBottom: '4px',
+    transition: 'all 0.2s',
+    background: 'transparent',
   },
   navIcon: {
     fontSize: '18px',
@@ -1125,16 +973,18 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    color: '#666',
   },
   navText: {
     fontSize: '14px',
-    color: '#000',
+    color: '#444',
+    fontWeight: 500,
   },
   sectionLabel: {
     padding: '12px 16px 8px',
     fontSize: '11px',
     fontWeight: 600,
-    color: '#666',
+    color: '#999',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
   },
@@ -1152,87 +1002,87 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   recentItem: {
     flex: 1,
     padding: '10px 12px',
-    borderRadius: '8px',
+    borderRadius: '10px',
     cursor: 'pointer',
-    fontSize: '14px',
-    color: '#000',
+    fontSize: '13px',
+    color: '#444',
     whiteSpace: 'nowrap' as const,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    position: 'relative' as const,
+    transition: 'all 0.2s',
   },
   recentItemActive: {
-    background: '#e8e8e8',
+    background: 'rgba(0, 0, 0, 0.04)',
     fontWeight: 500,
+    color: '#1a1a1a',
   },
   chatActions: {
     display: 'flex',
     gap: '4px',
-    marginLeft: '4px',
   },
   actionBtn: {
     background: 'none',
     border: 'none',
     fontSize: '14px',
     cursor: 'pointer',
-    padding: '4px 6px',
-    borderRadius: '4px',
-    opacity: 0.7,
+    padding: '6px',
+    borderRadius: '6px',
+    opacity: 0.6,
+    transition: 'all 0.2s',
   },
   renameWrapper: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
+    gap: '6px',
     width: '100%',
-    padding: '4px',
   },
   renameInput: {
     flex: 1,
-    padding: '6px 8px',
-    border: '1px solid #667eea',
-    borderRadius: '4px',
+    padding: '8px 10px',
+    border: '1px solid #d0d0d0',
+    borderRadius: '8px',
     fontSize: '13px',
     outline: 'none',
-    fontFamily: 'inherit',
   },
   renameBtn: {
     background: '#10b981',
     border: 'none',
     color: 'white',
-    padding: '6px 10px',
-    borderRadius: '4px',
-    fontSize: '14px',
+    padding: '8px 12px',
+    borderRadius: '6px',
+    fontSize: '13px',
     cursor: 'pointer',
   },
   cancelBtn: {
     background: '#ef4444',
     border: 'none',
     color: 'white',
-    padding: '6px 10px',
-    borderRadius: '4px',
-    fontSize: '14px',
+    padding: '8px 12px',
+    borderRadius: '6px',
+    fontSize: '13px',
     cursor: 'pointer',
   },
   sidebarFooter: {
     padding: '16px',
-    borderTop: '1px solid #e0e0e0',
+    borderTop: '1px solid rgba(0, 0, 0, 0.06)',
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
     cursor: 'pointer',
+    transition: 'all 0.2s',
   },
   avatar: {
     width: '36px',
     height: '36px',
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
+    background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%)',
+    border: '1px solid #d0d0d0',
+    color: '#666',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontWeight: 600,
-    fontSize: '14px',
-    flexShrink: 0,
+    fontSize: '13px',
   },
   userInfo: {
     flex: 1,
@@ -1242,126 +1092,132 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column' as const,
-    background: 'white',
+    background: '#fafafa',
     overflow: 'hidden',
-    maxWidth: '100%',
   },
   topBar: {
-    padding: '12px 16px',
-    borderBottom: '1px solid #e0e0e0',
+    padding: '14px 20px',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    maxWidth: '100%',
+    background: 'rgba(255, 255, 255, 0.7)',
+    backdropFilter: 'blur(20px)',
   },
   topBarLeft: {
     display: 'flex',
     alignItems: 'center',
-    overflow: 'hidden',
+    gap: '12px',
   },
-  modelBadge: {
-    fontSize: '14px',
-    fontWeight: 600,
-    color: '#000',
-    whiteSpace: 'nowrap' as const,
-  },
-  topBarRight: {
-    display: 'flex',
-    alignItems: 'center',
-  },
-  iconBtn: {
+  mobileMenuBtn: {
     background: 'none',
     border: 'none',
     fontSize: '20px',
     cursor: 'pointer',
+    padding: '4px',
+    color: '#666',
+  },
+  modelBadge: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#1a1a1a',
+    letterSpacing: '-0.01em',
+  },
+  iconBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: '18px',
+    cursor: 'pointer',
     padding: '8px',
     borderRadius: '8px',
+    transition: 'all 0.2s',
   },
   chatWrapper: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column' as const,
     overflow: 'hidden',
-    maxWidth: '100%',
   },
   messagesArea: {
     flex: 1,
     overflowY: 'auto' as const,
     overflowX: 'hidden' as const,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    maxWidth: '100%',
   },
   emptyState: {
-    flex: 1,
+    height: '100%',
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '20px',
+    padding: '40px 20px',
   },
   greetingLogo: {
     width: '64px',
     height: '64px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: '16px',
+    background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%)',
+    border: '2px solid #d0d0d0',
+    borderRadius: '18px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '32px',
+    color: '#999',
     marginBottom: '24px',
   },
   greetingText: {
     fontSize: '28px',
     fontWeight: 600,
-    color: '#000',
-    marginBottom: '24px',
-    textAlign: 'center' as const,
+    color: '#1a1a1a',
+    letterSpacing: '-0.02em',
+  },
+  messageLimitInfo: {
+    fontSize: '13px',
+    color: '#999',
+    marginTop: '12px',
   },
   chatMessages: {
     maxWidth: '768px',
     width: '100%',
     margin: '0 auto',
-    padding: '24px',
+    padding: '32px 24px',
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '24px',
-    boxSizing: 'border-box' as const,
+    gap: '16px',
   },
   chatMessagesMobile: {
-    padding: '16px 24px',
-    maxWidth: '100%',
-    boxSizing: 'border-box' as const,
+    padding: '20px 20px',
   },
   messageRowUser: {
     display: 'flex',
     width: '100%',
     justifyContent: 'flex-end',
-    maxWidth: '100%',
   },
   messageRowAssistant: {
     display: 'flex',
     width: '100%',
     justifyContent: 'flex-start',
-    maxWidth: '100%',
   },
   messageBubbleUser: {
-    maxWidth: '85%',
+    maxWidth: '80%',
     padding: '12px 16px',
     borderRadius: '16px',
-    fontSize: '15px',
-    lineHeight: 1.5,
-    wordWrap: 'break-word' as const,
-    background: '#000',
+    fontSize: '14px',
+    lineHeight: 1.6,
+    background: '#1a1a1a',
     color: '#fff',
-    boxSizing: 'border-box' as const,
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
   },
   messageBubbleAssistant: {
-    maxWidth: '85%',
+    maxWidth: '80%',
     padding: '12px 16px',
     borderRadius: '16px',
-    fontSize: '15px',
+    fontSize: '14px',
     lineHeight: 1.6,
-    wordWrap: 'break-word' as const,
-    background: '#f4f4f4',
-    color: '#000',
-    boxSizing: 'border-box' as const,
+    background: 'rgba(255, 255, 255, 0.7)',
+    backdropFilter: 'blur(20px)',
+    border: '1px solid rgba(0, 0, 0, 0.06)',
+    color: '#1a1a1a',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
   },
   messageText: {
     whiteSpace: 'pre-wrap' as const,
@@ -1370,89 +1226,93 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   typingIndicator: {
     display: 'flex',
     gap: '6px',
-    padding: '4px 0',
   },
   typingDot: {
     width: '8px',
     height: '8px',
     borderRadius: '50%',
-    background: '#666',
+    background: '#999',
+    animation: 'pulse 1.5s infinite',
   },
   inputArea: {
-    borderTop: '1px solid #e0e0e0',
-    background: 'white',
-    padding: '0',
-    maxWidth: '100%',
+    borderTop: '1px solid rgba(0, 0, 0, 0.06)',
+    background: 'rgba(255, 255, 255, 0.7)',
+    backdropFilter: 'blur(20px)',
   },
   inputWrapper: {
     maxWidth: '768px',
     width: '100%',
     margin: '0 auto',
     padding: '16px 24px',
-    boxSizing: 'border-box' as const,
   },
   inputWrapperMobile: {
     padding: '12px 16px',
-    maxWidth: '100%',
-    boxSizing: 'border-box' as const,
+  },
+  limitWarning: {
+    padding: '10px 14px',
+    background: 'rgba(245, 158, 11, 0.1)',
+    border: '1px solid rgba(245, 158, 11, 0.2)',
+    borderRadius: '10px',
+    marginBottom: '12px',
+    fontSize: '13px',
+    color: '#f59e0b',
+  },
+  upgradeLink: {
+    color: '#1a1a1a',
+    cursor: 'pointer',
+    fontWeight: 600,
+    textDecoration: 'underline',
   },
   inputCard: {
-    width: '100%',
-    background: 'white',
-    border: '1px solid #e0e0e0',
-    borderRadius: '24px',
-    padding: '6px 8px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-    boxSizing: 'border-box' as const,
-  },
-  inputRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
-    width: '100%',
+    gap: '8px',
+    background: '#fff',
+    border: '1px solid rgba(0, 0, 0, 0.08)',
+    borderRadius: '16px',
+    padding: '8px 12px',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
   },
   textarea: {
     flex: 1,
     border: 'none',
     background: 'transparent',
-    fontSize: '15px',
-    fontFamily: 'inherit',
+    fontSize: '14px',
     resize: 'none' as const,
     outline: 'none',
-    color: '#000',
+    color: '#1a1a1a',
     padding: '6px 8px',
     maxHeight: '120px',
-    minHeight: '24px',
     lineHeight: '1.5',
-    width: '100%',
   },
   sendBtn: {
     width: '32px',
     height: '32px',
     minWidth: '32px',
-    minHeight: '32px',
     border: 'none',
     borderRadius: '50%',
-    background: '#000',
+    background: '#1a1a1a',
     color: 'white',
     fontSize: '16px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    transition: 'all 0.2s',
     flexShrink: 0,
   },
   sendBtnDisabled: {
-    opacity: 0.5,
+    opacity: 0.3,
     cursor: 'not-allowed',
   },
   modelSelect: {
     padding: '8px 0 0',
     textAlign: 'center' as const,
     fontSize: '11px',
-    color: '#666',
-    maxWidth: '100%',
-    overflow: 'hidden',
+    color: '#999',
+  },
+  remainingMessages: {
+    color: '#bbb',
   },
   modalOverlay: {
     position: 'fixed' as const,
@@ -1460,7 +1320,8 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(0, 0, 0, 0.5)',
+    background: 'rgba(0, 0, 0, 0.4)',
+    backdropFilter: 'blur(8px)',
     zIndex: 999,
   },
   modalContainer: {
@@ -1469,87 +1330,83 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     zIndex: 1000,
-    maxWidth: '750px',
+    maxWidth: '650px',
     width: '90%',
     maxHeight: '85vh',
     overflowY: 'auto' as const,
   },
   modalContent: {
-    background: 'white',
-    borderRadius: '16px',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+    background: 'rgba(255, 255, 255, 0.95)',
+    backdropFilter: 'blur(20px)',
+    border: '1px solid rgba(0, 0, 0, 0.08)',
+    borderRadius: '20px',
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
   },
   modalHeader: {
-    padding: '20px 24px',
-    borderBottom: '1px solid #e0e0e0',
+    padding: '24px 28px',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   modalTitle: {
     fontSize: '20px',
-    fontWeight: 700,
-    color: '#000',
-    margin: 0,
+    fontWeight: 600,
+    color: '#1a1a1a',
   },
   modalCloseBtn: {
     background: 'none',
     border: 'none',
-    fontSize: '32px',
+    fontSize: '28px',
     cursor: 'pointer',
-    color: '#666',
+    color: '#999',
     lineHeight: 1,
-    padding: 0,
   },
   modalBody: {
-    padding: '20px 24px',
+    padding: '24px 28px',
   },
   modalSection: {
     marginBottom: '24px',
   },
-  modalSectionTitle: {
-    fontSize: '16px',
+  sectionTitle: {
+    fontSize: '15px',
     fontWeight: 600,
-    marginBottom: '12px',
-    color: '#000',
+    marginBottom: '16px',
+    color: '#1a1a1a',
   },
-  modalSubsectionTitle: {
+  infoGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '16px',
+  },
+  infoLabel: {
+    fontSize: '11px',
+    fontWeight: 600,
+    color: '#999',
+    textTransform: 'uppercase' as const,
+    marginBottom: '6px',
+    letterSpacing: '0.5px',
+  },
+  infoValue: {
     fontSize: '14px',
-    fontWeight: 600,
-    marginBottom: '12px',
-    marginTop: '16px',
-    color: '#000',
-  },
-  modalInfoRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '10px 0',
-    borderBottom: '1px solid #e0e0e0',
-    fontSize: '14px',
-  },
-  modalLabel: {
-    fontWeight: 600,
-    color: '#000',
-  },
-  modalValue: {
-    color: '#666',
+    color: '#1a1a1a',
   },
   planCurrentBadge: {
     padding: '20px',
-    background: '#f9f9f9',
+    background: 'rgba(0, 0, 0, 0.02)',
     borderRadius: '12px',
     textAlign: 'center' as const,
-    marginBottom: '16px',
+    marginBottom: '20px',
   },
   planBadgeLarge: {
     display: 'inline-block',
-    padding: '6px 16px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    padding: '6px 18px',
+    background: '#1a1a1a',
     color: 'white',
-    borderRadius: '24px',
+    borderRadius: '20px',
     fontWeight: 600,
-    fontSize: '14px',
-    marginBottom: '8px',
+    fontSize: '13px',
+    marginBottom: '10px',
   },
   planDescription: {
     color: '#666',
@@ -1558,54 +1415,53 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   progressBarContainer: {
     width: '100%',
-    height: '8px',
-    background: '#e0e0e0',
-    borderRadius: '4px',
+    height: '6px',
+    background: 'rgba(0, 0, 0, 0.06)',
+    borderRadius: '3px',
     overflow: 'hidden',
-    marginTop: '8px',
   },
   progressBar: {
     height: '100%',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: '4px',
+    background: '#1a1a1a',
+    borderRadius: '3px',
     transition: 'width 0.3s ease',
   },
   plansGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
     gap: '12px',
   },
   planCard: {
-    padding: '16px',
-    background: '#f9f9f9',
-    border: '2px solid #e0e0e0',
+    padding: '18px',
+    background: 'rgba(255, 255, 255, 0.5)',
+    border: '1px solid rgba(0, 0, 0, 0.08)',
     borderRadius: '12px',
-    minHeight: '220px',
+    transition: 'all 0.2s',
   },
   planCardActive: {
-    borderColor: '#667eea',
-    background: 'rgba(102, 126, 234, 0.05)',
+    borderColor: '#1a1a1a',
+    background: 'rgba(0, 0, 0, 0.02)',
   },
   planCardTitle: {
     fontSize: '15px',
     fontWeight: 700,
-    marginBottom: '6px',
-    color: '#000',
+    marginBottom: '8px',
+    color: '#1a1a1a',
   },
   planPrice: {
     fontSize: '22px',
     fontWeight: 700,
-    margin: '8px 0 12px',
-    color: '#000',
+    margin: '8px 0 16px',
+    color: '#1a1a1a',
   },
   planPricePeriod: {
     fontSize: '13px',
     fontWeight: 400,
-    color: '#666',
+    color: '#999',
   },
   planFeatures: {
     listStyle: 'none',
-    marginBottom: '14px',
+    marginBottom: '16px',
     padding: 0,
   },
   planFeature: {
@@ -1615,27 +1471,26 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   planBtn: {
     width: '100%',
-    padding: '8px 12px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    padding: '10px',
+    background: '#1a1a1a',
     color: 'white',
     border: 'none',
     borderRadius: '8px',
     fontSize: '12px',
     fontWeight: 600,
     cursor: 'pointer',
-    whiteSpace: 'nowrap' as const,
+    transition: 'all 0.2s',
   },
   planBtnSpacer: {
-    width: '100%',
-    height: '32px',
+    height: '38px',
   },
   logoutBtn: {
     width: '100%',
-    padding: '10px 20px',
+    padding: '12px',
     background: 'transparent',
     color: '#ef4444',
-    border: '2px solid #ef4444',
-    borderRadius: '8px',
+    border: '1px solid #ef4444',
+    borderRadius: '10px',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
@@ -1648,25 +1503,22 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     zIndex: 1000,
   },
   actionsModalContent: {
-    background: 'white',
-    borderRadius: '16px 16px 0 0',
-    boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.2)',
+    background: 'rgba(255, 255, 255, 0.95)',
+    backdropFilter: 'blur(20px)',
+    borderRadius: '20px 20px 0 0',
+    boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.1)',
   },
   actionsModalHeader: {
-    padding: '16px 20px',
-    borderBottom: '1px solid #e0e0e0',
+    padding: '18px 20px',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
   },
   actionsModalTitle: {
-    fontSize: '16px',
+    fontSize: '15px',
     fontWeight: 600,
-    color: '#000',
-    margin: 0,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap' as const,
+    color: '#1a1a1a',
   },
   actionsModalBody: {
-    padding: '8px',
+    padding: '12px',
   },
   actionMenuItem: {
     width: '100%',
@@ -1679,15 +1531,9 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    color: '#000',
-    borderRadius: '8px',
-  },
-  actionMenuItemDanger: {
-    color: '#ef4444',
-  },
-  actionMenuIcon: {
-    fontSize: '18px',
-    width: '24px',
+    color: '#1a1a1a',
+    borderRadius: '10px',
+    transition: 'all 0.2s',
   },
   deleteModalContainer: {
     position: 'fixed' as const,
@@ -1699,75 +1545,73 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     maxWidth: '400px',
   },
   deleteModalContent: {
-    background: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-  },
-  deleteModalHeader: {
-    padding: '20px 24px',
-    borderBottom: '1px solid #e0e0e0',
+    background: 'rgba(255, 255, 255, 0.95)',
+    backdropFilter: 'blur(20px)',
+    border: '1px solid rgba(0, 0, 0, 0.08)',
+    borderRadius: '16px',
+    padding: '24px',
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
   },
   deleteModalTitle: {
-    fontSize: '20px',
+    fontSize: '18px',
     fontWeight: 700,
-    color: '#000',
-    margin: 0,
-  },
-  deleteModalBody: {
-    padding: '20px 24px',
+    color: '#1a1a1a',
+    marginBottom: '12px',
   },
   deleteModalText: {
-    fontSize: '15px',
+    fontSize: '14px',
     color: '#666',
-    lineHeight: 1.5,
-    margin: 0,
+    marginBottom: '20px',
   },
   deleteModalFooter: {
-    padding: '16px 24px',
     display: 'flex',
-    gap: '12px',
+    gap: '10px',
     justifyContent: 'flex-end',
   },
   deleteCancelBtn: {
     padding: '10px 20px',
     background: 'transparent',
-    border: '1px solid #e0e0e0',
+    border: '1px solid rgba(0, 0, 0, 0.1)',
     borderRadius: '8px',
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 600,
     cursor: 'pointer',
-    color: '#000',
+    color: '#666',
   },
   deleteConfirmBtn: {
     padding: '10px 20px',
     background: '#ef4444',
     border: 'none',
     borderRadius: '8px',
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 600,
     cursor: 'pointer',
     color: 'white',
   },
-};
-
-// Dark Mode Styles
-const darkStyles: { [key: string]: React.CSSProperties } = {
-  ...lightStyles,
-  loadingContainer: {
-    ...lightStyles.loadingContainer,
-    background: '#1a1a1a',
-  },
-  loadingSpinner: {
-    ...lightStyles.loadingSpinner,
+  mobileMenuDots: {
+    position: 'absolute' as const,
+    right: '8px',
+    fontSize: '16px',
     color: '#999',
   },
+};
+
+const darkStyles: { [key: string]: React.CSSProperties } = {
+  ...lightStyles,
   authContainer: {
     ...lightStyles.authContainer,
-    background: '#1a1a1a',
+    background: '#0a0a0a',
   },
   authCard: {
     ...lightStyles.authCard,
-    background: '#2a2a2a',
+    background: 'rgba(30, 30, 30, 0.95)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+  },
+  authLogo: {
+    ...lightStyles.authLogo,
+    background: 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)',
+    border: '2px solid #3a3a3a',
+    color: '#999',
   },
   authTitle: {
     ...lightStyles.authTitle,
@@ -1777,9 +1621,22 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
     ...lightStyles.authSubtitle,
     color: '#999',
   },
+  tabs: {
+    ...lightStyles.tabs,
+    background: '#1a1a1a',
+  },
+  tab: {
+    ...lightStyles.tab,
+    color: '#999',
+  },
+  tabActive: {
+    ...lightStyles.tabActive,
+    background: '#2a2a2a',
+    color: '#fff',
+  },
   label: {
     ...lightStyles.label,
-    color: '#fff',
+    color: '#ccc',
   },
   input: {
     ...lightStyles.input,
@@ -1787,34 +1644,28 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
     border: '1px solid #3a3a3a',
     color: '#fff',
   },
-  authSwitch: {
-    ...lightStyles.authSwitch,
-    color: '#999',
-  },
-  authSuccess: {
-    ...lightStyles.authSuccess,
-    background: 'rgba(16, 185, 129, 0.2)',
-  },
-  mobileMenuBtn: {
-    ...lightStyles.mobileMenuBtn,
+  authBtn: {
+    ...lightStyles.authBtn,
+    background: 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)',
     color: '#fff',
+    border: '1px solid #3a3a3a',
   },
-  mobileMenuDots: {
-    ...lightStyles.mobileMenuDots,
-    color: '#999',
+  app: {
+    ...lightStyles.app,
+    background: '#0a0a0a',
   },
   sidebar: {
     ...lightStyles.sidebar,
-    background: '#1a1a1a',
-    borderRight: '1px solid #3a3a3a',
+    background: 'rgba(20, 20, 20, 0.7)',
+    borderRight: '1px solid rgba(255, 255, 255, 0.06)',
   },
   sidebarHeader: {
     ...lightStyles.sidebarHeader,
-    borderBottom: '1px solid #3a3a3a',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
   },
   sidebarToggle: {
     ...lightStyles.sidebarToggle,
-    color: '#fff',
+    color: '#999',
   },
   brand: {
     ...lightStyles.brand,
@@ -1822,45 +1673,67 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   section: {
     ...lightStyles.section,
-    borderBottom: '1px solid #3a3a3a',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+  },
+  navIcon: {
+    ...lightStyles.navIcon,
+    color: '#999',
   },
   navText: {
     ...lightStyles.navText,
-    color: '#fff',
+    color: '#ccc',
   },
   sectionLabel: {
     ...lightStyles.sectionLabel,
-    color: '#999',
+    color: '#666',
   },
   recentItem: {
     ...lightStyles.recentItem,
-    color: '#fff',
+    color: '#ccc',
   },
   recentItemActive: {
     ...lightStyles.recentItemActive,
-    background: '#3a3a3a',
+    background: 'rgba(255, 255, 255, 0.06)',
+    color: '#fff',
   },
   renameInput: {
     ...lightStyles.renameInput,
-    background: '#2a2a2a',
+    background: '#1a1a1a',
+    border: '1px solid #3a3a3a',
     color: '#fff',
-    border: '1px solid #667eea',
   },
   sidebarFooter: {
     ...lightStyles.sidebarFooter,
-    borderTop: '1px solid #3a3a3a',
+    borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+  },
+  avatar: {
+    ...lightStyles.avatar,
+    background: 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)',
+    border: '1px solid #3a3a3a',
+    color: '#999',
   },
   main: {
     ...lightStyles.main,
-    background: '#2a2a2a',
+    background: '#0a0a0a',
   },
   topBar: {
     ...lightStyles.topBar,
-    borderBottom: '1px solid #3a3a3a',
+    background: 'rgba(20, 20, 20, 0.7)',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+  },
+  mobileMenuBtn: {
+    ...lightStyles.mobileMenuBtn,
+    color: '#999',
   },
   modelBadge: {
     ...lightStyles.modelBadge,
     color: '#fff',
+  },
+  greetingLogo: {
+    ...lightStyles.greetingLogo,
+    background: 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)',
+    border: '2px solid #3a3a3a',
+    color: '#666',
   },
   greetingText: {
     ...lightStyles.greetingText,
@@ -1868,21 +1741,23 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   messageLimitInfo: {
     ...lightStyles.messageLimitInfo,
-    color: '#999',
+    color: '#666',
   },
   messageBubbleUser: {
     ...lightStyles.messageBubbleUser,
-    background: '#3a3a3a',
+    background: '#2a2a2a',
+    border: '1px solid #3a3a3a',
   },
   messageBubbleAssistant: {
     ...lightStyles.messageBubbleAssistant,
-    background: '#1a1a1a',
+    background: 'rgba(30, 30, 30, 0.7)',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
     color: '#fff',
   },
   inputArea: {
     ...lightStyles.inputArea,
-    background: '#2a2a2a',
-    borderTop: '1px solid #3a3a3a',
+    background: 'rgba(20, 20, 20, 0.7)',
+    borderTop: '1px solid rgba(255, 255, 255, 0.06)',
   },
   inputCard: {
     ...lightStyles.inputCard,
@@ -1900,15 +1775,12 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   modelSelect: {
     ...lightStyles.modelSelect,
-    color: '#999',
-  },
-  remainingMessages: {
-    ...lightStyles.remainingMessages,
     color: '#666',
   },
   modalContent: {
     ...lightStyles.modalContent,
-    background: '#2a2a2a',
+    background: 'rgba(30, 30, 30, 0.95)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
   },
   modalTitle: {
     ...lightStyles.modalTitle,
@@ -1916,35 +1788,32 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   modalCloseBtn: {
     ...lightStyles.modalCloseBtn,
-    color: '#999',
+    color: '#666',
   },
   modalHeader: {
     ...lightStyles.modalHeader,
-    borderBottom: '1px solid #3a3a3a',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
   },
-  modalSectionTitle: {
-    ...lightStyles.modalSectionTitle,
+  sectionTitle: {
+    ...lightStyles.sectionTitle,
     color: '#fff',
   },
-  modalSubsectionTitle: {
-    ...lightStyles.modalSubsectionTitle,
+  infoLabel: {
+    ...lightStyles.infoLabel,
+    color: '#666',
+  },
+  infoValue: {
+    ...lightStyles.infoValue,
     color: '#fff',
-  },
-  modalInfoRow: {
-    ...lightStyles.modalInfoRow,
-    borderBottom: '1px solid #3a3a3a',
-  },
-  modalLabel: {
-    ...lightStyles.modalLabel,
-    color: '#fff',
-  },
-  modalValue: {
-    ...lightStyles.modalValue,
-    color: '#999',
   },
   planCurrentBadge: {
     ...lightStyles.planCurrentBadge,
-    background: '#1a1a1a',
+    background: 'rgba(255, 255, 255, 0.02)',
+  },
+  planBadgeLarge: {
+    ...lightStyles.planBadgeLarge,
+    background: '#fff',
+    color: '#000',
   },
   planDescription: {
     ...lightStyles.planDescription,
@@ -1952,12 +1821,21 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   progressBarContainer: {
     ...lightStyles.progressBarContainer,
-    background: '#3a3a3a',
+    background: 'rgba(255, 255, 255, 0.06)',
+  },
+  progressBar: {
+    ...lightStyles.progressBar,
+    background: '#fff',
   },
   planCard: {
     ...lightStyles.planCard,
-    background: '#1a1a1a',
-    border: '2px solid #3a3a3a',
+    background: 'rgba(255, 255, 255, 0.02)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+  },
+  planCardActive: {
+    ...lightStyles.planCardActive,
+    borderColor: '#fff',
+    background: 'rgba(255, 255, 255, 0.04)',
   },
   planCardTitle: {
     ...lightStyles.planCardTitle,
@@ -1967,37 +1845,19 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
     ...lightStyles.planPrice,
     color: '#fff',
   },
-  planPricePeriod: {
-    ...lightStyles.planPricePeriod,
-    color: '#999',
-  },
   planFeature: {
     ...lightStyles.planFeature,
     color: '#999',
   },
-  actionsModalContent: {
-    ...lightStyles.actionsModalContent,
-    background: '#2a2a2a',
-  },
-  actionsModalHeader: {
-    ...lightStyles.actionsModalHeader,
-    borderBottom: '1px solid #3a3a3a',
-  },
-  actionsModalTitle: {
-    ...lightStyles.actionsModalTitle,
-    color: '#fff',
-  },
-  actionMenuItem: {
-    ...lightStyles.actionMenuItem,
-    color: '#fff',
+  planBtn: {
+    ...lightStyles.planBtn,
+    background: '#fff',
+    color: '#000',
   },
   deleteModalContent: {
     ...lightStyles.deleteModalContent,
-    background: '#2a2a2a',
-  },
-  deleteModalHeader: {
-    ...lightStyles.deleteModalHeader,
-    borderBottom: '1px solid #3a3a3a',
+    background: 'rgba(30, 30, 30, 0.95)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
   },
   deleteModalTitle: {
     ...lightStyles.deleteModalTitle,
@@ -2009,26 +1869,24 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   deleteCancelBtn: {
     ...lightStyles.deleteCancelBtn,
-    border: '1px solid #3a3a3a',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    color: '#999',
+  },
+  actionsModalContent: {
+    ...lightStyles.actionsModalContent,
+    background: 'rgba(30, 30, 30, 0.95)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+  },
+  actionsModalHeader: {
+    ...lightStyles.actionsModalHeader,
+    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+  },
+  actionsModalTitle: {
+    ...lightStyles.actionsModalTitle,
+    color: '#fff',
+  },
+  actionMenuItem: {
+    ...lightStyles.actionMenuItem,
     color: '#fff',
   },
 };
-
-// Wrap in Suspense for useSearchParams
-export default function Home() {
-  return (
-    <Suspense fallback={
-      <div style={{
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        background: '#f9f9f9'
-      }}>
-        <div style={{fontSize: '18px', color: '#666'}}>Loading...</div>
-      </div>
-    }>
-      <HomePage />
-    </Suspense>
-  );
-}
