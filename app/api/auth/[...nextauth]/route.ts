@@ -1,5 +1,7 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
+import GitHubProvider from "next-auth/providers/github";
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcrypt';
 
@@ -10,6 +12,14 @@ const supabase = createClient(
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    }),
+    GitHubProvider({
+      clientId: process.env.GITHUB_CLIENT_ID || "",
+      clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
+    }),
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -66,11 +76,62 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async signIn({ user, account }) {
+      // Handle OAuth sign in (Google/GitHub)
+      if (account?.provider === "google" || account?.provider === "github") {
+        const email = user.email?.toLowerCase();
+        if (!email) return false;
+
+        // Check if user already exists
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', email)
+          .single();
+
+        if (!existingUser) {
+          // Create new user for OAuth sign-in
+          const { error: insertError } = await supabase
+            .from('users')
+            .insert({
+              name: user.name || email.split('@')[0],
+              email: email,
+              password_hash: '', // No password for OAuth users
+              plan: 'Free',
+              messages_used_today: 0,
+              email_verified: true, // OAuth emails are verified
+              oauth_provider: account.provider,
+            });
+
+          if (insertError) {
+            console.error('Failed to create OAuth user:', insertError);
+            return false;
+          }
+        }
+      }
+      return true;
+    },
+    async jwt({ token, user, account }) {
       if (user) {
-        token.id = user.id;
-        token.plan = (user as any).plan;
-        token.messagesUsedToday = (user as any).messagesUsedToday;
+        // For credentials login, user object has our custom fields
+        if (account?.provider === "credentials") {
+          token.id = user.id;
+          token.plan = (user as any).plan;
+          token.messagesUsedToday = (user as any).messagesUsedToday;
+        } else {
+          // For OAuth login, we need to fetch user data from database
+          const { data: dbUser } = await supabase
+            .from('users')
+            .select('id, plan, messages_used_today')
+            .eq('email', user.email?.toLowerCase())
+            .single();
+
+          if (dbUser) {
+            token.id = dbUser.id;
+            token.plan = dbUser.plan;
+            token.messagesUsedToday = dbUser.messages_used_today;
+          }
+        }
       }
       return token;
     },

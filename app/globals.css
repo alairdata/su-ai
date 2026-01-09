@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -11,8 +13,7 @@ body {
 }
 
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: #f8f5ef;
   color: #262626;
   overflow: hidden; /* page itself doesn't scroll */
@@ -389,4 +390,220 @@ body {
 }
 * {
   scrollbar-width: none;
+}
+
+/* ==========================================
+   AUTH PAGE ANIMATIONS
+   ========================================== */
+
+/* Floating orb animation */
+@keyframes float-orb {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(20px, -20px);
+  }
+}
+
+@keyframes float-orb-2 {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-15px, 15px);
+  }
+}
+
+@keyframes float-orb-3 {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(10px, -10px);
+  }
+}
+
+/* Logo glow pulse animation - subtle gray */
+@keyframes logo-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(200, 200, 200, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(200, 200, 200, 0.5);
+  }
+}
+
+/* Button ripple effect - Material Design water ripple */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+/* Tab content fade and slide */
+@keyframes fadeSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Auth form styling classes */
+.auth-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 1;
+  pointer-events: none;
+}
+
+.auth-orb-1 {
+  width: 500px;
+  height: 500px;
+  top: -150px;
+  right: -150px;
+  animation: float-orb 6s ease-in-out infinite;
+}
+
+.auth-orb-2 {
+  width: 400px;
+  height: 400px;
+  bottom: -100px;
+  left: -100px;
+  animation: float-orb-2 8s ease-in-out infinite;
+}
+
+.auth-orb-3 {
+  width: 350px;
+  height: 350px;
+  top: 40%;
+  left: 30%;
+  animation: float-orb-3 10s ease-in-out infinite;
+}
+
+/* Light theme orb colors - soft pastels for glassmorphism effect */
+[data-theme="light"] .auth-orb-1 {
+  background: radial-gradient(circle, rgba(200, 180, 220, 0.4) 0%, transparent 70%);
+}
+[data-theme="light"] .auth-orb-2 {
+  background: radial-gradient(circle, rgba(180, 200, 220, 0.5) 0%, transparent 70%);
+}
+[data-theme="light"] .auth-orb-3 {
+  background: radial-gradient(circle, rgba(220, 190, 200, 0.35) 0%, transparent 70%);
+}
+
+/* Dark theme orb colors */
+[data-theme="dark"] .auth-orb-1 {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.5), rgba(236, 72, 153, 0.4));
+}
+[data-theme="dark"] .auth-orb-2 {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.5), rgba(6, 182, 212, 0.4));
+}
+[data-theme="dark"] .auth-orb-3 {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(99, 102, 241, 0.4));
+}
+
+.auth-logo-glow {
+  animation: logo-glow 2s ease-in-out infinite;
+}
+
+.auth-input-focus {
+  transition: all 0.3s ease;
+}
+
+.auth-input-focus:focus {
+  background: #fff;
+  border-color: #c0c0c0;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+  transform: translateY(-1px);
+}
+
+.auth-btn-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-btn-ripple .ripple-effect {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+  animation: ripple 0.7s ease-out forwards;
+  pointer-events: none;
+}
+
+.auth-btn-ripple:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  background: linear-gradient(135deg, #f0f0f0 0%, #fff 100%) !important;
+}
+
+.auth-btn-ripple:active {
+  transform: translateY(0);
+}
+
+.auth-tab-content {
+  animation: fadeSlideIn 0.3s ease-out;
+}
+
+/* Social button styles - matching main button */
+.social-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px 24px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid #d0d0d0 !important;
+  background: linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%) !important;
+  color: #1a1a1a !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.social-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  background: linear-gradient(135deg, #f0f0f0 0%, #fff 100%) !important;
+}
+
+.social-btn:active {
+  transform: translateY(0);
+}
+
+.social-btn .ripple-effect {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+  animation: ripple 0.7s ease-out forwards;
+  pointer-events: none;
+}
+
+.social-btn-google {
+  background: linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%) !important;
+  color: #1a1a1a !important;
+  border: 1px solid #d0d0d0 !important;
+}
+
+.social-btn-github {
+  background: linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%) !important;
+  color: #1a1a1a !important;
+  border: 1px solid #d0d0d0 !important;
 }

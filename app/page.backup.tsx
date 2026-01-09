@@ -6,20 +6,14 @@ import { useChats } from "./hooks/useChats";
 import { useTheme } from "./hooks/useTheme";
 import { useSearchParams } from "next/navigation";
 
-type View = "auth" | "chat";
-type AuthMode = "signin" | "signup";
+type View = "login" | "signup" | "chat";
 
 function HomePage() {
   const { data: session, status, update: updateSession } = useSession();
   const { theme, toggleTheme } = useTheme();
   const searchParams = useSearchParams();
   
-  const [currentView, setCurrentView] = useState<View>("auth");
-  const [authMode, setAuthMode] = useState<AuthMode>("signin");
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState("");
-  const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotSuccess, setForgotSuccess] = useState("");
+  const [currentView, setCurrentView] = useState<View>("login");
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showChatActionsModal, setShowChatActionsModal] = useState(false);
@@ -65,7 +59,7 @@ function HomePage() {
 
     if (verified === 'true') {
       setAuthSuccess('Email verified! You can now log in.');
-      setAuthMode('signin');
+      setCurrentView('login');
     } else if (error === 'invalid-token') {
       setAuthError('Invalid or expired verification link.');
     } else if (error === 'token-expired') {
@@ -95,7 +89,7 @@ function HomePage() {
     if (isAuthenticated) {
       setCurrentView("chat");
     } else if (!isAuthLoading) {
-      setCurrentView("auth");
+      setCurrentView("login");
     }
   }, [isAuthenticated, isAuthLoading]);
 
@@ -155,65 +149,20 @@ function HomePage() {
         return;
       }
 
-      // Show success message and switch to signin
+      // Show success message and switch to login
       setAuthSuccess(data.message || "Account created! Check your email to verify.");
       setAuthEmail("");
       setAuthPassword("");
       setAuthName("");
-
-      // Switch to signin mode after 2 seconds
+      
+      // Switch to login view after 2 seconds
       setTimeout(() => {
-        setAuthMode("signin");
+        setCurrentView("login");
       }, 2000);
 
     } catch (error) {
       setAuthError("Signup failed. Please try again.");
     }
-  };
-
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setForgotLoading(true);
-    setAuthError("");
-    setForgotSuccess("");
-
-    try {
-      const res = await fetch("/api/auth/forgot-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: forgotEmail }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setForgotSuccess("If an account exists with this email, you will receive a password reset link.");
-        setForgotEmail("");
-      } else {
-        setAuthError(data.error || "Failed to send reset email");
-      }
-    } catch (error) {
-      setAuthError("Failed to send reset email. Please try again.");
-    } finally {
-      setForgotLoading(false);
-    }
-  };
-
-  const handleRipple = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const button = e.currentTarget;
-    const rect = button.getBoundingClientRect();
-    const size = Math.max(rect.width, rect.height);
-    const x = e.clientX - rect.left - size / 2;
-    const y = e.clientY - rect.top - size / 2;
-
-    const ripple = document.createElement("span");
-    ripple.className = "ripple-effect";
-    ripple.style.width = ripple.style.height = `${size}px`;
-    ripple.style.left = `${x}px`;
-    ripple.style.top = `${y}px`;
-
-    button.appendChild(ripple);
-    setTimeout(() => ripple.remove(), 600);
   };
 
   const handleLogout = async () => {
@@ -344,260 +293,125 @@ function HomePage() {
     );
   }
 
-  if (currentView === "auth") {
+  if (currentView === "login") {
     return (
       <div style={currentStyles.authContainer}>
-        {/* Animated Background Orbs */}
-        <div className="auth-orb auth-orb-1" />
-        <div className="auth-orb auth-orb-2" />
-        <div className="auth-orb auth-orb-3" />
-
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          style={currentStyles.authThemeToggle}
-          title="Toggle theme"
-        >
-          {theme === "light" ? "🌙" : "☀️"}
-        </button>
-
-        {/* Glassmorphic Card */}
         <div style={currentStyles.authCard}>
-          {/* Logo with Glow */}
           <div style={currentStyles.authLogo}>
-            <div style={currentStyles.logoIcon} className="auth-logo-glow">✦</div>
+            <div style={currentStyles.logoIcon}></div>
             <h1 style={currentStyles.authTitle}>UnFiltered-AI</h1>
-            <p style={currentStyles.authSubtitle}>
-              {showForgotPassword
-                ? "Reset your password"
-                : authMode === "signin"
-                  ? "Welcome back"
-                  : "Create your account"}
-            </p>
+            <p style={currentStyles.authSubtitle}>Sign in to continue</p>
           </div>
 
-          {/* Error/Success Messages */}
           {authError && <div style={currentStyles.authError}>{authError}</div>}
           {authSuccess && <div style={currentStyles.authSuccess}>{authSuccess}</div>}
-          {forgotSuccess && <div style={currentStyles.authSuccess}>{forgotSuccess}</div>}
 
-          {/* Forgot Password View */}
-          {showForgotPassword ? (
-            <div className="auth-tab-content">
-              <form onSubmit={handleForgotPassword}>
-                <div style={currentStyles.formGroup}>
-                  <label style={currentStyles.label}>Email</label>
-                  <input
-                    type="email"
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    required
-                    style={currentStyles.input}
-                    className="auth-input-focus"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  style={currentStyles.authBtn}
-                  className="auth-btn-ripple"
-                  onClick={handleRipple}
-                  disabled={forgotLoading}
-                >
-                  {forgotLoading ? "Sending..." : "Send Reset Link"}
-                </button>
-              </form>
-              <div style={currentStyles.authSwitch}>
-                <a
-                  onClick={() => {
-                    setShowForgotPassword(false);
-                    setAuthError("");
-                    setForgotSuccess("");
-                  }}
-                  style={currentStyles.authLink}
-                >
-                  ← Back to sign in
-                </a>
-              </div>
+          <form onSubmit={handleLogin}>
+            <div style={currentStyles.formGroup}>
+              <label style={currentStyles.label}>Email</label>
+              <input
+                type="email"
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                style={currentStyles.input}
+              />
             </div>
-          ) : (
-            <>
-              {/* Tab Switcher */}
-              <div style={currentStyles.tabContainer}>
-                <button
-                  style={{
-                    ...currentStyles.tab,
-                    ...(authMode === "signin" ? currentStyles.tabActive : {}),
-                  }}
-                  onClick={() => {
-                    setAuthMode("signin");
-                    setAuthError("");
-                    setAuthSuccess("");
-                  }}
-                >
-                  Sign In
-                </button>
-                <button
-                  style={{
-                    ...currentStyles.tab,
-                    ...(authMode === "signup" ? currentStyles.tabActive : {}),
-                  }}
-                  onClick={() => {
-                    setAuthMode("signup");
-                    setAuthError("");
-                    setAuthSuccess("");
-                  }}
-                >
-                  Sign Up
-                </button>
-              </div>
+            <div style={currentStyles.formGroup}>
+              <label style={currentStyles.label}>Password</label>
+              <input
+                type="password"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                style={currentStyles.input}
+              />
+            </div>
+            <button type="submit" style={currentStyles.authBtn}>
+              Sign In
+            </button>
+          </form>
 
-              {/* Sign In Form */}
-              {authMode === "signin" && (
-                <div className="auth-tab-content" key="signin">
-                  <form onSubmit={handleLogin}>
-                    <div style={currentStyles.formGroup}>
-                      <label style={currentStyles.label}>Email</label>
-                      <input
-                        type="email"
-                        value={authEmail}
-                        onChange={(e) => setAuthEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        required
-                        style={currentStyles.input}
-                        className="auth-input-focus"
-                      />
-                    </div>
-                    <div style={currentStyles.formGroup}>
-                      <div style={currentStyles.labelRow}>
-                        <label style={currentStyles.label}>Password</label>
-                        <a
-                          onClick={() => {
-                            setShowForgotPassword(true);
-                            setAuthError("");
-                            setAuthSuccess("");
-                          }}
-                          style={currentStyles.forgotLink}
-                        >
-                          Forgot password?
-                        </a>
-                      </div>
-                      <input
-                        type="password"
-                        value={authPassword}
-                        onChange={(e) => setAuthPassword(e.target.value)}
-                        placeholder="••••••••"
-                        required
-                        style={currentStyles.input}
-                        className="auth-input-focus"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      style={currentStyles.authBtn}
-                      className="auth-btn-ripple"
-                      onClick={handleRipple}
-                    >
-                      Sign In
-                    </button>
-                  </form>
-                </div>
-              )}
+          <div style={currentStyles.authSwitch}>
+            Don't have an account?{" "}
+            <a onClick={() => {
+              setCurrentView("signup");
+              setAuthError("");
+              setAuthSuccess("");
+            }} style={currentStyles.authLink}>
+              Sign up
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-              {/* Sign Up Form */}
-              {authMode === "signup" && (
-                <div className="auth-tab-content" key="signup">
-                  <form onSubmit={handleSignup}>
-                    <div style={currentStyles.formGroup}>
-                      <label style={currentStyles.label}>Full Name</label>
-                      <input
-                        type="text"
-                        value={authName}
-                        onChange={(e) => setAuthName(e.target.value)}
-                        placeholder="Your name"
-                        required
-                        style={currentStyles.input}
-                        className="auth-input-focus"
-                      />
-                    </div>
-                    <div style={currentStyles.formGroup}>
-                      <label style={currentStyles.label}>Email</label>
-                      <input
-                        type="email"
-                        value={authEmail}
-                        onChange={(e) => setAuthEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        required
-                        style={currentStyles.input}
-                        className="auth-input-focus"
-                      />
-                    </div>
-                    <div style={currentStyles.formGroup}>
-                      <label style={currentStyles.label}>Password</label>
-                      <input
-                        type="password"
-                        value={authPassword}
-                        onChange={(e) => setAuthPassword(e.target.value)}
-                        placeholder="••••••••"
-                        minLength={6}
-                        required
-                        style={currentStyles.input}
-                        className="auth-input-focus"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      style={currentStyles.authBtn}
-                      className="auth-btn-ripple"
-                      onClick={handleRipple}
-                    >
-                      Create Account
-                    </button>
-                  </form>
-                </div>
-              )}
+  if (currentView === "signup") {
+    return (
+      <div style={currentStyles.authContainer}>
+        <div style={currentStyles.authCard}>
+          <div style={currentStyles.authLogo}>
+            <div style={currentStyles.logoIcon}></div>
+            <h1 style={currentStyles.authTitle}>UnFiltered-AI</h1>
+            <p style={currentStyles.authSubtitle}>Create your account</p>
+          </div>
 
-              {/* Divider */}
-              <div style={currentStyles.divider}>
-                <span style={currentStyles.dividerLine} />
-                <span style={currentStyles.dividerText}>or</span>
-                <span style={currentStyles.dividerLine} />
-              </div>
+          {authError && <div style={currentStyles.authError}>{authError}</div>}
+          {authSuccess && <div style={currentStyles.authSuccess}>{authSuccess}</div>}
 
-              {/* Social Login Buttons */}
-              <div style={currentStyles.socialButtons}>
-                <button
-                  className="social-btn social-btn-google"
-                  onClick={(e) => {
-                    handleRipple(e);
-                    signIn("google");
-                  }}
-                  type="button"
-                >
-                  <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
-                    <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
-                    <path d="M9.003 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009.003 18z" fill="#34A853"/>
-                    <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
-                    <path d="M9.003 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.464.891 11.428 0 9.002 0A8.997 8.997 0 00.957 4.958L3.964 7.29c.708-2.127 2.692-3.71 5.036-3.71z" fill="#EA4335"/>
-                  </svg>
-                  Google
-                </button>
-                <button
-                  className="social-btn social-btn-github"
-                  onClick={(e) => {
-                    handleRipple(e);
-                    signIn("github");
-                  }}
-                  type="button"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
-                  </svg>
-                  GitHub
-                </button>
-              </div>
-            </>
-          )}
+          <form onSubmit={handleSignup}>
+            <div style={currentStyles.formGroup}>
+              <label style={currentStyles.label}>Name</label>
+              <input
+                type="text"
+                value={authName}
+                onChange={(e) => setAuthName(e.target.value)}
+                placeholder="Your name"
+                required
+                style={currentStyles.input}
+              />
+            </div>
+            <div style={currentStyles.formGroup}>
+              <label style={currentStyles.label}>Email</label>
+              <input
+                type="email"
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                style={currentStyles.input}
+              />
+            </div>
+            <div style={currentStyles.formGroup}>
+              <label style={currentStyles.label}>Password</label>
+              <input
+                type="password"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                placeholder="••••••••"
+                minLength={6}
+                required
+                style={currentStyles.input}
+              />
+            </div>
+            <button type="submit" style={currentStyles.authBtn}>
+              Create Account
+            </button>
+          </form>
+
+          <div style={currentStyles.authSwitch}>
+            Already have an account?{" "}
+            <a onClick={() => {
+              setCurrentView("login");
+              setAuthError("");
+              setAuthSuccess("");
+            }} style={currentStyles.authLink}>
+              Sign in
+            </a>
+          </div>
         </div>
       </div>
     );
@@ -1127,60 +941,33 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '20px',
-    background: '#f8f9fa',
-    position: 'relative' as const,
-    overflow: 'hidden',
-  },
-  authThemeToggle: {
-    position: 'absolute' as const,
-    top: '24px',
-    right: '24px',
-    background: '#fafafa',
-    border: '1px solid #e0e0e0',
-    borderRadius: '10px',
-    padding: '10px 14px',
-    fontSize: '18px',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    zIndex: 10,
+    padding: '24px',
+    background: '#f9f9f9',
   },
   authCard: {
     width: '100%',
-    maxWidth: '400px',
-    padding: '36px 32px',
-    background: 'rgba(255, 255, 255, 0.65)',
-    borderRadius: '24px',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255, 255, 255, 0.4)',
-    position: 'relative' as const,
-    zIndex: 1,
+    maxWidth: '420px',
+    padding: '48px 40px',
+    background: 'white',
+    borderRadius: '16px',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
   },
   authLogo: {
     textAlign: 'center' as const,
-    marginBottom: '20px',
+    marginBottom: '32px',
   },
   logoIcon: {
-    width: '48px',
-    height: '48px',
-    background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%)',
-    border: '2px solid #d0d0d0',
-    borderRadius: '14px',
-    margin: '0 auto 20px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '24px',
-    color: '#666',
+    width: '64px',
+    height: '64px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    borderRadius: '16px',
+    margin: '0 auto 16px',
   },
   authTitle: {
-    fontSize: '26px',
-    fontWeight: 600,
-    marginBottom: '6px',
-    color: '#1a1a1a',
-    letterSpacing: '-0.02em',
+    fontSize: '28px',
+    fontWeight: 700,
+    marginBottom: '8px',
+    color: '#000',
   },
   authSubtitle: {
     fontSize: '14px',
@@ -1193,7 +980,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     borderRadius: '8px',
     color: '#ef4444',
     fontSize: '14px',
-    marginBottom: '20px',
+    marginBottom: '24px',
   },
   authSuccess: {
     padding: '12px 16px',
@@ -1202,103 +989,38 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     borderRadius: '8px',
     color: '#10b981',
     fontSize: '14px',
-    marginBottom: '20px',
-  },
-  tabContainer: {
-    display: 'flex',
-    gap: '8px',
     marginBottom: '24px',
-    background: '#f5f5f5',
-    padding: '4px',
-    borderRadius: '12px',
-  },
-  tab: {
-    flex: 1,
-    padding: '10px 16px',
-    border: 'none',
-    borderRadius: '10px',
-    fontSize: '14px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    background: 'transparent',
-    color: '#666',
-    transition: 'all 0.3s ease',
-  },
-  tabActive: {
-    background: '#fff',
-    color: '#1a1a1a',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
   },
   formGroup: {
-    marginBottom: '16px',
-  },
-  labelRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '8px',
+    marginBottom: '20px',
   },
   label: {
     display: 'block',
     marginBottom: '8px',
-    fontSize: '13px',
+    fontSize: '14px',
     fontWeight: 500,
-    color: '#444',
-  },
-  forgotLink: {
-    fontSize: '12px',
-    color: '#666',
-    cursor: 'pointer',
-    fontWeight: 400,
-    transition: 'color 0.3s ease',
+    color: '#000',
   },
   input: {
     width: '100%',
     padding: '12px 16px',
     border: '1px solid #e0e0e0',
-    borderRadius: '10px',
+    borderRadius: '8px',
     fontSize: '14px',
-    background: '#fafafa',
-    color: '#1a1a1a',
+    background: 'white',
+    color: '#000',
     boxSizing: 'border-box' as const,
-    transition: 'all 0.3s ease',
-    outline: 'none',
   },
   authBtn: {
     width: '100%',
-    padding: '13px 24px',
-    border: '1px solid #d0d0d0',
-    borderRadius: '10px',
+    padding: '12px 24px',
+    border: 'none',
+    borderRadius: '8px',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-    background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%)',
-    color: '#1a1a1a',
-    transition: 'all 0.3s ease',
-    marginTop: '20px',
-  },
-  divider: {
-    display: 'flex',
-    alignItems: 'center',
-    margin: '20px 0',
-    color: '#999',
-    fontSize: '12px',
-  },
-  dividerLine: {
-    flex: 1,
-    height: '1px',
-    background: '#e0e0e0',
-  },
-  dividerText: {
-    padding: '0 16px',
-    fontSize: '12px',
-    color: '#999',
-    fontWeight: 400,
-  },
-  socialButtons: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '10px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
   },
   authSwitch: {
     textAlign: 'center' as const,
@@ -1307,7 +1029,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     color: '#666',
   },
   authLink: {
-    color: '#1a1a1a',
+    color: '#667eea',
     cursor: 'pointer',
     fontWeight: 600,
   },
@@ -2041,19 +1763,11 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   authContainer: {
     ...lightStyles.authContainer,
-    background: '#0a0a0a',
-  },
-  authThemeToggle: {
-    ...lightStyles.authThemeToggle,
-    background: 'rgba(30, 30, 40, 0.8)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    color: '#fff',
+    background: '#1a1a1a',
   },
   authCard: {
     ...lightStyles.authCard,
-    background: 'rgba(20, 20, 30, 0.7)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+    background: '#2a2a2a',
   },
   authTitle: {
     ...lightStyles.authTitle,
@@ -2063,58 +1777,19 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
     ...lightStyles.authSubtitle,
     color: '#999',
   },
-  tabContainer: {
-    ...lightStyles.tabContainer,
-    background: 'rgba(255, 255, 255, 0.05)',
-  },
-  tab: {
-    ...lightStyles.tab,
-    color: '#999',
-  },
-  tabActive: {
-    ...lightStyles.tabActive,
-    background: 'rgba(255, 255, 255, 0.1)',
-    color: '#fff',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
-  },
-  labelRow: {
-    ...lightStyles.labelRow,
-  },
   label: {
     ...lightStyles.label,
     color: '#fff',
   },
-  forgotLink: {
-    ...lightStyles.forgotLink,
-    color: '#a78bfa',
-  },
   input: {
     ...lightStyles.input,
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    background: '#1a1a1a',
+    border: '1px solid #3a3a3a',
     color: '#fff',
-  },
-  divider: {
-    ...lightStyles.divider,
-  },
-  dividerLine: {
-    ...lightStyles.dividerLine,
-    background: 'rgba(255, 255, 255, 0.1)',
-  },
-  dividerText: {
-    ...lightStyles.dividerText,
-    color: '#666',
-  },
-  socialButtons: {
-    ...lightStyles.socialButtons,
   },
   authSwitch: {
     ...lightStyles.authSwitch,
     color: '#999',
-  },
-  authLink: {
-    ...lightStyles.authLink,
-    color: '#a78bfa',
   },
   authSuccess: {
     ...lightStyles.authSuccess,
