@@ -23,6 +23,7 @@ function HomePage() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [showResetEmailSent, setShowResetEmailSent] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+  const [showWelcome, setShowWelcome] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showChatActionsModal, setShowChatActionsModal] = useState(false);
@@ -75,11 +76,17 @@ function HomePage() {
       setAuthError('Verification link expired. Please sign up again.');
     } else if (error === 'verification-failed') {
       setAuthError('Verification failed. Please try again.');
-    } else if (error === 'NoAccount') {
-      setAuthError('No account found with this email. Please sign up first.');
-      setAuthMode('signup');
+    } else if (error === 'OAuthAccountNotLinked') {
+      setAuthError('This email is already registered with a different sign-in method.');
     }
   }, [searchParams]);
+
+  // Check if user is new (OAuth first-time user)
+  useEffect(() => {
+    if (session?.user && (session.user as any).isNewUser) {
+      setShowWelcome(true);
+    }
+  }, [session]);
 
   // Detect mobile
   useEffect(() => {
@@ -217,6 +224,16 @@ function HomePage() {
 
     button.appendChild(ripple);
     setTimeout(() => ripple.remove(), 600);
+  };
+
+  const handleDismissWelcome = async () => {
+    try {
+      await fetch('/api/user/dismiss-welcome', { method: 'POST' });
+      setShowWelcome(false);
+    } catch (error) {
+      console.error('Failed to dismiss welcome:', error);
+      setShowWelcome(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -633,8 +650,6 @@ function HomePage() {
                   className="social-btn social-btn-google"
                   onClick={(e) => {
                     handleRipple(e);
-                    // Set cookie to track auth intent
-                    document.cookie = `auth_intent=${authMode};path=/;max-age=300`;
                     signIn("google");
                   }}
                   type="button"
@@ -651,8 +666,6 @@ function HomePage() {
                   className="social-btn social-btn-github"
                   onClick={(e) => {
                     handleRipple(e);
-                    // Set cookie to track auth intent
-                    document.cookie = `auth_intent=${authMode};path=/;max-age=300`;
                     signIn("github");
                   }}
                   type="button"
@@ -665,6 +678,47 @@ function HomePage() {
               </div>
             </>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // Welcome screen for new OAuth users
+  if (showWelcome) {
+    return (
+      <div style={currentStyles.authContainer} data-theme={theme}>
+        <div className="auth-orb auth-orb-1" />
+        <div className="auth-orb auth-orb-2" />
+        <div className="auth-orb auth-orb-3" />
+        <button onClick={toggleTheme} style={currentStyles.themeToggle}>
+          {theme === 'light' ? '🌙' : '☀️'}
+        </button>
+        <div style={currentStyles.authCard}>
+          <div className="auth-tab-content" style={currentStyles.checkEmailContainer}>
+            <div style={currentStyles.emailIconWrapper}>
+              <div style={currentStyles.emailIcon} className="email-icon-animate">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+              </div>
+              <div style={currentStyles.emailIconRing} className="email-ring-animate" />
+            </div>
+            <h2 style={currentStyles.checkEmailTitle}>Welcome to UnFiltered-AI!</h2>
+            <p style={currentStyles.checkEmailText}>
+              Your account has been created successfully.
+            </p>
+            <p style={currentStyles.checkEmailSubtext}>
+              You're all set! Start chatting with our AI assistant and explore unlimited possibilities.
+            </p>
+            <button
+              onClick={handleDismissWelcome}
+              style={currentStyles.authBtn}
+              className="auth-btn-ripple"
+            >
+              Get Started
+            </button>
+          </div>
         </div>
       </div>
     );

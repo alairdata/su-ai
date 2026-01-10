@@ -4,7 +4,6 @@ import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcrypt';
-import { cookies } from 'next/headers';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -83,10 +82,6 @@ export const authOptions: NextAuthOptions = {
         const email = user.email?.toLowerCase();
         if (!email) return false;
 
-        // Get auth intent from cookie
-        const cookieStore = await cookies();
-        const authIntent = cookieStore.get('auth_intent')?.value || 'signin';
-
         // Check if user already exists
         const { data: existingUser } = await supabase
           .from('users')
@@ -95,12 +90,7 @@ export const authOptions: NextAuthOptions = {
           .single();
 
         if (!existingUser) {
-          // If user is trying to sign in but has no account, reject
-          if (authIntent === 'signin') {
-            return '/?error=NoAccount';
-          }
-
-          // Create new user for OAuth sign-up
+          // Create new user for OAuth sign-in
           const { error: insertError } = await supabase
             .from('users')
             .insert({
@@ -111,6 +101,7 @@ export const authOptions: NextAuthOptions = {
               messages_used_today: 0,
               email_verified: true, // OAuth emails are verified
               oauth_provider: account.provider,
+              is_new_user: true, // Flag for welcome screen
             });
 
           if (insertError) {
@@ -128,11 +119,12 @@ export const authOptions: NextAuthOptions = {
           token.id = user.id;
           token.plan = (user as any).plan;
           token.messagesUsedToday = (user as any).messagesUsedToday;
+          token.isNewUser = false;
         } else {
           // For OAuth login, we need to fetch user data from database
           const { data: dbUser } = await supabase
             .from('users')
-            .select('id, plan, messages_used_today')
+            .select('id, plan, messages_used_today, is_new_user')
             .eq('email', user.email?.toLowerCase())
             .single();
 
@@ -140,6 +132,7 @@ export const authOptions: NextAuthOptions = {
             token.id = dbUser.id;
             token.plan = dbUser.plan;
             token.messagesUsedToday = dbUser.messages_used_today;
+            token.isNewUser = dbUser.is_new_user || false;
           }
         }
       }
@@ -150,6 +143,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).id = token.id as string;
         (session.user as any).plan = token.plan as string;
         (session.user as any).messagesUsedToday = token.messagesUsedToday as number;
+        (session.user as any).isNewUser = token.isNewUser as boolean;
 
         // Check if daily reset needed
         const { data: user } = await supabase
