@@ -1025,7 +1025,7 @@ function HomePage() {
                         </div>
                         <div style={currentStyles.messageActions}>
                           <span style={currentStyles.messageTimestamp}>
-                            {formatTimestamp(m.createdAt ? new Date(m.createdAt) : new Date())}
+                            {formatTimestamp(m.created_at ? new Date(m.created_at) : new Date())}
                           </span>
                           <button
                             onClick={() => handleCopyMessage(m.content, m.id || String(idx))}
