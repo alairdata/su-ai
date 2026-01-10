@@ -4,6 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcrypt';
+import { cookies } from 'next/headers';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -82,6 +83,10 @@ export const authOptions: NextAuthOptions = {
         const email = user.email?.toLowerCase();
         if (!email) return false;
 
+        // Get auth intent from cookie
+        const cookieStore = await cookies();
+        const authIntent = cookieStore.get('auth_intent')?.value || 'signin';
+
         // Check if user already exists
         const { data: existingUser } = await supabase
           .from('users')
@@ -90,7 +95,12 @@ export const authOptions: NextAuthOptions = {
           .single();
 
         if (!existingUser) {
-          // Create new user for OAuth sign-in
+          // If user is trying to sign in but has no account, reject
+          if (authIntent === 'signin') {
+            return '/?error=NoAccount';
+          }
+
+          // Create new user for OAuth sign-up
           const { error: insertError } = await supabase
             .from('users')
             .insert({

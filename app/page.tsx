@@ -75,6 +75,9 @@ function HomePage() {
       setAuthError('Verification link expired. Please sign up again.');
     } else if (error === 'verification-failed') {
       setAuthError('Verification failed. Please try again.');
+    } else if (error === 'NoAccount') {
+      setAuthError('No account found with this email. Please sign up first.');
+      setAuthMode('signup');
     }
   }, [searchParams]);
 
@@ -630,6 +633,8 @@ function HomePage() {
                   className="social-btn social-btn-google"
                   onClick={(e) => {
                     handleRipple(e);
+                    // Set cookie to track auth intent
+                    document.cookie = `auth_intent=${authMode};path=/;max-age=300`;
                     signIn("google");
                   }}
                   type="button"
@@ -646,6 +651,8 @@ function HomePage() {
                   className="social-btn social-btn-github"
                   onClick={(e) => {
                     handleRipple(e);
+                    // Set cookie to track auth intent
+                    document.cookie = `auth_intent=${authMode};path=/;max-age=300`;
                     signIn("github");
                   }}
                   type="button"
