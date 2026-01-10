@@ -473,7 +473,6 @@ function HomePage() {
                   onClick={() => {
                     setShowForgotPassword(false);
                     setAuthError("");
-                    setForgotSuccess("");
                   }}
                   style={currentStyles.authLink}
                 >
