@@ -567,6 +567,35 @@ select {
   animation: fadeSlideIn 0.3s ease-out;
 }
 
+/* Email icon animations for check email screen */
+@keyframes email-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes email-ring-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 0;
+  }
+}
+
+.email-icon-animate {
+  animation: email-bounce 2s ease-in-out infinite;
+}
+
+.email-ring-animate {
+  animation: email-ring-pulse 2s ease-out infinite;
+}
+
 /* Social button styles - glassmorphic */
 .social-btn {
   display: flex;

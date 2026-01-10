@@ -17,9 +17,12 @@ function HomePage() {
   const [currentView, setCurrentView] = useState<View>("auth");
   const [authMode, setAuthMode] = useState<AuthMode>("signin");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showCheckEmail, setShowCheckEmail] = useState(false);
+  const [signupEmail, setSignupEmail] = useState("");
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotSuccess, setForgotSuccess] = useState("");
+  const [showResetEmailSent, setShowResetEmailSent] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showChatActionsModal, setShowChatActionsModal] = useState(false);
@@ -155,16 +158,12 @@ function HomePage() {
         return;
       }
 
-      // Show success message and switch to signin
-      setAuthSuccess(data.message || "Account created! Check your email to verify.");
+      // Show the check email screen
+      setSignupEmail(authEmail);
+      setShowCheckEmail(true);
       setAuthEmail("");
       setAuthPassword("");
       setAuthName("");
-
-      // Switch to signin mode after 2 seconds
-      setTimeout(() => {
-        setAuthMode("signin");
-      }, 2000);
 
     } catch (error) {
       setAuthError("Signup failed. Please try again.");
@@ -175,7 +174,6 @@ function HomePage() {
     e.preventDefault();
     setForgotLoading(true);
     setAuthError("");
-    setForgotSuccess("");
 
     try {
       const res = await fetch("/api/auth/forgot-password", {
@@ -187,7 +185,9 @@ function HomePage() {
       const data = await res.json();
 
       if (res.ok) {
-        setForgotSuccess("If an account exists with this email, you will receive a password reset link.");
+        setResetEmail(forgotEmail);
+        setShowResetEmailSent(true);
+        setShowForgotPassword(false);
         setForgotEmail("");
       } else {
         setAuthError(data.error || "Failed to send reset email");
@@ -379,10 +379,71 @@ function HomePage() {
           {/* Error/Success Messages */}
           {authError && <div style={currentStyles.authError}>{authError}</div>}
           {authSuccess && <div style={currentStyles.authSuccess}>{authSuccess}</div>}
-          {forgotSuccess && <div style={currentStyles.authSuccess}>{forgotSuccess}</div>}
 
-          {/* Forgot Password View */}
-          {showForgotPassword ? (
+          {/* Check Email Screen (after signup) */}
+          {showCheckEmail ? (
+            <div className="auth-tab-content" style={currentStyles.checkEmailContainer}>
+              <div style={currentStyles.emailIconWrapper}>
+                <div style={currentStyles.emailIcon} className="email-icon-animate">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2"/>
+                    <path d="M22 7l-10 6L2 7"/>
+                  </svg>
+                </div>
+                <div style={currentStyles.emailIconRing} className="email-ring-animate" />
+              </div>
+              <h2 style={currentStyles.checkEmailTitle}>Check your email</h2>
+              <p style={currentStyles.checkEmailText}>
+                We've sent a verification link to
+              </p>
+              <p style={currentStyles.checkEmailAddress}>{signupEmail}</p>
+              <p style={currentStyles.checkEmailSubtext}>
+                Click the link in the email to verify your account. If you don't see it, check your spam folder.
+              </p>
+              <button
+                onClick={() => {
+                  setShowCheckEmail(false);
+                  setAuthMode("signin");
+                }}
+                style={currentStyles.authBtn}
+                className="auth-btn-ripple"
+              >
+                Back to Sign In
+              </button>
+            </div>
+          ) : showResetEmailSent ? (
+            <div className="auth-tab-content" style={currentStyles.checkEmailContainer}>
+              <div style={currentStyles.emailIconWrapper}>
+                <div style={currentStyles.emailIcon} className="email-icon-animate">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                    <path d="M12 13v5"/>
+                    <path d="M9 18h6"/>
+                  </svg>
+                </div>
+                <div style={currentStyles.emailIconRing} className="email-ring-animate" />
+              </div>
+              <h2 style={currentStyles.checkEmailTitle}>Reset link sent!</h2>
+              <p style={currentStyles.checkEmailText}>
+                We've sent a password reset link to
+              </p>
+              <p style={currentStyles.checkEmailAddress}>{resetEmail}</p>
+              <p style={currentStyles.checkEmailSubtext}>
+                Click the link in the email to reset your password. The link expires in 1 hour. Don't forget to check your spam folder!
+              </p>
+              <button
+                onClick={() => {
+                  setShowResetEmailSent(false);
+                  setAuthMode("signin");
+                }}
+                style={currentStyles.authBtn}
+                className="auth-btn-ripple"
+              >
+                Back to Sign In
+              </button>
+            </div>
+          ) : showForgotPassword ? (
             <div className="auth-tab-content">
               <form onSubmit={handleForgotPassword}>
                 <div style={currentStyles.formGroup}>
@@ -1311,6 +1372,66 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     cursor: 'pointer',
     fontWeight: 600,
   },
+  checkEmailContainer: {
+    textAlign: 'center' as const,
+    padding: '20px 0',
+  },
+  emailIconWrapper: {
+    position: 'relative' as const,
+    width: '80px',
+    height: '80px',
+    margin: '0 auto 24px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emailIcon: {
+    width: '80px',
+    height: '80px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%)',
+    border: '2px solid #d0d0d0',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#666',
+    zIndex: 2,
+    position: 'relative' as const,
+  },
+  emailIconRing: {
+    position: 'absolute' as const,
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: '80px',
+    height: '80px',
+    borderRadius: '50%',
+    border: '2px solid #d0d0d0',
+    zIndex: 1,
+  },
+  checkEmailTitle: {
+    fontSize: '24px',
+    fontWeight: 600,
+    color: '#1a1a1a',
+    marginBottom: '12px',
+  },
+  checkEmailText: {
+    fontSize: '14px',
+    color: '#666',
+    marginBottom: '4px',
+  },
+  checkEmailAddress: {
+    fontSize: '15px',
+    fontWeight: 600,
+    color: '#1a1a1a',
+    marginBottom: '16px',
+  },
+  checkEmailSubtext: {
+    fontSize: '13px',
+    color: '#888',
+    marginBottom: '24px',
+    lineHeight: 1.5,
+  },
   app: {
     display: 'flex',
     height: '100vh',
@@ -2119,6 +2240,32 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   authSuccess: {
     ...lightStyles.authSuccess,
     background: 'rgba(16, 185, 129, 0.2)',
+  },
+  emailIcon: {
+    ...lightStyles.emailIcon,
+    background: 'rgba(255, 255, 255, 0.1)',
+    border: '2px solid rgba(255, 255, 255, 0.2)',
+    color: '#999',
+  },
+  emailIconRing: {
+    ...lightStyles.emailIconRing,
+    border: '2px solid rgba(255, 255, 255, 0.15)',
+  },
+  checkEmailTitle: {
+    ...lightStyles.checkEmailTitle,
+    color: '#fff',
+  },
+  checkEmailText: {
+    ...lightStyles.checkEmailText,
+    color: '#999',
+  },
+  checkEmailAddress: {
+    ...lightStyles.checkEmailAddress,
+    color: '#fff',
+  },
+  checkEmailSubtext: {
+    ...lightStyles.checkEmailSubtext,
+    color: '#777',
   },
   mobileMenuBtn: {
     ...lightStyles.mobileMenuBtn,
