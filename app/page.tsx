@@ -116,6 +116,69 @@ function HomePage() {
   const showGreeting = !currentChat || messages.length === 0;
   const remainingMessages = getRemainingMessages();
 
+  // Dynamic greeting based on time of day
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    const userName = session?.user?.name?.split(' ')[0] || '';
+
+    const morningGreetings = [
+      "It's morning already?! Rise and grind!",
+      "Ugh, mornings. Coffee first, questions later.",
+      "Early bird gets the worm... or just asks me stuff.",
+      "Morning! Let's pretend we're both awake.",
+      "Sun's up. Brain's loading... How can I help?",
+      "Good morning! Just kidding, mornings suck. What's up?",
+    ];
+
+    const afternoonGreetings = [
+      "Afternoon slump hitting? I got you.",
+      "Post-lunch brain fog? Let's power through.",
+      "It's PM o'clock. What are we working on?",
+      "Halfway through the day. Still standing?",
+      "Afternoon! The boring part of the day. Spice it up!",
+      "Lunch coma? Same. But I'm here if you need me.",
+    ];
+
+    const eveningGreetings = [
+      "Evening mode activated. What's on your mind?",
+      "Sun's setting. Productivity rising?",
+      "End of day grind? Let's finish strong.",
+      "Evening! Almost made it. What do you need?",
+      "Golden hour thoughts? I'm listening.",
+      "Wrapping up? Or just getting started?",
+    ];
+
+    const nightGreetings = [
+      "Burning the midnight oil? Respect.",
+      "Night owl energy! What's keeping you up?",
+      "Sleep is overrated anyway. How can I help?",
+      "Late night thoughts hit different. Shoot.",
+      "It's dark outside. We're doing this? Let's go.",
+      "Insomnia or inspiration? Either way, I'm here.",
+      "The world's asleep but we're built different.",
+    ];
+
+    let greetings;
+    if (hour >= 5 && hour < 12) {
+      greetings = morningGreetings;
+    } else if (hour >= 12 && hour < 17) {
+      greetings = afternoonGreetings;
+    } else if (hour >= 17 && hour < 21) {
+      greetings = eveningGreetings;
+    } else {
+      greetings = nightGreetings;
+    }
+
+    const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+    return userName ? `Hey ${userName}! ${randomGreeting}` : randomGreeting;
+  };
+
+  const [greeting, setGreeting] = useState("");
+
+  useEffect(() => {
+    setGreeting(getGreeting());
+  }, [session, currentChat]);
+
   // Calculate progress percentage
   const getProgressPercentage = () => {
     if (!session?.user) return 0;
@@ -234,6 +297,26 @@ function HomePage() {
       console.error('Failed to dismiss welcome:', error);
       setShowWelcome(false);
     }
+  };
+
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+
+  const handleCopyMessage = async (content: string, messageId: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedMessageId(messageId);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  };
+
+  const formatTimestamp = (date: Date) => {
+    return new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(date);
   };
 
   const handleLogout = async () => {
@@ -908,8 +991,14 @@ function HomePage() {
             <div style={currentStyles.messagesArea}>
               {showGreeting && (
                 <div style={currentStyles.emptyState}>
-                  <div style={currentStyles.greetingLogo}></div>
-                  <div style={currentStyles.greetingText}>What's good?</div>
+                  <div style={currentStyles.greetingLogo}>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                      <path d="M2 17l10 5 10-5"/>
+                      <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                  </div>
+                  <div style={currentStyles.greetingText}>{greeting}</div>
                   {remainingMessages !== Infinity && (
                     <div style={currentStyles.messageLimitInfo}>
                       {remainingMessages} messages remaining today
@@ -928,10 +1017,33 @@ function HomePage() {
                       key={m.id || idx}
                       style={m.role === "user" ? currentStyles.messageRowUser : currentStyles.messageRowAssistant}
                     >
-                      <div
-                        style={m.role === "user" ? currentStyles.messageBubbleUser : currentStyles.messageBubbleAssistant}
-                      >
-                        <div style={currentStyles.messageText}>{m.content}</div>
+                      <div style={currentStyles.messageWrapper}>
+                        <div
+                          style={m.role === "user" ? currentStyles.messageBubbleUser : currentStyles.messageBubbleAssistant}
+                        >
+                          <div style={currentStyles.messageText}>{m.content}</div>
+                        </div>
+                        <div style={currentStyles.messageActions}>
+                          <span style={currentStyles.messageTimestamp}>
+                            {formatTimestamp(m.createdAt ? new Date(m.createdAt) : new Date())}
+                          </span>
+                          <button
+                            onClick={() => handleCopyMessage(m.content, m.id || String(idx))}
+                            style={currentStyles.actionButton}
+                            title="Copy message"
+                          >
+                            {copiedMessageId === (m.id || String(idx)) ? (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                            ) : (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                              </svg>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1760,18 +1872,25 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     padding: '20px',
   },
   greetingLogo: {
-    width: '64px',
-    height: '64px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: '16px',
+    width: '72px',
+    height: '72px',
+    background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%)',
+    border: '2px solid #d0d0d0',
+    borderRadius: '20px',
     marginBottom: '24px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#666',
   },
   greetingText: {
-    fontSize: '28px',
+    fontSize: '24px',
     fontWeight: 600,
-    color: '#000',
+    color: '#1a1a1a',
     marginBottom: '24px',
     textAlign: 'center' as const,
+    maxWidth: '500px',
+    lineHeight: 1.4,
   },
   chatMessages: {
     maxWidth: '768px',
@@ -1801,30 +1920,64 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     maxWidth: '100%',
   },
   messageBubbleUser: {
-    maxWidth: '85%',
-    padding: '12px 16px',
-    borderRadius: '16px',
-    fontSize: '15px',
-    lineHeight: 1.5,
-    wordWrap: 'break-word' as const,
-    background: '#000',
-    color: '#fff',
-    boxSizing: 'border-box' as const,
-  },
-  messageBubbleAssistant: {
-    maxWidth: '85%',
-    padding: '12px 16px',
-    borderRadius: '16px',
-    fontSize: '15px',
+    maxWidth: '80%',
+    padding: '14px 18px',
+    borderRadius: '18px 18px 4px 18px',
+    fontSize: '14px',
     lineHeight: 1.6,
     wordWrap: 'break-word' as const,
-    background: '#f4f4f4',
-    color: '#000',
+    background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+    color: '#fff',
     boxSizing: 'border-box' as const,
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+  },
+  messageBubbleAssistant: {
+    maxWidth: '80%',
+    padding: '14px 18px',
+    borderRadius: '18px 18px 18px 4px',
+    fontSize: '14px',
+    lineHeight: 1.6,
+    wordWrap: 'break-word' as const,
+    background: 'rgba(255, 255, 255, 0.7)',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+    border: '1px solid rgba(0, 0, 0, 0.05)',
+    color: '#1a1a1a',
+    boxSizing: 'border-box' as const,
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
   },
   messageText: {
     whiteSpace: 'pre-wrap' as const,
     wordBreak: 'break-word' as const,
+  },
+  messageWrapper: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '6px',
+    maxWidth: '80%',
+  },
+  messageActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    paddingLeft: '4px',
+    opacity: 0.6,
+  },
+  messageTimestamp: {
+    fontSize: '11px',
+    color: '#888',
+  },
+  actionButton: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '4px',
+    borderRadius: '4px',
+    color: '#888',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
   },
   typingIndicator: {
     display: 'flex',
@@ -2394,6 +2547,12 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
     ...lightStyles.modelBadge,
     color: '#fff',
   },
+  greetingLogo: {
+    ...lightStyles.greetingLogo,
+    background: 'rgba(255, 255, 255, 0.1)',
+    border: '2px solid rgba(255, 255, 255, 0.2)',
+    color: '#999',
+  },
   greetingText: {
     ...lightStyles.greetingText,
     color: '#fff',
@@ -2404,11 +2563,12 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   messageBubbleUser: {
     ...lightStyles.messageBubbleUser,
-    background: '#3a3a3a',
+    background: 'linear-gradient(135deg, #4a4a4a 0%, #3a3a3a 100%)',
   },
   messageBubbleAssistant: {
     ...lightStyles.messageBubbleAssistant,
-    background: '#1a1a1a',
+    background: 'rgba(255, 255, 255, 0.08)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
     color: '#fff',
   },
   inputArea: {
