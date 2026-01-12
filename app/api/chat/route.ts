@@ -146,8 +146,11 @@ export async function POST(req: NextRequest) {
 
     await Promise.all(updatePromises);
 
+    const newMessagesUsed = session.user.messagesUsedToday + 1;
+
     return NextResponse.json({
       reply: assistantMessage,
+      messagesUsedToday: newMessagesUsed,
       ...(generatedTitle && { title: generatedTitle }),
     });
 

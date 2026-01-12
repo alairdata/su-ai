@@ -1367,7 +1367,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     color: '#f59e0b',
   },
   upgradeLink: {
-    color: '#667eea',
+    color: '#1a1a1a',
     cursor: 'pointer',
     fontWeight: 600,
     textDecoration: 'underline',
@@ -1786,7 +1786,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   renameInput: {
     flex: 1,
     padding: '6px 8px',
-    border: '1px solid #667eea',
+    border: '1px solid #1a1a1a',
     borderRadius: '4px',
     fontSize: '13px',
     outline: 'none',
@@ -1822,7 +1822,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     width: '36px',
     height: '36px',
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #1a1a1a 0%, #3d3d3d 100%)',
     color: 'white',
     display: 'flex',
     alignItems: 'center',
@@ -2188,7 +2188,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   planBadgeLarge: {
     display: 'inline-block',
     padding: '6px 16px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #1a1a1a 0%, #3d3d3d 100%)',
     color: 'white',
     borderRadius: '24px',
     fontWeight: 600,
@@ -2210,7 +2210,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   progressBar: {
     height: '100%',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #1a1a1a 0%, #3d3d3d 100%)',
     borderRadius: '4px',
     transition: 'width 0.3s ease',
   },
@@ -2227,8 +2227,8 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     minHeight: '220px',
   },
   planCardActive: {
-    border: '2px solid #667eea',
-    background: 'rgba(102, 126, 234, 0.05)',
+    border: '2px solid #1a1a1a',
+    background: 'rgba(26, 26, 26, 0.05)',
   },
   planCardTitle: {
     fontSize: '15px',
@@ -2577,7 +2577,7 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
     ...lightStyles.renameInput,
     background: '#2a2a2a',
     color: '#fff',
-    border: '1px solid #667eea',
+    border: '1px solid #555',
   },
   sidebarFooter: {
     ...lightStyles.sidebarFooter,
@@ -2717,6 +2717,14 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   planFeature: {
     ...lightStyles.planFeature,
     color: '#999',
+  },
+  planCardActive: {
+    border: '2px solid #fff',
+    background: 'rgba(255, 255, 255, 0.05)',
+  },
+  upgradeLink: {
+    ...lightStyles.upgradeLink,
+    color: '#fff',
   },
   actionsModalContent: {
     ...lightStyles.actionsModalContent,

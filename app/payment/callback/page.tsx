@@ -147,7 +147,7 @@ const styles = {
   } as React.CSSProperties,
   button: {
     padding: '12px 32px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #1a1a1a 0%, #3d3d3d 100%)',
     color: 'white',
     border: 'none',
     borderRadius: '8px',

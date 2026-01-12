@@ -26,8 +26,22 @@ export function useChats() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [localMessagesUsed, setLocalMessagesUsed] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const previousMessageCountRef = useRef(0);
+
+  // Sync local message count from session on initial load or user change
+  const userId = session?.user?.id ?? null;
+  const sessionMessagesUsed = session?.user?.messagesUsedToday ?? 0;
+  const lastUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Only sync when user changes (login) or on first load
+    if (userId && userId !== lastUserIdRef.current) {
+      setLocalMessagesUsed(sessionMessagesUsed);
+      lastUserIdRef.current = userId;
+    }
+  }, [userId, sessionMessagesUsed]);
 
   // Load chats from API when user logs in
   useEffect(() => {
@@ -64,17 +78,20 @@ export function useChats() {
     ? chats.find((c) => c.id === currentChatId) || null 
     : null;
 
+  // Use local count for real-time updates
+  const messagesUsed = localMessagesUsed ?? session?.user?.messagesUsedToday ?? 0;
+
   const canSendMessage = (): boolean => {
     if (!session?.user) return false;
     const limit = PLAN_LIMITS[session.user.plan as keyof typeof PLAN_LIMITS] || 50;
-    return session.user.messagesUsedToday < limit;
+    return messagesUsed < limit;
   };
 
   const getRemainingMessages = (): number => {
     if (!session?.user) return 0;
     const limit = PLAN_LIMITS[session.user.plan as keyof typeof PLAN_LIMITS] || 50;
     if (limit === Infinity) return Infinity;
-    return Math.max(0, limit - session.user.messagesUsedToday);
+    return Math.max(0, limit - messagesUsed);
   };
 
   // Generate SMART chat title from first message
@@ -207,6 +224,9 @@ export function useChats() {
             : c
         )
       );
+
+      // Update local message count instantly (no refresh needed)
+      setLocalMessagesUsed(prev => (prev ?? 0) + 1);
 
     } catch (error) {
       console.error('Error sending message:', error);
