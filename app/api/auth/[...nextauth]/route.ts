@@ -148,24 +148,32 @@ export const authOptions: NextAuthOptions = {
         // Fetch fresh user data from database (including plan for upgrades)
         const { data: user } = await supabase
           .from('users')
-          .select('plan, messages_used_today, last_reset_date')
+          .select('plan, messages_used_today, last_reset_date, timezone')
           .eq('id', token.id)
           .single();
 
         if (user) {
           // Always use fresh plan from database (for upgrades to reflect immediately)
           (session.user as any).plan = user.plan;
+          (session.user as any).timezone = user.timezone || 'UTC';
 
-          const lastReset = user.last_reset_date ? new Date(user.last_reset_date) : null;
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
+          // Calculate midnight in user's timezone (server-side, no client manipulation possible)
+          const userTimezone = user.timezone || 'UTC';
+          const now = new Date();
 
-          if (!lastReset || lastReset < today) {
+          // Get current date in user's timezone
+          const userDateStr = now.toLocaleDateString('en-CA', { timeZone: userTimezone }); // YYYY-MM-DD format
+          const lastResetStr = user.last_reset_date
+            ? new Date(user.last_reset_date).toLocaleDateString('en-CA', { timeZone: userTimezone })
+            : null;
+
+          // Reset if last reset was on a different day in user's timezone
+          if (!lastResetStr || lastResetStr !== userDateStr) {
             await supabase
               .from('users')
               .update({
                 messages_used_today: 0,
-                last_reset_date: today.toISOString(),
+                last_reset_date: now.toISOString(),
               })
               .eq('id', token.id);
 

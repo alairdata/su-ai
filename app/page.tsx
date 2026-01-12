@@ -26,6 +26,8 @@ function HomePage() {
   const [resetEmail, setResetEmail] = useState("");
   const [showWelcome, setShowWelcome] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [selectedTimezone, setSelectedTimezone] = useState("");
+  const [isUpdatingTimezone, setIsUpdatingTimezone] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showChatActionsModal, setShowChatActionsModal] = useState(false);
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
@@ -88,6 +90,25 @@ function HomePage() {
       setShowWelcome(true);
     }
   }, [session]);
+
+  // Auto-detect and save timezone for OAuth users (runs once per session)
+  useEffect(() => {
+    const autoDetectTimezone = async () => {
+      if (session?.user && !(session.user as any).timezone) {
+        try {
+          const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          await fetch('/api/user/timezone', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timezone: detectedTimezone }),
+          });
+        } catch (error) {
+          console.error('Failed to auto-detect timezone:', error);
+        }
+      }
+    };
+    autoDetectTimezone();
+  }, [session?.user]);
 
   // Detect mobile
   useEffect(() => {
@@ -189,12 +210,52 @@ function HomePage() {
     return (session.user.messagesUsedToday / limit) * 100;
   };
 
+  // Auto-detect and save user's timezone
+  const saveUserTimezone = async () => {
+    try {
+      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      await fetch('/api/user/timezone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timezone: detectedTimezone }),
+      });
+    } catch (error) {
+      console.error('Failed to save timezone:', error);
+    }
+  };
+
+  // Sync selected timezone when modal opens
+  useEffect(() => {
+    if (showAccountModal && session?.user) {
+      setSelectedTimezone((session.user as any).timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
+    }
+  }, [showAccountModal, session]);
+
+  // Update user's timezone
+  const updateTimezone = async (newTimezone: string) => {
+    setIsUpdatingTimezone(true);
+    try {
+      const res = await fetch('/api/user/timezone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timezone: newTimezone }),
+      });
+      if (res.ok) {
+        setSelectedTimezone(newTimezone);
+      }
+    } catch (error) {
+      console.error('Failed to update timezone:', error);
+    } finally {
+      setIsUpdatingTimezone(false);
+    }
+  };
+
   // Auth handlers
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
     setAuthSuccess("");
-    
+
     const result = await signIn("credentials", {
       email: authEmail,
       password: authPassword,
@@ -206,6 +267,8 @@ function HomePage() {
     } else {
       setAuthEmail("");
       setAuthPassword("");
+      // Auto-detect and save timezone on successful login
+      await saveUserTimezone();
     }
   };
 
@@ -1160,6 +1223,78 @@ function HomePage() {
                     <span style={currentStyles.modalLabel}>Email:</span>
                     <span style={currentStyles.modalValue}>{session?.user?.email}</span>
                   </div>
+                </div>
+
+                <div style={currentStyles.modalSection}>
+                  <h3 style={currentStyles.modalSectionTitle}>Timezone</h3>
+                  <p style={{ fontSize: '13px', color: '#666', marginBottom: '12px' }}>
+                    Your daily message limit resets at midnight in your timezone.
+                  </p>
+                  <select
+                    value={selectedTimezone}
+                    onChange={(e) => updateTimezone(e.target.value)}
+                    disabled={isUpdatingTimezone}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #e0e0e0',
+                      fontSize: '14px',
+                      background: '#fff',
+                      cursor: 'pointer',
+                      outline: 'none',
+                    }}
+                  >
+                    {/* Show detected timezone if not in predefined list */}
+                    {selectedTimezone && ![
+                      'Africa/Lagos', 'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Nairobi',
+                      'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+                      'America/Toronto', 'America/Sao_Paulo', 'Asia/Dubai', 'Asia/Kolkata',
+                      'Asia/Singapore', 'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Hong_Kong',
+                      'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow',
+                      'Pacific/Auckland', 'Australia/Sydney', 'UTC'
+                    ].includes(selectedTimezone) && (
+                      <option value={selectedTimezone}>{selectedTimezone} (Detected)</option>
+                    )}
+                    <optgroup label="Africa">
+                      <option value="Africa/Lagos">Lagos (WAT)</option>
+                      <option value="Africa/Cairo">Cairo (EET)</option>
+                      <option value="Africa/Johannesburg">Johannesburg (SAST)</option>
+                      <option value="Africa/Nairobi">Nairobi (EAT)</option>
+                    </optgroup>
+                    <optgroup label="Americas">
+                      <option value="America/New_York">New York (EST/EDT)</option>
+                      <option value="America/Chicago">Chicago (CST/CDT)</option>
+                      <option value="America/Denver">Denver (MST/MDT)</option>
+                      <option value="America/Los_Angeles">Los Angeles (PST/PDT)</option>
+                      <option value="America/Toronto">Toronto (EST/EDT)</option>
+                      <option value="America/Sao_Paulo">São Paulo (BRT)</option>
+                    </optgroup>
+                    <optgroup label="Asia">
+                      <option value="Asia/Dubai">Dubai (GST)</option>
+                      <option value="Asia/Kolkata">India (IST)</option>
+                      <option value="Asia/Singapore">Singapore (SGT)</option>
+                      <option value="Asia/Tokyo">Tokyo (JST)</option>
+                      <option value="Asia/Shanghai">Shanghai (CST)</option>
+                      <option value="Asia/Hong_Kong">Hong Kong (HKT)</option>
+                    </optgroup>
+                    <optgroup label="Europe">
+                      <option value="Europe/London">London (GMT/BST)</option>
+                      <option value="Europe/Paris">Paris (CET/CEST)</option>
+                      <option value="Europe/Berlin">Berlin (CET/CEST)</option>
+                      <option value="Europe/Moscow">Moscow (MSK)</option>
+                    </optgroup>
+                    <optgroup label="Pacific">
+                      <option value="Pacific/Auckland">Auckland (NZST)</option>
+                      <option value="Australia/Sydney">Sydney (AEST)</option>
+                    </optgroup>
+                    <optgroup label="Other">
+                      <option value="UTC">UTC</option>
+                    </optgroup>
+                  </select>
+                  {isUpdatingTimezone && (
+                    <p style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>Updating...</p>
+                  )}
                 </div>
 
                 <div style={currentStyles.modalSection}>
