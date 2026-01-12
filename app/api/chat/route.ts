@@ -112,21 +112,43 @@ export async function POST(req: NextRequest) {
       }).eq("id", session.user.id),
     ];
 
-    // Add title update for first message
+    // Generate smart title for first message using Claude
+    let generatedTitle: string | null = null;
     if (isFirstMessage) {
-      const title = userMessage.length > 30 
-        ? userMessage.substring(0, 30) + "..." 
-        : userMessage;
-      
+      try {
+        const titleResponse = await anthropic.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 30,
+          messages: [
+            {
+              role: "user",
+              content: `Summarize this message in 3-5 words for a chat title. No quotes, no punctuation at the end. Just the title:\n\n"${userMessage}"`
+            }
+          ],
+        });
+
+        generatedTitle = titleResponse.content
+          .map((block: any) => ("text" in block ? block.text : ""))
+          .join("")
+          .trim()
+          .slice(0, 50); // Safety limit
+      } catch {
+        // Fallback to simple truncation if title generation fails
+        generatedTitle = userMessage.length > 30
+          ? userMessage.substring(0, 30) + "..."
+          : userMessage;
+      }
+
       updatePromises.push(
-        supabase.from("chats").update({ title }).eq("id", chatId)
+        supabase.from("chats").update({ title: generatedTitle }).eq("id", chatId)
       );
     }
 
     await Promise.all(updatePromises);
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       reply: assistantMessage,
+      ...(generatedTitle && { title: generatedTitle }),
     });
 
   } catch (error) {

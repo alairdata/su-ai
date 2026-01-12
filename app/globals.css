@@ -352,6 +352,72 @@ select {
   border-bottom-left-radius: 4px;
 }
 
+/* Markdown styles inside message bubbles */
+.message-bubble,
+.message-bubble p,
+.message-bubble span,
+.message-bubble div {
+  text-align: left !important;
+  word-spacing: normal !important;
+  letter-spacing: normal !important;
+}
+
+.message-bubble p {
+  margin: 0 0 0.5em 0 !important;
+  padding: 0 !important;
+}
+
+.message-bubble p:last-child {
+  margin-bottom: 0 !important;
+}
+
+.message-bubble strong {
+  font-weight: 600;
+}
+
+.message-bubble em {
+  font-style: italic;
+}
+
+.message-bubble ul,
+.message-bubble ol {
+  margin: 0 !important;
+  padding: 0 0 0 1em !important;
+}
+
+.message-bubble li {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.message-bubble code {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.message-bubble pre {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 0.5em;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0 !important;
+}
+
+.message-bubble pre code {
+  background: none;
+  padding: 0;
+}
+
+.message-bubble blockquote {
+  border-left: 3px solid rgba(0, 0, 0, 0.2);
+  margin: 0 !important;
+  padding-left: 0.5em;
+  font-style: italic;
+}
+
 /* typing dots */
 
 .typing-indicator {

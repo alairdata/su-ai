@@ -16,7 +16,7 @@ type Chat = {
 };
 
 const PLAN_LIMITS = {
-  'Free': 10,
+  'Free': 50,
   'Pro': 100,
   'Enterprise': Infinity
 };
@@ -66,13 +66,13 @@ export function useChats() {
 
   const canSendMessage = (): boolean => {
     if (!session?.user) return false;
-    const limit = PLAN_LIMITS[session.user.plan as keyof typeof PLAN_LIMITS] || 10;
+    const limit = PLAN_LIMITS[session.user.plan as keyof typeof PLAN_LIMITS] || 50;
     return session.user.messagesUsedToday < limit;
   };
 
   const getRemainingMessages = (): number => {
     if (!session?.user) return 0;
-    const limit = PLAN_LIMITS[session.user.plan as keyof typeof PLAN_LIMITS] || 10;
+    const limit = PLAN_LIMITS[session.user.plan as keyof typeof PLAN_LIMITS] || 50;
     if (limit === Infinity) return Infinity;
     return Math.max(0, limit - session.user.messagesUsedToday);
   };
@@ -195,13 +195,14 @@ export function useChats() {
         created_at: new Date().toISOString(),
       };
 
-      // Add assistant response
+      // Add assistant response and update title if returned
       setChats(prev =>
         prev.map(c =>
           c.id === activeChatId
             ? {
                 ...c,
-                messages: [...c.messages, assistantMessage]
+                messages: [...c.messages, assistantMessage],
+                ...(data.title && { title: data.title }),
               }
             : c
         )

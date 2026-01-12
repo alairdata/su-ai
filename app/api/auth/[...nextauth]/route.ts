@@ -145,14 +145,17 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).messagesUsedToday = token.messagesUsedToday as number;
         (session.user as any).isNewUser = token.isNewUser as boolean;
 
-        // Check if daily reset needed
+        // Fetch fresh user data from database (including plan for upgrades)
         const { data: user } = await supabase
           .from('users')
-          .select('messages_used_today, last_reset_date')
+          .select('plan, messages_used_today, last_reset_date')
           .eq('id', token.id)
           .single();
 
         if (user) {
+          // Always use fresh plan from database (for upgrades to reflect immediately)
+          (session.user as any).plan = user.plan;
+
           const lastReset = user.last_reset_date ? new Date(user.last_reset_date) : null;
           const today = new Date();
           today.setHours(0, 0, 0, 0);

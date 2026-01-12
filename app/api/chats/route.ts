@@ -30,7 +30,8 @@ export async function GET(req: NextRequest) {
       )
     `)
     .eq("user_id", session.user.id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .order("created_at", { referencedTable: "messages", ascending: true });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

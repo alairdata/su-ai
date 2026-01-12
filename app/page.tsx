@@ -5,6 +5,7 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import { useChats } from "./hooks/useChats";
 import { useTheme } from "./hooks/useTheme";
 import { useSearchParams } from "next/navigation";
+import ReactMarkdown from "react-markdown";
 
 type View = "auth" | "chat";
 type AuthMode = "signin" | "signup";
@@ -122,40 +123,40 @@ function HomePage() {
     const userName = session?.user?.name?.split(' ')[0] || '';
 
     const morningGreetings = [
-      "It's morning already?! Rise and grind!",
-      "Ugh, mornings. Coffee first, questions later.",
-      "Early bird gets the worm... or just asks me stuff.",
-      "Morning! Let's pretend we're both awake.",
-      "Sun's up. Brain's loading... How can I help?",
-      "Good morning! Just kidding, mornings suck. What's up?",
+      "Morning already?! Howdy!",
+      "Coffee first. Talk later.",
+      "Rise and grind!",
+      "Morning! What's up?",
+      "Brain loading... Go!",
+      "Mornings suck. Anyway...",
     ];
 
     const afternoonGreetings = [
-      "Afternoon slump hitting? I got you.",
-      "Post-lunch brain fog? Let's power through.",
-      "It's PM o'clock. What are we working on?",
-      "Halfway through the day. Still standing?",
-      "Afternoon! The boring part of the day. Spice it up!",
-      "Lunch coma? Same. But I'm here if you need me.",
+      "Afternoon slump? Got you.",
+      "Post-lunch vibes. Shoot!",
+      "PM mode. What's good?",
+      "Still standing? Nice!",
+      "Spice up the day!",
+      "Lunch coma? Same. Go!",
     ];
 
     const eveningGreetings = [
-      "Evening mode activated. What's on your mind?",
-      "Sun's setting. Productivity rising?",
-      "End of day grind? Let's finish strong.",
-      "Evening! Almost made it. What do you need?",
-      "Golden hour thoughts? I'm listening.",
-      "Wrapping up? Or just getting started?",
+      "Evening mode. Shoot!",
+      "Sun's setting. Talk!",
+      "Almost done? What's up?",
+      "Golden hour. Thoughts?",
+      "Wrapping up? Or nah?",
+      "End of day grind!",
     ];
 
     const nightGreetings = [
-      "Burning the midnight oil? Respect.",
-      "Night owl energy! What's keeping you up?",
-      "Sleep is overrated anyway. How can I help?",
-      "Late night thoughts hit different. Shoot.",
-      "It's dark outside. We're doing this? Let's go.",
-      "Insomnia or inspiration? Either way, I'm here.",
-      "The world's asleep but we're built different.",
+      "Midnight oil? Respect.",
+      "Night owl! What's up?",
+      "Sleep's overrated. Go!",
+      "Late night thoughts?",
+      "Built different. Shoot!",
+      "Insomnia gang! Talk.",
+      "World's asleep. Not us!",
     ];
 
     let greetings;
@@ -170,7 +171,7 @@ function HomePage() {
     }
 
     const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
-    return userName ? `Hey ${userName}! ${randomGreeting}` : randomGreeting;
+    return userName ? `${userName}! ${randomGreeting}` : randomGreeting;
   };
 
   const [greeting, setGreeting] = useState("");
@@ -182,7 +183,7 @@ function HomePage() {
   // Calculate progress percentage
   const getProgressPercentage = () => {
     if (!session?.user) return 0;
-    const limits = { Free: 10, Pro: 100, Enterprise: Infinity };
+    const limits = { Free: 50, Pro: 100, Enterprise: Infinity };
     const limit = limits[session.user.plan as keyof typeof limits];
     if (limit === Infinity) return 100;
     return (session.user.messagesUsedToday / limit) * 100;
@@ -1019,14 +1020,14 @@ function HomePage() {
                     >
                       <div style={currentStyles.messageWrapper}>
                         <div
+                          className="message-bubble"
                           style={m.role === "user" ? currentStyles.messageBubbleUser : currentStyles.messageBubbleAssistant}
                         >
-                          <div style={currentStyles.messageText}>{m.content}</div>
+                          <div style={currentStyles.messageText}>
+                            <ReactMarkdown>{m.content}</ReactMarkdown>
+                          </div>
                         </div>
                         <div style={currentStyles.messageActions}>
-                          <span style={currentStyles.messageTimestamp}>
-                            {formatTimestamp(m.created_at ? new Date(m.created_at) : new Date())}
-                          </span>
                           <button
                             onClick={() => handleCopyMessage(m.content, m.id || String(idx))}
                             style={currentStyles.actionButton}
@@ -1043,6 +1044,18 @@ function HomePage() {
                               </svg>
                             )}
                           </button>
+                          {m.role === "assistant" && (
+                            <button
+                              onClick={() => {/* TODO: regenerate */}}
+                              style={currentStyles.actionButton}
+                              title="Regenerate response"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="23 4 23 10 17 10"/>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                              </svg>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1129,7 +1142,10 @@ function HomePage() {
               <div style={currentStyles.modalHeader}>
                 <h2 style={currentStyles.modalTitle}>Account Settings</h2>
                 <button style={currentStyles.modalCloseBtn} onClick={() => setShowAccountModal(false)}>
-                  ×
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                 </button>
               </div>
 
@@ -1151,7 +1167,7 @@ function HomePage() {
                   <div style={currentStyles.planCurrentBadge}>
                     <div style={currentStyles.planBadgeLarge}>{session?.user?.plan}</div>
                     <div style={currentStyles.planDescription}>
-                      {session?.user?.plan === "Free" && `${session.user.messagesUsedToday}/10 messages used today`}
+                      {session?.user?.plan === "Free" && `${session.user.messagesUsedToday}/50 messages used today`}
                       {session?.user?.plan === "Pro" && `${session.user.messagesUsedToday}/100 messages used today`}
                       {session?.user?.plan === "Enterprise" && "Unlimited messages"}
                     </div>
@@ -1175,7 +1191,7 @@ function HomePage() {
                       <h5 style={currentStyles.planCardTitle}>Free</h5>
                       <div style={currentStyles.planPrice}>$0<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
-                        <li style={currentStyles.planFeature}>✓ 10 messages/day</li>
+                        <li style={currentStyles.planFeature}>✓ 50 messages/day</li>
                         <li style={currentStyles.planFeature}>✓ Basic support</li>
                       </ul>
                       {session?.user?.plan !== "Free" && (
@@ -1260,20 +1276,30 @@ function HomePage() {
                   style={currentStyles.actionMenuItem}
                   onClick={() => handleRenameStart(selectedChatForActions.id, selectedChatForActions.title)}
                 >
-                  <span style={currentStyles.actionMenuIcon}>✏️</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
                   Rename
                 </button>
                 <button
                   style={{...currentStyles.actionMenuItem, ...currentStyles.actionMenuItemDanger}}
                   onClick={() => handleDeleteClick(selectedChatForActions.id)}
                 >
-                  <span style={currentStyles.actionMenuIcon}>🗑️</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
                   Delete
                 </button>
                 <button
                   style={currentStyles.actionMenuItem}
                   onClick={() => setShowChatActionsModal(false)}
                 >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                   Cancel
                 </button>
               </div>
@@ -1899,11 +1925,11 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     padding: '24px',
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '24px',
+    gap: '8px',
     boxSizing: 'border-box' as const,
   },
   chatMessagesMobile: {
-    padding: '16px 24px',
+    padding: '12px 8px',
     maxWidth: '100%',
     boxSizing: 'border-box' as const,
   },
@@ -1920,7 +1946,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     maxWidth: '100%',
   },
   messageBubbleUser: {
-    maxWidth: '80%',
+    maxWidth: '90%',
     padding: '14px 18px',
     borderRadius: '18px 18px 4px 18px',
     fontSize: '14px',
@@ -1930,9 +1956,10 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     color: '#fff',
     boxSizing: 'border-box' as const,
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+    alignSelf: 'flex-end' as const,
   },
   messageBubbleAssistant: {
-    maxWidth: '80%',
+    maxWidth: '90%',
     padding: '14px 18px',
     borderRadius: '18px 18px 18px 4px',
     fontSize: '14px',
@@ -1947,14 +1974,12 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
   },
   messageText: {
-    whiteSpace: 'pre-wrap' as const,
     wordBreak: 'break-word' as const,
   },
   messageWrapper: {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '6px',
-    maxWidth: '80%',
   },
   messageActions: {
     display: 'flex',
@@ -2081,40 +2106,47 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     zIndex: 1000,
-    maxWidth: '750px',
+    maxWidth: '500px',
     width: '90%',
     maxHeight: '85vh',
     overflowY: 'auto' as const,
   },
   modalContent: {
-    background: 'white',
-    borderRadius: '16px',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+    background: 'rgba(255, 255, 255, 0.85)',
+    borderRadius: '24px',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    border: '1px solid rgba(255, 255, 255, 0.4)',
   },
   modalHeader: {
-    padding: '20px 24px',
-    borderBottom: '1px solid #e0e0e0',
+    padding: '24px 28px 20px',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   modalTitle: {
-    fontSize: '20px',
-    fontWeight: 700,
-    color: '#000',
+    fontSize: '18px',
+    fontWeight: 600,
+    color: '#1a1a1a',
     margin: 0,
   },
   modalCloseBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '32px',
+    background: 'linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%)',
+    border: '1px solid #d0d0d0',
+    borderRadius: '10px',
+    width: '36px',
+    height: '36px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     cursor: 'pointer',
     color: '#666',
-    lineHeight: 1,
-    padding: 0,
+    transition: 'all 0.2s ease',
   },
   modalBody: {
-    padding: '20px 24px',
+    padding: '20px 28px 28px',
   },
   modalSection: {
     marginBottom: '24px',
@@ -2195,7 +2227,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     minHeight: '220px',
   },
   planCardActive: {
-    borderColor: '#667eea',
+    border: '2px solid #667eea',
     background: 'rgba(102, 126, 234, 0.05)',
   },
   planCardTitle: {
@@ -2227,79 +2259,95 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   planBtn: {
     width: '100%',
-    padding: '8px 12px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    padding: '10px 14px',
+    background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '12px',
     fontWeight: 600,
     cursor: 'pointer',
     whiteSpace: 'nowrap' as const,
+    transition: 'all 0.2s ease',
   },
   planBtnSpacer: {
     width: '100%',
-    height: '32px',
+    height: '36px',
   },
   logoutBtn: {
     width: '100%',
-    padding: '10px 20px',
-    background: 'transparent',
-    color: '#ef4444',
-    border: '2px solid #ef4444',
-    borderRadius: '8px',
+    padding: '13px 24px',
+    background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+    color: '#dc2626',
+    border: '1px solid #fca5a5',
+    borderRadius: '12px',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
+    transition: 'all 0.2s ease',
   },
   actionsModalContainer: {
     position: 'fixed' as const,
-    bottom: 0,
-    left: 0,
-    right: 0,
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
     zIndex: 1000,
+    width: '90%',
+    maxWidth: '340px',
   },
   actionsModalContent: {
-    background: 'white',
-    borderRadius: '16px 16px 0 0',
-    boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.2)',
+    background: 'rgba(255, 255, 255, 0.85)',
+    borderRadius: '24px',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    border: '1px solid rgba(255, 255, 255, 0.4)',
+    overflow: 'hidden',
   },
   actionsModalHeader: {
-    padding: '16px 20px',
-    borderBottom: '1px solid #e0e0e0',
+    padding: '20px 24px 16px',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
   },
   actionsModalTitle: {
     fontSize: '16px',
     fontWeight: 600,
-    color: '#000',
+    color: '#1a1a1a',
     margin: 0,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap' as const,
+    textAlign: 'center' as const,
   },
   actionsModalBody: {
-    padding: '8px',
+    padding: '16px 20px 20px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '10px',
   },
   actionMenuItem: {
     width: '100%',
-    padding: '14px 20px',
-    background: 'none',
-    border: 'none',
-    fontSize: '15px',
+    padding: '13px 24px',
+    background: 'linear-gradient(135deg, #f0f0f0 0%, #fafafa 100%)',
+    border: '1px solid #e0e0e0',
+    borderRadius: '12px',
+    fontSize: '14px',
+    fontWeight: 500,
     cursor: 'pointer',
-    textAlign: 'left' as const,
+    textAlign: 'center' as const,
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    color: '#000',
-    borderRadius: '8px',
+    justifyContent: 'center',
+    gap: '8px',
+    transition: 'all 0.2s ease',
+    color: '#1a1a1a',
   },
   actionMenuItemDanger: {
-    color: '#ef4444',
+    background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+    border: '1px solid #fca5a5',
+    color: '#dc2626',
   },
   actionMenuIcon: {
-    fontSize: '18px',
-    width: '24px',
+    fontSize: '16px',
   },
   deleteModalContainer: {
     position: 'fixed' as const,
@@ -2600,7 +2648,8 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   modalContent: {
     ...lightStyles.modalContent,
-    background: '#2a2a2a',
+    background: 'rgba(30, 30, 40, 0.9)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
   },
   modalTitle: {
     ...lightStyles.modalTitle,
@@ -2608,11 +2657,13 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   modalCloseBtn: {
     ...lightStyles.modalCloseBtn,
+    background: 'linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%)',
+    border: '1px solid #4a4a4a',
     color: '#999',
   },
   modalHeader: {
     ...lightStyles.modalHeader,
-    borderBottom: '1px solid #3a3a3a',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
   },
   modalSectionTitle: {
     ...lightStyles.modalSectionTitle,
@@ -2669,11 +2720,12 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   actionsModalContent: {
     ...lightStyles.actionsModalContent,
-    background: '#2a2a2a',
+    background: 'rgba(30, 30, 40, 0.9)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
   },
   actionsModalHeader: {
     ...lightStyles.actionsModalHeader,
-    borderBottom: '1px solid #3a3a3a',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
   },
   actionsModalTitle: {
     ...lightStyles.actionsModalTitle,
@@ -2681,7 +2733,21 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   actionMenuItem: {
     ...lightStyles.actionMenuItem,
+    background: 'linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%)',
+    border: '1px solid #4a4a4a',
     color: '#fff',
+  },
+  actionMenuItemDanger: {
+    ...lightStyles.actionMenuItemDanger,
+    background: 'linear-gradient(135deg, #4a1c1c 0%, #3a1515 100%)',
+    border: '1px solid #7f1d1d',
+    color: '#fca5a5',
+  },
+  logoutBtn: {
+    ...lightStyles.logoutBtn,
+    background: 'linear-gradient(135deg, #4a1c1c 0%, #3a1515 100%)',
+    border: '1px solid #7f1d1d',
+    color: '#fca5a5',
   },
   deleteModalContent: {
     ...lightStyles.deleteModalContent,
