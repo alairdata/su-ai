@@ -25,10 +25,10 @@ Foster self-awareness and urgency while holding them accountable. Be real and re
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user) {
       return NextResponse.json(
-        { reply: "Please log in to use the chat." },
+        { error: "Please log in to use the chat." },
         { status: 401 }
       );
     }
@@ -39,23 +39,23 @@ export async function POST(req: NextRequest) {
 
     if (!userMessage.trim()) {
       return NextResponse.json(
-        { reply: "No message provided." },
+        { error: "No message provided." },
         { status: 400 }
       );
     }
 
     if (!chatId) {
       return NextResponse.json(
-        { reply: "No chat ID provided." },
+        { error: "No chat ID provided." },
         { status: 400 }
       );
     }
 
-    // OPTIMIZATION 1: Single query to verify chat + get messages
+    // Get chat and messages
     const { data: chat } = await supabase
       .from("chats")
       .select(`
-        id, 
+        id,
         user_id,
         messages (role, content, created_at)
       `)
@@ -64,100 +64,130 @@ export async function POST(req: NextRequest) {
 
     if (!chat || chat.user_id !== session.user.id) {
       return NextResponse.json(
-        { reply: "Chat not found." },
+        { error: "Chat not found." },
         { status: 404 }
       );
     }
 
-    const allMessages = chat.messages as any[] || [];
+    const allMessages = (chat.messages as any[]) || [];
     const isFirstMessage = allMessages.length === 0;
 
-    // OPTIMIZATION 2: Call Claude while saving user message (parallel)
-    const [claudeResponse] = await Promise.all([
-      // Claude API call
-      anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
-        system: SYSTEM_PROMPT,
-        messages: [
-          ...allMessages.map((m: any) => ({ role: m.role, content: m.content })),
-          { role: "user", content: userMessage }
-        ],
-      }),
-      // Save user message to database
-      supabase.from("messages").insert({
-        chat_id: chatId,
-        role: "user",
-        content: userMessage,
-      }),
-    ]);
+    // Save user message immediately (don't wait)
+    supabase.from("messages").insert({
+      chat_id: chatId,
+      role: "user",
+      content: userMessage,
+    }).then(() => {});
 
-    const assistantMessage =
-      claudeResponse.content
-        .map((block: any) => ("text" in block ? block.text : ""))
-        .join(" ")
-        .trim() || "No response from Claude.";
+    // Create streaming response
+    const stream = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1024,
+      stream: true,
+      system: SYSTEM_PROMPT,
+      messages: [
+        ...allMessages.map((m: any) => ({ role: m.role, content: m.content })),
+        { role: "user", content: userMessage }
+      ],
+    });
 
-    // OPTIMIZATION 3: Run all final operations in parallel
-    const updatePromises = [
-      // Save assistant response
-      supabase.from("messages").insert({
-        chat_id: chatId,
-        role: "assistant",
-        content: assistantMessage,
-      }),
-      // Increment message count
-      supabase.from("users").update({ 
-        messages_used_today: session.user.messagesUsedToday + 1 
-      }).eq("id", session.user.id),
-    ];
+    // Track full response for saving to database
+    let fullResponse = "";
+    const userId = session.user.id;
+    const messagesUsedToday = session.user.messagesUsedToday;
 
-    // Generate smart title for first message using Claude
-    let generatedTitle: string | null = null;
-    if (isFirstMessage) {
-      try {
-        const titleResponse = await anthropic.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 30,
-          messages: [
-            {
-              role: "user",
-              content: `Summarize this message in 3-5 words for a chat title. No quotes, no punctuation at the end. Just the title:\n\n"${userMessage}"`
+    // Create a TransformStream to process the response
+    const encoder = new TextEncoder();
+
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const event of stream) {
+            if (event.type === "content_block_delta") {
+              const delta = event.delta as any;
+              if (delta.type === "text_delta" && delta.text) {
+                fullResponse += delta.text;
+                // Send each text chunk as SSE
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: delta.text })}\n\n`));
+              }
             }
-          ],
-        });
+          }
 
-        generatedTitle = titleResponse.content
-          .map((block: any) => ("text" in block ? block.text : ""))
-          .join("")
-          .trim()
-          .slice(0, 50); // Safety limit
-      } catch {
-        // Fallback to simple truncation if title generation fails
-        generatedTitle = userMessage.length > 30
-          ? userMessage.substring(0, 30) + "..."
-          : userMessage;
-      }
+          // Stream complete - save to database in background
+          const savePromises = [
+            supabase.from("messages").insert({
+              chat_id: chatId,
+              role: "assistant",
+              content: fullResponse,
+            }),
+            supabase.from("users").update({
+              messages_used_today: messagesUsedToday + 1
+            }).eq("id", userId),
+          ];
 
-      updatePromises.push(
-        supabase.from("chats").update({ title: generatedTitle }).eq("id", chatId)
-      );
-    }
+          // Generate title for first message (using Haiku for speed)
+          if (isFirstMessage) {
+            try {
+              const titleResponse = await anthropic.messages.create({
+                model: "claude-3-5-haiku-20241022",
+                max_tokens: 30,
+                messages: [
+                  {
+                    role: "user",
+                    content: `Summarize this in 3-5 words for a chat title. No quotes, no punctuation. Just the title:\n\n"${userMessage}"`
+                  }
+                ],
+              });
 
-    await Promise.all(updatePromises);
+              const generatedTitle = titleResponse.content
+                .map((block: any) => ("text" in block ? block.text : ""))
+                .join("")
+                .trim()
+                .slice(0, 50);
 
-    const newMessagesUsed = session.user.messagesUsedToday + 1;
+              savePromises.push(
+                supabase.from("chats").update({ title: generatedTitle }).eq("id", chatId)
+              );
 
-    return NextResponse.json({
-      reply: assistantMessage,
-      messagesUsedToday: newMessagesUsed,
-      ...(generatedTitle && { title: generatedTitle }),
+              // Send title in stream
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ title: generatedTitle })}\n\n`));
+            } catch {
+              // Fallback title
+              const fallbackTitle = userMessage.length > 30
+                ? userMessage.substring(0, 30) + "..."
+                : userMessage;
+              savePromises.push(
+                supabase.from("chats").update({ title: fallbackTitle }).eq("id", chatId)
+              );
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ title: fallbackTitle })}\n\n`));
+            }
+          }
+
+          await Promise.all(savePromises);
+
+          // Send done signal
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
+          controller.close();
+        } catch (error) {
+          console.error("Streaming error:", error);
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Stream error" })}\n\n`));
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(readableStream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
     });
 
   } catch (error) {
     console.error("Error in /api/chat:", error);
     return NextResponse.json(
-      { reply: "Something went wrong talking to Claude." },
+      { error: "Something went wrong talking to Claude." },
       { status: 500 }
     );
   }

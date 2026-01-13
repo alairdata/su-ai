@@ -189,52 +189,118 @@ export function useChats() {
       );
     }
 
+    // Create assistant message placeholder for streaming
+    const assistantMessageId = `msg-${Date.now()}`;
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      created_at: new Date().toISOString(),
+    };
+
+    // Add empty assistant message immediately
+    setChats(prev =>
+      prev.map(c =>
+        c.id === activeChatId
+          ? { ...c, messages: [...c.messages, assistantMessage] }
+          : c
+      )
+    );
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          chatId: activeChatId, 
-          message: input 
+        body: JSON.stringify({
+          chatId: activeChatId,
+          message: input
         }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to send message');
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to send message');
       }
 
-      const assistantMessage: Message = {
-        id: `msg-${Date.now()}`,
-        role: 'assistant',
-        content: data.reply,
-        created_at: new Date().toISOString(),
-      };
+      // Handle streaming response
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
 
-      // Add assistant response and update title if returned
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      let streamedContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.text) {
+                streamedContent += data.text;
+                // Update assistant message content in real-time
+                setChats(prev =>
+                  prev.map(c =>
+                    c.id === activeChatId
+                      ? {
+                          ...c,
+                          messages: c.messages.map(m =>
+                            m.id === assistantMessageId
+                              ? { ...m, content: streamedContent }
+                              : m
+                          ),
+                        }
+                      : c
+                  )
+                );
+              }
+
+              if (data.title) {
+                // Update chat title
+                setChats(prev =>
+                  prev.map(c =>
+                    c.id === activeChatId
+                      ? { ...c, title: data.title }
+                      : c
+                  )
+                );
+              }
+
+              if (data.done) {
+                // Update local message count
+                setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+              }
+
+              if (data.error) {
+                throw new Error(data.error);
+              }
+            } catch (parseError) {
+              // Skip invalid JSON lines
+            }
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Remove both messages on error
       setChats(prev =>
         prev.map(c =>
           c.id === activeChatId
             ? {
                 ...c,
-                messages: [...c.messages, assistantMessage],
-                ...(data.title && { title: data.title }),
+                messages: c.messages.filter(m =>
+                  m.id !== optimisticMessage.id && m.id !== assistantMessageId
+                )
               }
-            : c
-        )
-      );
-
-      // Update local message count instantly (no refresh needed)
-      setLocalMessagesUsed(prev => (prev ?? 0) + 1);
-
-    } catch (error) {
-      console.error('Error sending message:', error);
-      // Remove optimistic message on error
-      setChats(prev =>
-        prev.map(c =>
-          c.id === activeChatId
-            ? { ...c, messages: c.messages.filter(m => m.id !== optimisticMessage.id) }
             : c
         )
       );
