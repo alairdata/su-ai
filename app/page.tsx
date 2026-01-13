@@ -2129,6 +2129,8 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '6px',
+    width: 'fit-content' as const,
+    maxWidth: '90%',
   },
   messageActions: {
     display: 'flex',
