@@ -10,17 +10,22 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  
+
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { chatId } = await req.json();
 
-  // Verify ownership
+  // Fetch chat with messages before deleting
   const { data: chat } = await supabase
     .from("chats")
-    .select("user_id")
+    .select(`
+      id,
+      user_id,
+      title,
+      messages (id, role, content, created_at)
+    `)
     .eq("id", chatId)
     .single();
 
@@ -28,14 +33,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { error } = await supabase
+  // Save to deleted_chats table (audit log)
+  const { error: archiveError } = await supabase
+    .from("deleted_chats")
+    .insert({
+      original_chat_id: chat.id,
+      user_id: chat.user_id,
+      title: chat.title,
+      messages: chat.messages,
+    });
+
+  if (archiveError) {
+    console.error("Failed to archive deleted chat:", archiveError);
+    // Continue with deletion even if archive fails
+  }
+
+  // Delete the chat (messages will cascade delete if set up, or delete separately)
+  const { error: deleteError } = await supabase
     .from("chats")
     .delete()
     .eq("id", chatId);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (deleteError) {
+    return NextResponse.json({ error: deleteError.message }, { status: 500 });
   }
+
+  // Cleanup: Remove entries older than 30 days from deleted_chats
+  // This runs on each delete to keep the table clean (since cron isn't available)
+  await supabase
+    .from("deleted_chats")
+    .delete()
+    .lt("deleted_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
 
   return NextResponse.json({ success: true });
 }
