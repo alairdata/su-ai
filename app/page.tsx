@@ -1147,7 +1147,8 @@ function HomePage() {
                     </div>
                   ))}
 
-                  {chatLoading && (
+                  {/* Only show typing indicator if loading AND last message is not already an assistant message */}
+                  {chatLoading && messages.length > 0 && messages[messages.length - 1].role !== 'assistant' && (
                     <div style={currentStyles.messageRowAssistant}>
                       <div style={currentStyles.messageBubbleAssistant}>
                         <div style={currentStyles.typingIndicator}>
