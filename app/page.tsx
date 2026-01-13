@@ -1081,14 +1081,18 @@ function HomePage() {
                       key={m.id || idx}
                       style={m.role === "user" ? currentStyles.messageRowUser : currentStyles.messageRowAssistant}
                     >
-                      <div style={currentStyles.messageWrapper}>
-                        <div
-                          className={m.role === "assistant" ? "message-bubble" : ""}
-                          style={m.role === "user" ? currentStyles.messageBubbleUser : currentStyles.messageBubbleAssistant}
-                        >
-                          {m.role === "user" ? (
-                            <span>{m.content}</span>
-                          ) : (
+                      {m.role === "user" ? (
+                        /* User messages: Simple structure like backup - no wrapper */
+                        <div style={currentStyles.messageBubbleUser}>
+                          <span>{m.content}</span>
+                        </div>
+                      ) : (
+                        /* AI messages: Full structure with wrapper and markdown */
+                        <div style={currentStyles.messageWrapper}>
+                          <div
+                            className="message-bubble"
+                            style={currentStyles.messageBubbleAssistant}
+                          >
                             <div style={currentStyles.messageText}>
                               <ReactMarkdown
                                 components={{
@@ -1098,26 +1102,24 @@ function HomePage() {
                                 {m.content}
                               </ReactMarkdown>
                             </div>
-                          )}
-                        </div>
-                        <div style={currentStyles.messageActions}>
-                          <button
-                            onClick={() => handleCopyMessage(m.content, m.id || String(idx))}
-                            style={currentStyles.actionButton}
-                            title="Copy message"
-                          >
-                            {copiedMessageId === (m.id || String(idx)) ? (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="20 6 9 17 4 12"/>
-                              </svg>
-                            ) : (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                              </svg>
-                            )}
-                          </button>
-                          {m.role === "assistant" && (
+                          </div>
+                          <div style={currentStyles.messageActions}>
+                            <button
+                              onClick={() => handleCopyMessage(m.content, m.id || String(idx))}
+                              style={currentStyles.actionButton}
+                              title="Copy message"
+                            >
+                              {copiedMessageId === (m.id || String(idx)) ? (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                              ) : (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                </svg>
+                              )}
+                            </button>
                             <button
                               onClick={() => {/* TODO: regenerate */}}
                               style={currentStyles.actionButton}
@@ -1128,9 +1130,9 @@ function HomePage() {
                                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
                               </svg>
                             </button>
-                          )}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   ))}
 
