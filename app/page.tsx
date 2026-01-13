@@ -110,10 +110,15 @@ function HomePage() {
     autoDetectTimezone();
   }, [session?.user]);
 
-  // Detect mobile
+  // Detect mobile and handle orientation changes
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      // Close sidebar when switching to desktop to prevent desync
+      if (!mobile) {
+        setSidebarOpen(false);
+      }
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -1106,7 +1111,10 @@ function HomePage() {
                           <div style={currentStyles.messageActions}>
                             <button
                               onClick={() => handleCopyMessage(m.content, m.id || String(idx))}
-                              style={currentStyles.actionButton}
+                              style={{
+                                ...currentStyles.actionButton,
+                                ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {})
+                              }}
                               title="Copy message"
                             >
                               {copiedMessageId === (m.id || String(idx)) ? (
@@ -1122,7 +1130,10 @@ function HomePage() {
                             </button>
                             <button
                               onClick={() => {/* TODO: regenerate */}}
-                              style={currentStyles.actionButton}
+                              style={{
+                                ...currentStyles.actionButton,
+                                ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {})
+                              }}
                               title="Regenerate response"
                             >
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1179,6 +1190,11 @@ function HomePage() {
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={handleKeyDown}
+                      onInput={(e) => {
+                        const el = e.currentTarget;
+                        el.style.height = 'auto';
+                        el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
+                      }}
                       disabled={chatLoading || !canSendMessage()}
                       style={currentStyles.textarea}
                     />
@@ -1494,7 +1510,7 @@ function HomePage() {
 // Light Mode Styles
 const lightStyles: { [key: string]: React.CSSProperties } = {
   loadingContainer: {
-    minHeight: '100vh',
+    minHeight: '100dvh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1529,7 +1545,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     fontSize: '11px',
   },
   authContainer: {
-    minHeight: '100vh',
+    minHeight: '100dvh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1779,7 +1795,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   app: {
     display: 'flex',
-    height: '100vh',
+    height: '100dvh',
     width: '100vw',
     maxWidth: '100%',
     overflow: 'hidden',
@@ -1805,11 +1821,16 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   mobileMenuDots: {
     position: 'absolute' as const,
-    right: '8px',
+    right: '4px',
     top: '50%',
     transform: 'translateY(-50%)',
     fontSize: '18px',
-    padding: '4px 8px',
+    padding: '10px 12px',
+    minWidth: '44px',
+    minHeight: '44px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     color: '#666',
   },
   sidebar: {
@@ -2113,6 +2134,8 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     fontSize: '14px',
     lineHeight: 1.6,
     wordWrap: 'break-word' as const,
+    wordBreak: 'break-word' as const,
+    overflowWrap: 'break-word' as const,
     background: 'rgba(255, 255, 255, 0.7)',
     backdropFilter: 'blur(10px)',
     WebkitBackdropFilter: 'blur(10px)',
@@ -2209,10 +2232,11 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     outline: 'none',
     color: '#000',
     padding: '6px 8px',
-    maxHeight: '120px',
+    maxHeight: '150px',
     minHeight: '24px',
     lineHeight: '1.5',
     width: '100%',
+    overflow: 'auto' as const,
   },
   sendBtn: {
     width: '32px',
@@ -2936,7 +2960,7 @@ export default function Home() {
   return (
     <Suspense fallback={
       <div style={{
-        minHeight: '100vh', 
+        minHeight: '100dvh', 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
