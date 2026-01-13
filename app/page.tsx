@@ -64,6 +64,7 @@ function HomePage() {
 
   const isAuthLoading = status === "loading";
   const isAuthenticated = !!session?.user;
+  const isUnauthenticated = status === "unauthenticated";
 
   // Check for verification status from URL
   useEffect(() => {
@@ -130,14 +131,14 @@ function HomePage() {
     document.body.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Show chat view when authenticated
+  // Show chat view when authenticated, auth view only when confirmed unauthenticated
   React.useEffect(() => {
     if (isAuthenticated) {
       setCurrentView("chat");
-    } else if (!isAuthLoading) {
+    } else if (isUnauthenticated) {
       setCurrentView("auth");
     }
-  }, [isAuthenticated, isAuthLoading]);
+  }, [isAuthenticated, isUnauthenticated]);
 
   const messages = currentChat?.messages ?? [];
   const showGreeting = !currentChat || messages.length === 0;
@@ -508,7 +509,8 @@ function HomePage() {
 
   const currentStyles = theme === 'dark' ? darkStyles : lightStyles;
 
-  if (isAuthLoading) {
+  // Show loading while auth state is being determined
+  if (isAuthLoading || (!isAuthenticated && !isUnauthenticated)) {
     return (
       <div style={currentStyles.loadingContainer}>
         <div style={currentStyles.loadingSpinner}>Loading...</div>
