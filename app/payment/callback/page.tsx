@@ -13,11 +13,11 @@ function PaymentCallbackContent() {
 
   useEffect(() => {
     const verifyPayment = async () => {
-      const reference = searchParams.get('reference');
+      const sessionId = searchParams.get('session_id');
 
-      if (!reference) {
+      if (!sessionId) {
         setStatus('error');
-        setMessage('Invalid payment reference');
+        setMessage('Invalid payment session');
         return;
       }
 
@@ -25,20 +25,20 @@ function PaymentCallbackContent() {
         const res = await fetch('/api/payment/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reference }),
+          body: JSON.stringify({ sessionId }),
         });
 
         const data = await res.json();
 
         if (res.ok && data.success) {
           setStatus('success');
-          setMessage('Payment successful! Upgrading your plan...');
-          
+          setMessage(`Welcome to ${data.plan}! Your plan has been upgraded.`);
+
           await updateSession();
-          
+
           setTimeout(() => {
             router.push('/');
-          }, 2000);
+          }, 2500);
         } else {
           setStatus('error');
           setMessage(data.error || 'Payment verification failed');
@@ -57,25 +57,44 @@ function PaymentCallbackContent() {
       <div style={styles.card}>
         {status === 'verifying' && (
           <>
-            <div style={styles.spinner}>⏳</div>
+            <div style={styles.spinner}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
+                <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round">
+                  <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/>
+                </path>
+              </svg>
+            </div>
             <h2 style={styles.title}>{message}</h2>
           </>
         )}
-        
+
         {status === 'success' && (
           <>
-            <div style={styles.success}>✅</div>
+            <div style={styles.success}>
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
             <h2 style={styles.title}>Payment Successful!</h2>
             <p style={styles.message}>{message}</p>
+            <p style={styles.redirect}>Redirecting you back...</p>
           </>
         )}
-        
+
         {status === 'error' && (
           <>
-            <div style={styles.error}>❌</div>
+            <div style={styles.error}>
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+              </svg>
+            </div>
             <h2 style={styles.title}>Payment Failed</h2>
             <p style={styles.message}>{message}</p>
-            <button 
+            <button
               onClick={() => router.push('/')}
               style={styles.button}
             >
@@ -94,7 +113,14 @@ export default function PaymentCallback() {
     <Suspense fallback={
       <div style={styles.container}>
         <div style={styles.card}>
-          <div style={styles.spinner}>⏳</div>
+          <div style={styles.spinner}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
+              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round">
+                <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/>
+              </path>
+            </svg>
+          </div>
           <h2 style={styles.title}>Loading...</h2>
         </div>
       </div>
@@ -123,16 +149,19 @@ const styles = {
     textAlign: 'center' as const,
   } as React.CSSProperties,
   spinner: {
-    fontSize: '48px',
     marginBottom: '24px',
+    display: 'flex',
+    justifyContent: 'center',
   } as React.CSSProperties,
   success: {
-    fontSize: '64px',
     marginBottom: '24px',
+    display: 'flex',
+    justifyContent: 'center',
   } as React.CSSProperties,
   error: {
-    fontSize: '64px',
     marginBottom: '24px',
+    display: 'flex',
+    justifyContent: 'center',
   } as React.CSSProperties,
   title: {
     fontSize: '24px',
@@ -143,7 +172,11 @@ const styles = {
   message: {
     fontSize: '16px',
     color: '#666',
-    marginBottom: '24px',
+    marginBottom: '16px',
+  } as React.CSSProperties,
+  redirect: {
+    fontSize: '14px',
+    color: '#999',
   } as React.CSSProperties,
   button: {
     padding: '12px 32px',

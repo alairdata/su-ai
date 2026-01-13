@@ -494,9 +494,9 @@ function HomePage() {
 
     const data = await res.json();
 
-    if (res.ok && data.authorizationUrl) {
-      // Redirect to Paystack checkout
-      window.location.href = data.authorizationUrl;
+    if (res.ok && data.checkoutUrl) {
+      // Redirect to Stripe checkout
+      window.location.href = data.checkoutUrl;
     } else {
       alert(data.error || 'Failed to initialize payment');
     }
