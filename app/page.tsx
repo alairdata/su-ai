@@ -1087,12 +1087,35 @@ function HomePage() {
                       style={m.role === "user" ? currentStyles.messageRowUser : currentStyles.messageRowAssistant}
                     >
                       {m.role === "user" ? (
-                        /* User messages: Simple structure like backup - no wrapper */
-                        <div style={currentStyles.messageBubbleUser}>
-                          <span>{m.content}</span>
+                        /* User messages: with copy button */
+                        <div style={currentStyles.messageWrapperUser}>
+                          <div style={currentStyles.messageActionsUser}>
+                            <button
+                              onClick={() => handleCopyMessage(m.content, m.id || String(idx))}
+                              style={{
+                                ...currentStyles.actionButton,
+                                ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {})
+                              }}
+                              title="Copy message"
+                            >
+                              {copiedMessageId === (m.id || String(idx)) ? (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                              ) : (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+                          <div style={currentStyles.messageBubbleUser}>
+                            <span>{m.content}</span>
+                          </div>
                         </div>
                       ) : (
-                        /* AI messages: Full structure with wrapper and markdown */
+                        /* AI messages: with markdown and copy button */
                         <div style={currentStyles.messageWrapper}>
                           <div
                             className="message-bubble"
@@ -1127,19 +1150,6 @@ function HomePage() {
                                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                                 </svg>
                               )}
-                            </button>
-                            <button
-                              onClick={() => {/* TODO: regenerate */}}
-                              style={{
-                                ...currentStyles.actionButton,
-                                ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {})
-                              }}
-                              title="Regenerate response"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="23 4 23 10 17 10"/>
-                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                              </svg>
                             </button>
                           </div>
                         </div>
@@ -2115,7 +2125,6 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     maxWidth: '100%',
   },
   messageBubbleUser: {
-    maxWidth: '90%',
     padding: '14px 18px',
     borderRadius: '18px 18px 4px 18px',
     fontSize: '14px',
@@ -2126,7 +2135,6 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     color: '#fff',
     boxSizing: 'border-box' as const,
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-    alignSelf: 'flex-end' as const,
   },
   messageBubbleAssistant: {
     maxWidth: '90%',
@@ -2152,15 +2160,31 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   messageWrapper: {
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '6px',
+    gap: '4px',
     width: 'fit-content' as const,
     maxWidth: '90%',
+  },
+  messageWrapperUser: {
+    display: 'flex',
+    flexDirection: 'row' as const,
+    alignItems: 'flex-end',
+    gap: '4px',
+    width: 'fit-content' as const,
+    maxWidth: '90%',
+    marginLeft: 'auto',
   },
   messageActions: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    paddingLeft: '4px',
+    gap: '4px',
+    paddingLeft: '2px',
+    opacity: 0.6,
+  },
+  messageActionsUser: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    paddingRight: '2px',
     opacity: 0.6,
   },
   messageTimestamp: {
