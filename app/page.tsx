@@ -1083,18 +1083,22 @@ function HomePage() {
                     >
                       <div style={currentStyles.messageWrapper}>
                         <div
-                          className="message-bubble"
+                          className={m.role === "assistant" ? "message-bubble" : ""}
                           style={m.role === "user" ? currentStyles.messageBubbleUser : currentStyles.messageBubbleAssistant}
                         >
-                          <div style={currentStyles.messageText}>
-                            <ReactMarkdown
-                              components={{
-                                p: ({ children }) => <p style={{ margin: 0, display: 'block' }}>{children}</p>,
-                              }}
-                            >
-                              {m.content}
-                            </ReactMarkdown>
-                          </div>
+                          {m.role === "user" ? (
+                            <span>{m.content}</span>
+                          ) : (
+                            <div style={currentStyles.messageText}>
+                              <ReactMarkdown
+                                components={{
+                                  p: ({ children }) => <p style={{ margin: 0, display: 'block' }}>{children}</p>,
+                                }}
+                              >
+                                {m.content}
+                              </ReactMarkdown>
+                            </div>
+                          )}
                         </div>
                         <div style={currentStyles.messageActions}>
                           <button
