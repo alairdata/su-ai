@@ -339,6 +339,9 @@ select {
   border-radius: 16px;
   font-size: 14px;
   line-height: 1.4;
+  word-break: normal;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .message-bubble.user {
@@ -360,6 +363,9 @@ select {
   text-align: left !important;
   word-spacing: normal !important;
   letter-spacing: normal !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
+  hyphens: none !important;
 }
 
 .message-bubble p {

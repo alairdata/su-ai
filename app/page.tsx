@@ -1087,7 +1087,13 @@ function HomePage() {
                           style={m.role === "user" ? currentStyles.messageBubbleUser : currentStyles.messageBubbleAssistant}
                         >
                           <div style={currentStyles.messageText}>
-                            <ReactMarkdown>{m.content}</ReactMarkdown>
+                            <ReactMarkdown
+                              components={{
+                                p: ({ children }) => <p style={{ margin: 0, display: 'block' }}>{children}</p>,
+                              }}
+                            >
+                              {m.content}
+                            </ReactMarkdown>
                           </div>
                         </div>
                         <div style={currentStyles.messageActions}>
@@ -2109,7 +2115,8 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
   },
   messageText: {
-    wordBreak: 'break-word' as const,
+    wordBreak: 'normal' as const,
+    overflowWrap: 'break-word' as const,
   },
   messageWrapper: {
     display: 'flex',
