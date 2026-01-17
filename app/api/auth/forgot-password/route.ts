@@ -19,11 +19,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if user exists
+    // Check if user exists (normalize email for consistent lookup)
+    const normalizedEmail = email.toLowerCase().trim();
     const { data: user, error } = await supabase
       .from('users')
       .select('id, name, email')
-      .eq('email', email.toLowerCase())
+      .eq('email', normalizedEmail)
       .single();
 
     // Always return success to prevent email enumeration

@@ -31,11 +31,14 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Missing credentials");
         }
 
+        // Normalize email to lowercase for consistent lookup
+        const normalizedEmail = credentials.email.toLowerCase().trim();
+
         // Check if user exists in users table (only verified users are here)
         const { data: user, error } = await supabase
           .from('users')
           .select('*')
-          .eq('email', credentials.email)
+          .eq('email', normalizedEmail)
           .single();
 
         if (error || !user) {
@@ -43,7 +46,7 @@ export const authOptions: NextAuthOptions = {
           const { data: pendingUser } = await supabase
             .from('pending_users')
             .select('email')
-            .eq('email', credentials.email)
+            .eq('email', normalizedEmail)
             .single();
 
           if (pendingUser) {

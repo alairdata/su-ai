@@ -12,15 +12,18 @@ const supabase = createClient(
 
 export async function POST(request: Request) {
   try {
-    const { name, email, password } = await request.json();
+    const { name, email: rawEmail, password } = await request.json();
 
     // Validate inputs
-    if (!name || !email || !password) {
+    if (!name || !rawEmail || !password) {
       return NextResponse.json(
         { error: 'All fields are required' },
         { status: 400 }
       );
     }
+
+    // Normalize email to lowercase for consistent storage and lookup
+    const email = rawEmail.toLowerCase().trim();
 
     // Block disposable emails
     if (isDisposableEmail(email)) {
