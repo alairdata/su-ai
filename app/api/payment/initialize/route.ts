@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     }
 
     const planDetails = PLAN_PRICES[plan as PlanType];
-    const userId = (session.user as any).id;
+    const userId = session.user.id;
 
     // Create Stripe Checkout session
     const checkoutSession = await stripe.checkout.sessions.create({

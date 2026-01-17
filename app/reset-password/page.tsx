@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 
 function ResetPasswordPage() {
   const searchParams = useSearchParams();
@@ -72,7 +73,7 @@ function ResetPasswordPage() {
       } else {
         setError(data.error || "Failed to reset password");
       }
-    } catch (err) {
+    } catch {
       setError("Failed to reset password. Please try again.");
     } finally {
       setLoading(false);
@@ -98,9 +99,9 @@ function ResetPasswordPage() {
           <div style={currentStyles.error}>
             This reset link is invalid or has expired. Please request a new password reset.
           </div>
-          <a href="/" style={currentStyles.link}>
+          <Link href="/" style={currentStyles.link}>
             ← Back to login
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -164,9 +165,9 @@ function ResetPasswordPage() {
         )}
 
         <div style={currentStyles.footer}>
-          <a href="/" style={currentStyles.link}>
+          <Link href="/" style={currentStyles.link}>
             ← Back to login
-          </a>
+          </Link>
         </div>
       </div>
     </div>

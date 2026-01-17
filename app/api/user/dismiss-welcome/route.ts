@@ -8,7 +8,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
 
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = (session.user as any).id;
+    const userId = session.user.id;
 
     // Update is_new_user to false
     const { error } = await supabase

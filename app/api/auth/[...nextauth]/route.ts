@@ -68,7 +68,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           plan: user.plan,
           messagesUsedToday: user.messages_used_today,
-        } as any;
+        };
       },
     }),
   ],
@@ -117,8 +117,8 @@ export const authOptions: NextAuthOptions = {
         // For credentials login, user object has our custom fields
         if (account?.provider === "credentials") {
           token.id = user.id;
-          token.plan = (user as any).plan;
-          token.messagesUsedToday = (user as any).messagesUsedToday;
+          token.plan = user.plan;
+          token.messagesUsedToday = user.messagesUsedToday;
           token.isNewUser = false;
         } else {
           // For OAuth login, we need to fetch user data from database
@@ -140,10 +140,10 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.id as string;
-        (session.user as any).plan = token.plan as string;
-        (session.user as any).messagesUsedToday = token.messagesUsedToday as number;
-        (session.user as any).isNewUser = token.isNewUser as boolean;
+        session.user.id = token.id as string;
+        session.user.plan = token.plan as "Free" | "Pro" | "Enterprise";
+        session.user.messagesUsedToday = token.messagesUsedToday as number;
+        session.user.isNewUser = token.isNewUser as boolean;
 
         // Fetch fresh user data from database (including plan for upgrades)
         const { data: user } = await supabase
@@ -154,8 +154,8 @@ export const authOptions: NextAuthOptions = {
 
         if (user) {
           // Always use fresh plan from database (for upgrades to reflect immediately)
-          (session.user as any).plan = user.plan;
-          (session.user as any).timezone = user.timezone || 'UTC';
+          session.user.plan = user.plan;
+          session.user.timezone = user.timezone || 'UTC';
 
           // Calculate midnight in user's timezone (server-side, no client manipulation possible)
           const userTimezone = user.timezone || 'UTC';
@@ -177,9 +177,9 @@ export const authOptions: NextAuthOptions = {
               })
               .eq('id', token.id);
 
-            (session.user as any).messagesUsedToday = 0;
+            session.user.messagesUsedToday = 0;
           } else {
-            (session.user as any).messagesUsedToday = user.messages_used_today;
+            session.user.messagesUsedToday = user.messages_used_today;
           }
         }
       }

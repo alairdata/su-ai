@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     const userId = checkoutSession.metadata?.userId;
 
     // Verify the user matches
-    if (userId !== (session.user as any).id) {
+    if (userId !== session.user.id) {
       return NextResponse.json(
         { error: 'User mismatch' },
         { status: 403 }

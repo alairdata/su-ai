@@ -53,6 +53,7 @@ function HomePage() {
   const isAuthenticated = !!session?.user;
 
   // Check for verification status from URL
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const verified = searchParams.get('verified');
     const error = searchParams.get('error');
@@ -68,6 +69,7 @@ function HomePage() {
       setAuthError('Verification failed. Please try again.');
     }
   }, [searchParams]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Detect mobile
   useEffect(() => {
@@ -160,7 +162,7 @@ function HomePage() {
         setCurrentView("login");
       }, 2000);
 
-    } catch (error) {
+    } catch {
       setAuthError("Signup failed. Please try again.");
     }
   };
@@ -335,7 +337,7 @@ function HomePage() {
           </form>
 
           <div style={currentStyles.authSwitch}>
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <a onClick={() => {
               setCurrentView("signup");
               setAuthError("");
@@ -602,7 +604,7 @@ function HomePage() {
               {showGreeting && (
                 <div style={currentStyles.emptyState}>
                   <div style={currentStyles.greetingLogo}></div>
-                  <div style={currentStyles.greetingText}>What's good?</div>
+                  <div style={currentStyles.greetingText}>What&apos;s good?</div>
                   {remainingMessages !== Infinity && (
                     <div style={currentStyles.messageLimitInfo}>
                       {remainingMessages} messages remaining today
@@ -653,7 +655,7 @@ function HomePage() {
               }}>
                 {!canSendMessage() && (
                   <div style={currentStyles.limitWarning}>
-                    <strong>Daily limit reached!</strong> You've used all your messages for today.
+                    <strong>Daily limit reached!</strong> You&apos;ve used all your messages for today.
                     {" "}
                     <span 
                       style={currentStyles.upgradeLink} 

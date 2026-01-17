@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Move user from pending_users to users table
-    const { data: newUser, error: createError } = await supabase
+    const { error: createError } = await supabase
       .from('users')
       .insert([
         {

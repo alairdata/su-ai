@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const allMessages = (chat.messages as any[]) || [];
+    const allMessages = (chat.messages as Array<{ role: "user" | "assistant"; content: string; created_at: string }>) || [];
     const isFirstMessage = allMessages.length === 0;
 
     // Save user message immediately (don't wait)
@@ -86,8 +86,8 @@ export async function POST(req: NextRequest) {
       stream: true,
       system: SYSTEM_PROMPT,
       messages: [
-        ...allMessages.map((m: any) => ({ role: m.role, content: m.content })),
-        { role: "user", content: userMessage }
+        ...allMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+        { role: "user" as const, content: userMessage }
       ],
     });
 
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
         try {
           for await (const event of stream) {
             if (event.type === "content_block_delta") {
-              const delta = event.delta as any;
+              const delta = event.delta as { type: string; text?: string };
               if (delta.type === "text_delta" && delta.text) {
                 fullResponse += delta.text;
                 // Send each text chunk as SSE
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
               });
 
               const generatedTitle = titleResponse.content
-                .map((block: any) => ("text" in block ? block.text : ""))
+                .map((block) => ("text" in block ? block.text : ""))
                 .join("")
                 .trim()
                 .slice(0, 50);

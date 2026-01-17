@@ -130,9 +130,14 @@ export function useChats() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'New Chat' }),
       });
-      
+
       const data = await res.json();
-      const newChat = { ...data.chat, messages: [] };
+
+      if (!res.ok || !data.chat) {
+        console.error('Failed to create chat - API response:', res.status, data);
+        return null;
+      }
+
       // DON'T add to chats list yet - wait for first message
       setCurrentChatId(data.chat.id);
       return data.chat.id;
@@ -282,7 +287,7 @@ export function useChats() {
               if (data.error) {
                 throw new Error(data.error);
               }
-            } catch (parseError) {
+            } catch {
               // Skip invalid JSON lines
             }
           }

@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react';
 
-export function useTheme() {
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+function getInitialTheme(): "light" | "dark" {
+  if (typeof window === 'undefined') return 'light';
+  const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
+  return savedTheme || 'light';
+}
 
-  // Load theme on mount
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-    }
-  }, []);
+export function useTheme() {
+  const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme);
 
   // Persist theme and update document
   useEffect(() => {

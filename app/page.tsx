@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, Suspense, useRef, useCallback } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useChats } from "./hooks/useChats";
 import { useTheme } from "./hooks/useTheme";
@@ -39,6 +39,8 @@ function HomePage() {
   const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [isMobile, setIsMobile] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const messagesAreaRef = useRef<HTMLDivElement>(null);
 
   // Auth form states
   const [authEmail, setAuthEmail] = useState("");
@@ -87,7 +89,7 @@ function HomePage() {
 
   // Check if user is new (OAuth first-time user)
   useEffect(() => {
-    if (session?.user && (session.user as any).isNewUser) {
+    if (session?.user && session.user.isNewUser) {
       setShowWelcome(true);
     }
   }, [session]);
@@ -95,7 +97,7 @@ function HomePage() {
   // Auto-detect and save timezone for OAuth users (runs once per session)
   useEffect(() => {
     const autoDetectTimezone = async () => {
-      if (session?.user && !(session.user as any).timezone) {
+      if (session?.user && !session.user.timezone) {
         try {
           const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
           await fetch('/api/user/timezone', {
@@ -205,6 +207,7 @@ function HomePage() {
 
   useEffect(() => {
     setGreeting(getGreeting());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, currentChat]);
 
   // Calculate progress percentage
@@ -233,7 +236,7 @@ function HomePage() {
   // Sync selected timezone when modal opens
   useEffect(() => {
     if (showAccountModal && session?.user) {
-      setSelectedTimezone((session.user as any).timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
+      setSelectedTimezone(session.user.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
     }
   }, [showAccountModal, session]);
 
@@ -308,7 +311,7 @@ function HomePage() {
       setAuthPassword("");
       setAuthName("");
 
-    } catch (error) {
+    } catch {
       setAuthError("Signup failed. Please try again.");
     }
   };
@@ -335,7 +338,7 @@ function HomePage() {
       } else {
         setAuthError(data.error || "Failed to send reset email");
       }
-    } catch (error) {
+    } catch {
       setAuthError("Failed to send reset email. Please try again.");
     } finally {
       setForgotLoading(false);
@@ -381,7 +384,7 @@ function HomePage() {
     }
   };
 
-  const formatTimestamp = (date: Date) => {
+  const _formatTimestamp = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', {
       hour: 'numeric',
       minute: '2-digit',
@@ -393,6 +396,19 @@ function HomePage() {
     setShowAccountModal(false);
     await signOut({ redirect: false });
   };
+
+  // Scroll to bottom handler
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messagesEndRef]);
+
+  // Handle scroll to show/hide scroll button
+  const handleScroll = useCallback(() => {
+    if (!messagesAreaRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = messagesAreaRef.current;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    setShowScrollButton(!isNearBottom);
+  }, []);
 
   const handleSend = async () => {
     if (!input.trim() || chatLoading || !canSendMessage()) return;
@@ -568,11 +584,11 @@ function HomePage() {
               </div>
               <h2 style={currentStyles.checkEmailTitle}>Check your email</h2>
               <p style={currentStyles.checkEmailText}>
-                We've sent a verification link to
+                We&apos;ve sent a verification link to
               </p>
               <p style={currentStyles.checkEmailAddress}>{signupEmail}</p>
               <p style={currentStyles.checkEmailSubtext}>
-                Click the link in the email to verify your account. If you don't see it, check your spam folder.
+                Click the link in the email to verify your account. If you don&apos;t see it, check your spam folder.
               </p>
               <button
                 onClick={() => {
@@ -600,11 +616,11 @@ function HomePage() {
               </div>
               <h2 style={currentStyles.checkEmailTitle}>Reset link sent!</h2>
               <p style={currentStyles.checkEmailText}>
-                We've sent a password reset link to
+                We&apos;ve sent a password reset link to
               </p>
               <p style={currentStyles.checkEmailAddress}>{resetEmail}</p>
               <p style={currentStyles.checkEmailSubtext}>
-                Click the link in the email to reset your password. The link expires in 1 hour. Don't forget to check your spam folder!
+                Click the link in the email to reset your password. The link expires in 1 hour. Don&apos;t forget to check your spam folder!
               </p>
               <button
                 onClick={() => {
@@ -863,7 +879,7 @@ function HomePage() {
               Your account has been created successfully.
             </p>
             <p style={currentStyles.checkEmailSubtext}>
-              You're all set! Start chatting with our AI assistant and explore unlimited possibilities.
+              You&apos;re all set! Start chatting with our AI assistant and explore unlimited possibilities.
             </p>
             <button
               onClick={handleDismissWelcome}
@@ -1059,7 +1075,11 @@ function HomePage() {
           </div>
 
           <div style={currentStyles.chatWrapper}>
-            <div style={currentStyles.messagesArea}>
+            <div
+              ref={messagesAreaRef}
+              onScroll={handleScroll}
+              style={currentStyles.messagesArea}
+            >
               {showGreeting && (
                 <div style={currentStyles.emptyState}>
                   <div style={currentStyles.greetingLogo}>
@@ -1177,6 +1197,19 @@ function HomePage() {
               )}
             </div>
 
+            {/* Scroll to bottom floating button */}
+            {showScrollButton && (
+              <button
+                onClick={scrollToBottom}
+                style={currentStyles.scrollToBottomBtn}
+                title="Scroll to bottom"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+            )}
+
             <div style={currentStyles.inputArea}>
               <div style={{
                 ...currentStyles.inputWrapper,
@@ -1184,7 +1217,7 @@ function HomePage() {
               }}>
                 {!canSendMessage() && (
                   <div style={currentStyles.limitWarning}>
-                    <strong>Daily limit reached!</strong> You've used all your messages for today.
+                    <strong>Daily limit reached!</strong> You&apos;ve used all your messages for today.
                     {" "}
                     <span 
                       style={currentStyles.upgradeLink} 
@@ -2061,6 +2094,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     flexDirection: 'column' as const,
     overflow: 'hidden',
     maxWidth: '100%',
+    position: 'relative' as const,
   },
   messagesArea: {
     flex: 1,
@@ -2069,6 +2103,25 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     flexDirection: 'column' as const,
     maxWidth: '100%',
+  },
+  scrollToBottomBtn: {
+    position: 'absolute' as const,
+    bottom: '140px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: '40px',
+    height: '40px',
+    borderRadius: '50%',
+    background: '#f0f0f0',
+    border: '1px solid #d0d0d0',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#666',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+    zIndex: 10,
+    transition: 'all 0.2s ease',
   },
   emptyState: {
     flex: 1,
@@ -2797,132 +2850,13 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
     ...lightStyles.modelBadge,
     color: '#fff',
   },
-  greetingLogo: {
-    ...lightStyles.greetingLogo,
-    background: 'rgba(255, 255, 255, 0.1)',
-    border: '2px solid rgba(255, 255, 255, 0.2)',
-    color: '#999',
-  },
-  greetingText: {
-    ...lightStyles.greetingText,
-    color: '#fff',
-  },
-  messageLimitInfo: {
-    ...lightStyles.messageLimitInfo,
-    color: '#999',
-  },
-  messageBubbleUser: {
-    ...lightStyles.messageBubbleUser,
-    background: 'linear-gradient(135deg, #4a4a4a 0%, #3a3a3a 100%)',
-  },
-  messageBubbleAssistant: {
-    ...lightStyles.messageBubbleAssistant,
-    background: 'rgba(255, 255, 255, 0.08)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    color: '#fff',
-  },
-  inputArea: {
-    ...lightStyles.inputArea,
+  scrollToBottomBtn: {
+    ...lightStyles.scrollToBottomBtn,
     background: '#2a2a2a',
-    borderTop: '1px solid #3a3a3a',
-  },
-  inputCard: {
-    ...lightStyles.inputCard,
-    background: '#1a1a1a',
-    border: '1px solid #3a3a3a',
-  },
-  textarea: {
-    ...lightStyles.textarea,
-    color: '#fff',
-  },
-  sendBtn: {
-    ...lightStyles.sendBtn,
-    background: '#fff',
-    color: '#000',
-  },
-  modelSelect: {
-    ...lightStyles.modelSelect,
-    color: '#999',
-  },
-  remainingMessages: {
-    ...lightStyles.remainingMessages,
-    color: '#666',
-  },
-  modalContent: {
-    ...lightStyles.modalContent,
-    background: 'rgba(30, 30, 40, 0.9)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-  },
-  modalTitle: {
-    ...lightStyles.modalTitle,
-    color: '#fff',
-  },
-  modalCloseBtn: {
-    ...lightStyles.modalCloseBtn,
-    background: 'linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%)',
-    border: '1px solid #4a4a4a',
-    color: '#999',
-  },
-  modalHeader: {
-    ...lightStyles.modalHeader,
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-  },
-  modalSectionTitle: {
-    ...lightStyles.modalSectionTitle,
-    color: '#fff',
-  },
-  modalSubsectionTitle: {
-    ...lightStyles.modalSubsectionTitle,
-    color: '#fff',
-  },
-  modalInfoRow: {
-    ...lightStyles.modalInfoRow,
-    borderBottom: '1px solid #3a3a3a',
-  },
-  modalLabel: {
-    ...lightStyles.modalLabel,
-    color: '#fff',
-  },
-  modalValue: {
-    ...lightStyles.modalValue,
-    color: '#999',
-  },
-  planCurrentBadge: {
-    ...lightStyles.planCurrentBadge,
-    background: '#1a1a1a',
-  },
-  planDescription: {
-    ...lightStyles.planDescription,
-    color: '#999',
-  },
-  progressBarContainer: {
-    ...lightStyles.progressBarContainer,
-    background: '#3a3a3a',
-  },
-  planCard: {
-    ...lightStyles.planCard,
-    background: '#1a1a1a',
-    border: '2px solid #3a3a3a',
-  },
-  planCardTitle: {
-    ...lightStyles.planCardTitle,
-    color: '#fff',
-  },
-  planPrice: {
-    ...lightStyles.planPrice,
-    color: '#fff',
-  },
-  planPricePeriod: {
-    ...lightStyles.planPricePeriod,
-    color: '#999',
-  },
-  planFeature: {
-    ...lightStyles.planFeature,
-    color: '#999',
-  },
-  planCardActive: {
-    border: '2px solid #fff',
-    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid #444',
+    color: '#ccc',
+
+d: 'rgba(255, 255, 255, 0.05)',
   },
   upgradeLink: {
     ...lightStyles.upgradeLink,

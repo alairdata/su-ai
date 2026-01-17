@@ -9,7 +9,7 @@ const supabase = createClient(
 );
 
 // GET - Load all chats for the user
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   const session = await getServerSession(authOptions);
   
   if (!session?.user) {
