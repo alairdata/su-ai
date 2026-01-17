@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   const { plan } = await req.json();
 
-  if (!["Free", "Pro", "Enterprise"].includes(plan)) {
+  if (!["Free", "Pro", "Plus"].includes(plan)) {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 

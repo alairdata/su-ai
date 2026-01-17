@@ -30,6 +30,7 @@ function HomePage() {
   const [isUpdatingTimezone, setIsUpdatingTimezone] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showChatActionsModal, setShowChatActionsModal] = useState(false);
+  const [isCancellingSubscription, setIsCancellingSubscription] = useState(false);
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
   const [selectedChatForActions, setSelectedChatForActions] = useState<{id: string, title: string} | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -213,7 +214,7 @@ function HomePage() {
   // Calculate progress percentage
   const getProgressPercentage = () => {
     if (!session?.user) return 0;
-    const limits = { Free: 50, Pro: 100, Enterprise: Infinity };
+    const limits: Record<string, number> = { Free: 15, Pro: 150, Plus: 400 };
     const limit = limits[session.user.plan as keyof typeof limits];
     if (limit === Infinity) return 100;
     return (session.user.messagesUsedToday / limit) * 100;
@@ -479,7 +480,7 @@ function HomePage() {
     }
   };
 
-  const upgradePlan = async (newPlan: "Free" | "Pro" | "Enterprise") => {
+  const upgradePlan = async (newPlan: "Free" | "Pro" | "Plus") => {
   if (!session?.user) return;
   
   // Downgrade to Free - no payment needed
@@ -501,7 +502,7 @@ function HomePage() {
     return;
   }
 
-  // Upgrade to Pro or Enterprise - requires payment
+  // Upgrade to Pro or Plus - requires payment
   try {
     const res = await fetch("/api/payment/initialize", {
       method: "POST",
@@ -522,6 +523,39 @@ function HomePage() {
     alert('Failed to initialize payment. Please try again.');
   }
 };
+
+  const cancelSubscription = async () => {
+    if (!session?.user || session.user.plan === "Free") return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel your subscription? You'll keep access until the end of your current billing period."
+    );
+
+    if (!confirmed) return;
+
+    setIsCancellingSubscription(true);
+
+    try {
+      const res = await fetch("/api/subscription/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert("Your subscription has been cancelled. You'll retain access until the end of your billing period.");
+        await updateSession();
+      } else {
+        alert(data.error || "Failed to cancel subscription");
+      }
+    } catch (error) {
+      console.error("Failed to cancel subscription:", error);
+      alert("Failed to cancel subscription. Please try again.");
+    } finally {
+      setIsCancellingSubscription(false);
+    }
+  };
 
   const currentStyles = theme === 'dark' ? darkStyles : lightStyles;
 
@@ -1048,7 +1082,7 @@ function HomePage() {
             <div style={{...currentStyles.userInfo, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
               <div style={{ fontSize: 13 }}>{session?.user?.name}</div>
               <div style={{ fontSize: 11, color: theme === 'dark' ? '#999' : '#666' }}>
-                {session?.user?.plan} plan
+                {session?.user?.plan} plan • {session?.user?.messagesUsedToday}/{session?.user?.plan === 'Free' ? 15 : session?.user?.plan === 'Pro' ? 150 : 400} msgs
               </div>
             </div>
           </div>
@@ -1376,13 +1410,13 @@ function HomePage() {
                   <div style={currentStyles.planCurrentBadge}>
                     <div style={currentStyles.planBadgeLarge}>{session?.user?.plan}</div>
                     <div style={currentStyles.planDescription}>
-                      {session?.user?.plan === "Free" && `${session.user.messagesUsedToday}/50 messages used today`}
-                      {session?.user?.plan === "Pro" && `${session.user.messagesUsedToday}/100 messages used today`}
-                      {session?.user?.plan === "Enterprise" && "Unlimited messages"}
+                      {session?.user?.plan === "Free" && `${session.user.messagesUsedToday}/15 messages used today`}
+                      {session?.user?.plan === "Pro" && `${session.user.messagesUsedToday}/150 messages used today`}
+                      {session?.user?.plan === "Plus" && `${session.user.messagesUsedToday}/400 messages used today`}
                     </div>
-                    
+
                     {/* Progress Bar */}
-                    {session?.user?.plan !== "Enterprise" && (
+                    {session?.user && (
                       <div style={currentStyles.progressBarContainer}>
                         <div 
                           style={{
@@ -1400,7 +1434,7 @@ function HomePage() {
                       <h5 style={currentStyles.planCardTitle}>Free</h5>
                       <div style={currentStyles.planPrice}>$0<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
-                        <li style={currentStyles.planFeature}>✓ 50 messages/day</li>
+                        <li style={currentStyles.planFeature}>✓ 15 messages/day</li>
                         <li style={currentStyles.planFeature}>✓ Basic support</li>
                       </ul>
                       {session?.user?.plan !== "Free" && (
@@ -1418,9 +1452,9 @@ function HomePage() {
 
                     <div style={{...currentStyles.planCard, ...(session?.user?.plan === "Pro" ? currentStyles.planCardActive : {})}}>
                       <h5 style={currentStyles.planCardTitle}>Pro</h5>
-                      <div style={currentStyles.planPrice}>$19<span style={currentStyles.planPricePeriod}>/mo</span></div>
+                      <div style={currentStyles.planPrice}>$4.99<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
-                        <li style={currentStyles.planFeature}>✓ 100 messages/day</li>
+                        <li style={currentStyles.planFeature}>✓ 150 messages/day</li>
                         <li style={currentStyles.planFeature}>✓ Priority support</li>
                         <li style={currentStyles.planFeature}>✓ Advanced features</li>
                       </ul>
@@ -1437,27 +1471,42 @@ function HomePage() {
                       )}
                     </div>
 
-                    <div style={{...currentStyles.planCard, ...(session?.user?.plan === "Enterprise" ? currentStyles.planCardActive : {})}}>
-                      <h5 style={currentStyles.planCardTitle}>Enterprise</h5>
-                      <div style={currentStyles.planPrice}>$99<span style={currentStyles.planPricePeriod}>/mo</span></div>
+                    <div style={{...currentStyles.planCard, ...(session?.user?.plan === "Plus" ? currentStyles.planCardActive : {})}}>
+                      <h5 style={currentStyles.planCardTitle}>Plus</h5>
+                      <div style={currentStyles.planPrice}>$9.99<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
-                        <li style={currentStyles.planFeature}>✓ Unlimited messages</li>
+                        <li style={currentStyles.planFeature}>✓ 400 messages/day</li>
                         <li style={currentStyles.planFeature}>✓ 24/7 support</li>
-                        <li style={currentStyles.planFeature}>✓ Custom integrations</li>
+                        <li style={currentStyles.planFeature}>✓ Priority features</li>
                       </ul>
-                      {session?.user?.plan !== "Enterprise" && (
+                      {session?.user?.plan !== "Plus" && (
                         <button
                           style={currentStyles.planBtn}
-                          onClick={() => upgradePlan("Enterprise")}
+                          onClick={() => upgradePlan("Plus")}
                         >
-                          Upgrade to Enterprise
+                          Upgrade to Plus
                         </button>
                       )}
-                      {session?.user?.plan === "Enterprise" && (
+                      {session?.user?.plan === "Plus" && (
                         <div style={currentStyles.planBtnSpacer} />
                       )}
                     </div>
                   </div>
+
+                  {/* Cancel Subscription Button - only show for paid plans */}
+                  {session?.user?.plan !== "Free" && (
+                    <button
+                      style={{
+                        ...currentStyles.cancelSubscriptionBtn,
+                        opacity: isCancellingSubscription ? 0.6 : 1,
+                        cursor: isCancellingSubscription ? 'not-allowed' : 'pointer',
+                      }}
+                      onClick={cancelSubscription}
+                      disabled={isCancellingSubscription}
+                    >
+                      {isCancellingSubscription ? "Cancelling..." : "Cancel Subscription"}
+                    </button>
+                  )}
                 </div>
 
                 <div style={currentStyles.modalSection}>
@@ -2541,6 +2590,19 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     cursor: 'pointer',
     transition: 'all 0.2s ease',
   },
+  cancelSubscriptionBtn: {
+    width: '100%',
+    padding: '10px 16px',
+    marginTop: '16px',
+    background: 'transparent',
+    color: '#888',
+    border: '1px solid #ddd',
+    borderRadius: '8px',
+    fontSize: '13px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
   actionsModalContainer: {
     position: 'fixed' as const,
     top: '50%',
@@ -2892,6 +2954,11 @@ d: 'rgba(255, 255, 255, 0.05)',
     background: 'linear-gradient(135deg, #4a1c1c 0%, #3a1515 100%)',
     border: '1px solid #7f1d1d',
     color: '#fca5a5',
+  },
+  cancelSubscriptionBtn: {
+    ...lightStyles.cancelSubscriptionBtn,
+    color: '#777',
+    border: '1px solid #444',
   },
   deleteModalContent: {
     ...lightStyles.deleteModalContent,

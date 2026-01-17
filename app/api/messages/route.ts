@@ -13,10 +13,10 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 });
 
-const PLAN_LIMITS = {
-  Free: 10,
-  Pro: 100,
-  Enterprise: Infinity,
+const PLAN_LIMITS: Record<string, number> = {
+  Free: 15,
+  Pro: 150,
+  Plus: 400,
 };
 
 export async function POST(req: NextRequest) {

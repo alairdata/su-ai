@@ -15,10 +15,10 @@ type Chat = {
   created_at: string;
 };
 
-const PLAN_LIMITS = {
-  'Free': 50,
-  'Pro': 100,
-  'Enterprise': Infinity
+const PLAN_LIMITS: Record<string, number> = {
+  'Free': 15,
+  'Pro': 150,
+  'Plus': 400
 };
 
 export function useChats() {
