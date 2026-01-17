@@ -1026,7 +1026,8 @@ function HomePage() {
                       <div
                         style={{
                           ...currentStyles.recentItem,
-                          ...(chat.id === currentChatId ? currentStyles.recentItemActive : {})
+                          ...(chat.id === currentChatId ? currentStyles.recentItemActive : {}),
+                          ...(isMobile ? { paddingRight: '48px' } : {})
                         }}
                         onClick={() => handleSelectChat(chat.id)}
                       >
