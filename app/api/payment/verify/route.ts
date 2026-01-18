@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
-import { stripe } from '@/lib/stripe';
+import { verifyTransaction } from '@/lib/paystack';
 import { createClient } from '@supabase/supabase-js';
-import Stripe from 'stripe';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,91 +20,30 @@ export async function POST(request: Request) {
       );
     }
 
-    const { sessionId } = await request.json();
+    const { reference } = await request.json();
 
-    if (!sessionId) {
+    if (!reference) {
       return NextResponse.json(
-        { error: 'Missing session ID' },
+        { error: 'Missing reference' },
         { status: 400 }
       );
     }
 
-    // Retrieve the Stripe Checkout session with subscription expanded
-    const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['subscription'],
-    });
+    // Verify the transaction with Paystack
+    const verification = await verifyTransaction(reference);
 
-    // For subscriptions, check if subscription was created
-    if (checkoutSession.mode === 'subscription') {
-      const subscription = checkoutSession.subscription as Stripe.Subscription;
-
-      if (!subscription || subscription.status !== 'active') {
-        return NextResponse.json(
-          { error: 'Subscription not active' },
-          { status: 400 }
-        );
-      }
-
-      const plan = checkoutSession.metadata?.plan;
-      const userId = checkoutSession.metadata?.userId;
-
-      // Verify the user matches
-      if (userId !== session.user.id) {
-        return NextResponse.json(
-          { error: 'User mismatch' },
-          { status: 403 }
-        );
-      }
-
-      if (!plan) {
-        return NextResponse.json(
-          { error: 'Plan not found in session' },
-          { status: 400 }
-        );
-      }
-
-      // Update user's plan and subscription info in database
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const subscriptionData = subscription as any;
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          plan: plan,
-          stripe_customer_id: checkoutSession.customer as string,
-          stripe_subscription_id: subscription.id,
-          subscription_status: subscription.status,
-          current_period_end: subscriptionData.current_period_end
-            ? new Date(subscriptionData.current_period_end * 1000).toISOString()
-            : null,
-        })
-        .eq('id', userId);
-
-      if (updateError) {
-        console.error('Failed to update user plan:', updateError);
-        return NextResponse.json(
-          { error: 'Failed to update plan' },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-        plan: plan,
-        message: 'Subscription activated successfully!',
-      });
-    }
-
-    // Fallback for one-time payments (legacy)
-    if (checkoutSession.payment_status !== 'paid') {
+    if (!verification.status || verification.data.status !== 'success') {
       return NextResponse.json(
         { error: 'Payment not completed' },
         { status: 400 }
       );
     }
 
-    const plan = checkoutSession.metadata?.plan;
-    const userId = checkoutSession.metadata?.userId;
+    const { metadata, customer } = verification.data;
+    const plan = metadata?.plan as string;
+    const userId = metadata?.userId as string;
 
+    // Verify the user matches
     if (userId !== session.user.id) {
       return NextResponse.json(
         { error: 'User mismatch' },
@@ -115,14 +53,25 @@ export async function POST(request: Request) {
 
     if (!plan) {
       return NextResponse.json(
-        { error: 'Plan not found in session' },
+        { error: 'Plan not found in transaction' },
         { status: 400 }
       );
     }
 
+    // Calculate subscription period end (30 days from now for monthly)
+    const currentPeriodEnd = new Date();
+    currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30);
+
+    // Update user's plan and subscription info in database
     const { error: updateError } = await supabase
       .from('users')
-      .update({ plan: plan })
+      .update({
+        plan: plan,
+        paystack_customer_code: customer.customer_code,
+        paystack_subscription_code: reference, // Using reference as subscription identifier
+        subscription_status: 'active',
+        current_period_end: currentPeriodEnd.toISOString(),
+      })
       .eq('id', userId);
 
     if (updateError) {

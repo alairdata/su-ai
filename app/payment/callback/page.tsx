@@ -13,11 +13,11 @@ function PaymentCallbackContent() {
 
   useEffect(() => {
     const verifyPayment = async () => {
-      const sessionId = searchParams.get('session_id');
+      const reference = searchParams.get('reference');
 
-      if (!sessionId) {
+      if (!reference) {
         setStatus('error');
-        setMessage('Invalid payment session');
+        setMessage('Invalid payment reference');
         return;
       }
 
@@ -25,7 +25,7 @@ function PaymentCallbackContent() {
         const res = await fetch('/api/payment/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId }),
+          body: JSON.stringify({ reference }),
         });
 
         const data = await res.json();

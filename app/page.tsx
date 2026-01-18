@@ -502,26 +502,8 @@ function HomePage() {
     return;
   }
 
-  // Upgrade to Pro or Plus - requires payment
-  try {
-    const res = await fetch("/api/payment/initialize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan: newPlan }),
-    });
-
-    const data = await res.json();
-
-    if (res.ok && data.checkoutUrl) {
-      // Redirect to Stripe checkout
-      window.location.href = data.checkoutUrl;
-    } else {
-      alert(data.error || 'Failed to initialize payment');
-    }
-  } catch (error) {
-    console.error("Failed to initialize payment:", error);
-    alert('Failed to initialize payment. Please try again.');
-  }
+  // Upgrade to Pro or Plus - redirect to custom checkout
+  window.location.href = `/checkout?plan=${newPlan}`;
 };
 
   const cancelSubscription = async () => {
