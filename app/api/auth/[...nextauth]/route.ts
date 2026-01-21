@@ -10,6 +10,13 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// VIP emails that get free Plus access (comma-separated in env var)
+// Example: VIP_EMAILS=admin@example.com,vip@example.com
+const VIP_EMAILS = (process.env.VIP_EMAILS || '')
+  .split(',')
+  .map(email => email.trim().toLowerCase())
+  .filter(email => email.length > 0);
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
@@ -184,6 +191,12 @@ export const authOptions: NextAuthOptions = {
           session.user.plan = user.plan;
           session.user.timezone = user.timezone || 'UTC';
           session.user.isNewUser = user.is_new_user || false;
+
+          // VIP override: Give Plus access to special email addresses
+          const userEmail = session.user.email?.toLowerCase();
+          if (userEmail && VIP_EMAILS.includes(userEmail)) {
+            session.user.plan = 'Plus';
+          }
 
           // SECURITY: Use reset_timezone (the timezone at last reset) for calculations
           // This prevents abuse where users change timezone to trigger early resets
