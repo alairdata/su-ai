@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import { createClient } from '@supabase/supabase-js';
+import { cancelSubscriptionAtPeriodEnd } from '@/lib/stripe';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,21 +23,19 @@ export async function POST() {
     // Get user's subscription info from database
     const { data: user, error: fetchError } = await supabase
       .from('users')
-      .select('paystack_subscription_code, current_period_end')
+      .select('stripe_subscription_id, current_period_end')
       .eq('id', session.user.id)
       .single();
 
-    if (fetchError || !user?.paystack_subscription_code) {
+    if (fetchError || !user?.stripe_subscription_id) {
       return NextResponse.json(
         { error: 'No active subscription found' },
         { status: 400 }
       );
     }
 
-    // For Paystack, we'll mark the subscription as canceling
-    // The user keeps access until current_period_end
-    // In a full implementation, you would call Paystack's disable subscription API
-    // But this requires the email_token which we may not have stored
+    // Cancel the subscription at period end via Stripe
+    const subscription = await cancelSubscriptionAtPeriodEnd(user.stripe_subscription_id);
 
     // Update subscription status to canceling
     const { error: updateError } = await supabase
@@ -54,10 +53,16 @@ export async function POST() {
       );
     }
 
+    // Get period end from subscription item
+    const subscriptionItem = subscription.items?.data?.[0];
+    const periodEnd = subscriptionItem?.current_period_end
+      ? new Date(subscriptionItem.current_period_end * 1000).toISOString()
+      : user.current_period_end;
+
     return NextResponse.json({
       success: true,
       message: 'Subscription will be canceled at the end of the billing period',
-      current_period_end: user.current_period_end,
+      current_period_end: periodEnd,
     });
   } catch (error) {
     console.error('Cancel subscription error:', error);

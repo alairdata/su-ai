@@ -13,11 +13,20 @@ function PaymentCallbackContent() {
 
   useEffect(() => {
     const verifyPayment = async () => {
-      const reference = searchParams.get('reference');
+      // Stripe sends back session_id as query parameter
+      let sessionId = searchParams.get('session_id');
 
-      if (!reference) {
+      // Also check sessionStorage (for cases where URL params are lost)
+      if (!sessionId && typeof window !== 'undefined') {
+        sessionId = sessionStorage.getItem('stripe_session_id');
+        if (sessionId) {
+          sessionStorage.removeItem('stripe_session_id');
+        }
+      }
+
+      if (!sessionId) {
         setStatus('error');
-        setMessage('Invalid payment reference');
+        setMessage('Invalid payment session');
         return;
       }
 
@@ -25,23 +34,25 @@ function PaymentCallbackContent() {
         const res = await fetch('/api/payment/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reference }),
+          body: JSON.stringify({ session_id: sessionId }),
         });
 
         const data = await res.json();
 
-        if (res.ok && data.success) {
+        if (data.success) {
           setStatus('success');
           setMessage(`Welcome to ${data.plan}! Your plan has been upgraded.`);
-
           await updateSession();
-
           setTimeout(() => {
             router.push('/');
           }, 2500);
+        } else if (data.status === 'pending') {
+          // Still processing - keep checking
+          setMessage('Payment is still processing...');
+          setTimeout(() => verifyPayment(), 3000);
         } else {
           setStatus('error');
-          setMessage(data.error || 'Payment verification failed');
+          setMessage(data.error || data.message || 'Payment verification failed');
         }
       } catch {
         setStatus('error');
@@ -107,7 +118,6 @@ function PaymentCallbackContent() {
   );
 }
 
-// Wrap in Suspense
 export default function PaymentCallback() {
   return (
     <Suspense fallback={
@@ -130,7 +140,7 @@ export default function PaymentCallback() {
   );
 }
 
-const styles = {
+const styles: { [key: string]: React.CSSProperties } = {
   container: {
     minHeight: '100vh',
     display: 'flex',
@@ -138,7 +148,7 @@ const styles = {
     justifyContent: 'center',
     background: '#f9f9f9',
     padding: '24px',
-  } as React.CSSProperties,
+  },
   card: {
     maxWidth: '500px',
     width: '100%',
@@ -146,38 +156,38 @@ const styles = {
     background: 'white',
     borderRadius: '16px',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-    textAlign: 'center' as const,
-  } as React.CSSProperties,
+    textAlign: 'center',
+  },
   spinner: {
     marginBottom: '24px',
     display: 'flex',
     justifyContent: 'center',
-  } as React.CSSProperties,
+  },
   success: {
     marginBottom: '24px',
     display: 'flex',
     justifyContent: 'center',
-  } as React.CSSProperties,
+  },
   error: {
     marginBottom: '24px',
     display: 'flex',
     justifyContent: 'center',
-  } as React.CSSProperties,
+  },
   title: {
     fontSize: '24px',
     fontWeight: 700,
     marginBottom: '16px',
     color: '#000',
-  } as React.CSSProperties,
+  },
   message: {
     fontSize: '16px',
     color: '#666',
     marginBottom: '16px',
-  } as React.CSSProperties,
+  },
   redirect: {
     fontSize: '14px',
     color: '#999',
-  } as React.CSSProperties,
+  },
   button: {
     padding: '12px 32px',
     background: 'linear-gradient(135deg, #1a1a1a 0%, #3d3d3d 100%)',
@@ -187,5 +197,5 @@ const styles = {
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-  } as React.CSSProperties,
+  },
 };
