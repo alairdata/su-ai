@@ -3,36 +3,61 @@ import Stripe from 'stripe';
 // Initialize Stripe with secret key
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-// Subscription plans configuration (same structure as before)
+// Subscription plans configuration
 export const PLAN_CONFIG = {
+  Free: {
+    priceUSD: 0,
+    messagesPerDay: 10,
+    name: 'Free Plan',
+    description: '10 messages per day',
+    features: [
+      '10 messages per day',
+      'Basic support',
+      'Chat on web',
+      'Limited uploads',
+      'Limited memory and context',
+    ],
+    stripePriceId: null,
+  },
   Pro: {
     priceUSD: 0.99,
+    messagesPerDay: 150,
     name: 'Pro Plan',
-    description: '150 messages per day with priority support',
+    description: '150 messages per day - 15x more than Free',
     features: [
       '150 messages per day',
-      'Priority support',
-      'Advanced AI responses',
-      'Cancel anytime',
+      '15x more than Free',
+      'Expanded memory and context',
+      'Early access to new features',
+      'More advanced reasoning models',
+      'Memory across conversations',
     ],
     stripePriceId: process.env.STRIPE_PRO_PRICE_ID!,
   },
   Plus: {
     priceUSD: 9.99,
+    messagesPerDay: 300,
     name: 'Plus Plan',
-    description: '400 messages per day with 24/7 support',
+    description: '300 messages per day - Everything in Pro and more',
     features: [
-      '400 messages per day',
-      '24/7 priority support',
-      'Advanced AI responses',
-      'Early access to new features',
-      'Cancel anytime',
+      'Everything in Pro',
+      '300 messages per day',
+      '30x more than Free, 2x more than Pro',
+      'Higher outputs for more tasks',
+      'Priority access at high traffic times',
+      'Early access to advanced So Unfiltered AI features',
     ],
     stripePriceId: process.env.STRIPE_PLUS_PRICE_ID!,
   },
 };
 
-export type PlanType = keyof typeof PLAN_CONFIG;
+export type PlanType = 'Free' | 'Pro' | 'Plus';
+export type PaidPlanType = 'Pro' | 'Plus';
+
+// Helper to get message limit for a plan
+export function getMessageLimit(plan: PlanType): number {
+  return PLAN_CONFIG[plan].messagesPerDay;
+}
 
 // Create a Stripe Checkout Session for subscription
 export async function createCheckoutSession(params: {

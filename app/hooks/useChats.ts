@@ -16,9 +16,9 @@ type Chat = {
 };
 
 const PLAN_LIMITS: Record<string, number> = {
-  'Free': 15,
+  'Free': 10,
   'Pro': 150,
-  'Plus': 400
+  'Plus': 300
 };
 
 export function useChats() {
