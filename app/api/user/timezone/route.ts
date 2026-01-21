@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
   }
 
+  // Only update the timezone preference - does NOT reset message counts
   const { error } = await supabase
     .from("users")
     .update({ timezone })

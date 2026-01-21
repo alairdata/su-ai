@@ -149,30 +149,78 @@ export const authOptions: NextAuthOptions = {
         session.user.isNewUser = token.isNewUser as boolean;
 
         // Fetch fresh user data from database (including plan for upgrades)
-        const { data: user } = await supabase
+        // First try with reset_timezone, fall back to without if column doesn't exist
+        let user: {
+          name: string;
+          plan: "Free" | "Pro" | "Plus";
+          messages_used_today: number;
+          last_reset_date: string | null;
+          timezone: string | null;
+          reset_timezone?: string | null;
+        } | null = null;
+
+        const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('plan, messages_used_today, last_reset_date, timezone')
+          .select('name, plan, messages_used_today, last_reset_date, timezone, reset_timezone')
           .eq('id', token.id)
           .single();
 
+        if (userError && userError.message.includes('reset_timezone')) {
+          // Column doesn't exist, try without it
+          const { data: fallbackData } = await supabase
+            .from('users')
+            .select('name, plan, messages_used_today, last_reset_date, timezone')
+            .eq('id', token.id)
+            .single();
+          user = fallbackData;
+        } else {
+          user = userData;
+        }
+
         if (user) {
-          // Always use fresh plan from database (for upgrades to reflect immediately)
+          // Always use fresh data from database (for name/plan updates to reflect immediately)
+          session.user.name = user.name;
           session.user.plan = user.plan;
           session.user.timezone = user.timezone || 'UTC';
 
-          // Calculate midnight in user's timezone (server-side, no client manipulation possible)
-          const userTimezone = user.timezone || 'UTC';
+          // SECURITY: Use reset_timezone (the timezone at last reset) for calculations
+          // This prevents abuse where users change timezone to trigger early resets
+          // Falls back to current timezone if reset_timezone doesn't exist
+          let resetTimezone = user.reset_timezone || user.timezone || 'UTC';
           const now = new Date();
 
-          // Get current date in user's timezone
-          const userDateStr = now.toLocaleDateString('en-CA', { timeZone: userTimezone }); // YYYY-MM-DD format
-          const lastResetStr = user.last_reset_date
-            ? new Date(user.last_reset_date).toLocaleDateString('en-CA', { timeZone: userTimezone })
-            : null;
+          // Validate timezone - if invalid, fall back to UTC
+          try {
+            Intl.DateTimeFormat(undefined, { timeZone: resetTimezone });
+          } catch {
+            console.warn('Invalid timezone:', resetTimezone, '- falling back to UTC');
+            resetTimezone = 'UTC';
+          }
 
-          // Reset if last reset was on a different day in user's timezone
-          if (!lastResetStr || lastResetStr !== userDateStr) {
-            await supabase
+          // Get current date in the RESET timezone (not current user timezone)
+          let currentDateStr: string;
+          let lastResetStr: string | null = null;
+
+          try {
+            currentDateStr = now.toLocaleDateString('en-CA', { timeZone: resetTimezone }); // YYYY-MM-DD format
+            if (user.last_reset_date) {
+              lastResetStr = new Date(user.last_reset_date).toLocaleDateString('en-CA', { timeZone: resetTimezone });
+            }
+          } catch (dateError) {
+            console.error('Date parsing error:', dateError);
+            // Fall back to UTC
+            currentDateStr = now.toLocaleDateString('en-CA', { timeZone: 'UTC' });
+            if (user.last_reset_date) {
+              lastResetStr = new Date(user.last_reset_date).toLocaleDateString('en-CA', { timeZone: 'UTC' });
+            }
+          }
+
+          console.log('Reset check:', { currentDateStr, lastResetStr, resetTimezone, lastResetDate: user.last_reset_date });
+
+          // Reset if last reset was on a different day in the RESET timezone
+          if (!lastResetStr || lastResetStr !== currentDateStr) {
+            console.log('Triggering reset - dates differ or no last reset');
+            const { error: updateError } = await supabase
               .from('users')
               .update({
                 messages_used_today: 0,
@@ -180,8 +228,13 @@ export const authOptions: NextAuthOptions = {
               })
               .eq('id', token.id);
 
+            if (updateError) {
+              console.error('Failed to update last_reset_date:', updateError.message);
+            }
+
             session.user.messagesUsedToday = 0;
           } else {
+            console.log('No reset needed - same day');
             session.user.messagesUsedToday = user.messages_used_today;
           }
         }

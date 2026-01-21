@@ -433,11 +433,10 @@ select {
 }
 
 .typing-dot {
-  width: 5px;
-  height: 5px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #7a6a55;
-  opacity: 0.3;
+  background: #888;
   animation: typing-bounce 1.2s infinite ease-in-out;
 }
 
@@ -450,17 +449,13 @@ select {
 }
 
 @keyframes typing-bounce {
-  0% {
-    opacity: 0.3;
+  0%, 80%, 100% {
+    opacity: 0.4;
     transform: translateY(0);
-  }
-  20% {
-    opacity: 1;
-    transform: translateY(-2px);
   }
   40% {
-    opacity: 0.3;
-    transform: translateY(0);
+    opacity: 1;
+    transform: translateY(-5px);
   }
 }
 

@@ -42,6 +42,7 @@ function HomePage() {
   const [isMobile, setIsMobile] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auth form states
   const [authEmail, setAuthEmail] = useState("");
@@ -49,6 +50,9 @@ function HomePage() {
   const [authName, setAuthName] = useState("");
   const [authError, setAuthError] = useState("");
   const [authSuccess, setAuthSuccess] = useState("");
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editNameValue, setEditNameValue] = useState("");
+  const [isSavingName, setIsSavingName] = useState(false);
 
   const {
     chats,
@@ -260,6 +264,32 @@ function HomePage() {
     }
   };
 
+  const updateName = async () => {
+    if (!editNameValue.trim() || editNameValue.trim() === session?.user?.name) {
+      setIsEditingName(false);
+      return;
+    }
+    setIsSavingName(true);
+    try {
+      const res = await fetch('/api/user/update-name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editNameValue.trim() }),
+      });
+      if (res.ok) {
+        await updateSession(); // Refresh session with new name
+        setIsEditingName(false);
+      } else {
+        const data = await res.json();
+        console.error('Failed to update name:', data.error);
+      }
+    } catch (error) {
+      console.error('Failed to update name:', error);
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
   // Auth handlers
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -413,10 +443,15 @@ function HomePage() {
 
   const handleSend = async () => {
     if (!input.trim() || chatLoading || !canSendMessage()) return;
-    
+
     const messageToSend = input;
     setInput("");
-    
+
+    // Reset textarea height to default
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+
     await sendMessage(messageToSend);
   };
 
@@ -1081,7 +1116,7 @@ function HomePage() {
               {session?.user?.name?.substring(0, 2).toUpperCase()}
             </div>
             <div style={{...currentStyles.userInfo, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
-              <div style={{ fontSize: 13 }}>{session?.user?.name}</div>
+              <div style={{ fontSize: 13, color: theme === 'dark' ? '#fff' : '#1a1a1a' }}>{session?.user?.name}</div>
               <div style={{ fontSize: 11, color: theme === 'dark' ? '#999' : '#666' }}>
                 {session?.user?.plan} plan • {session?.user?.messagesUsedToday}/{session?.user?.plan === 'Free' ? 15 : session?.user?.plan === 'Pro' ? 150 : 400} msgs
               </div>
@@ -1144,7 +1179,7 @@ function HomePage() {
                       style={m.role === "user" ? currentStyles.messageRowUser : currentStyles.messageRowAssistant}
                     >
                       {m.role === "user" ? (
-                        /* User messages: with copy button */
+                        /* User messages: copy button on left, bubble on right */
                         <div style={currentStyles.messageWrapperUser}>
                           <div style={currentStyles.messageActionsUser}>
                             <button
@@ -1172,7 +1207,7 @@ function HomePage() {
                           </div>
                         </div>
                       ) : (
-                        /* AI messages: with markdown and copy button */
+                        /* AI messages: bubble on left, copy button on right */
                         <div style={currentStyles.messageWrapper}>
                           <div
                             className="message-bubble"
@@ -1219,9 +1254,9 @@ function HomePage() {
                     <div style={currentStyles.messageRowAssistant}>
                       <div style={currentStyles.messageBubbleAssistant}>
                         <div style={currentStyles.typingIndicator}>
-                          <span style={currentStyles.typingDot} />
-                          <span style={{...currentStyles.typingDot, animationDelay: '0.2s'}} />
-                          <span style={{...currentStyles.typingDot, animationDelay: '0.4s'}} />
+                          <span className="typing-dot" />
+                          <span className="typing-dot" />
+                          <span className="typing-dot" />
                         </div>
                       </div>
                     </div>
@@ -1266,6 +1301,7 @@ function HomePage() {
                 <div style={currentStyles.inputCard}>
                   <div style={currentStyles.inputRow}>
                     <textarea
+                      ref={textareaRef}
                       rows={1}
                       placeholder={canSendMessage() ? "What's up? Time to spill it..." : "Daily limit reached. Upgrade to continue."}
                       value={input}
@@ -1326,7 +1362,81 @@ function HomePage() {
                   <h3 style={currentStyles.modalSectionTitle}>Profile Information</h3>
                   <div style={currentStyles.modalInfoRow}>
                     <span style={currentStyles.modalLabel}>Name:</span>
-                    <span style={currentStyles.modalValue}>{session?.user?.name}</span>
+                    {isEditingName ? (
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1 }}>
+                        <input
+                          type="text"
+                          value={editNameValue}
+                          onChange={(e) => setEditNameValue(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && updateName()}
+                          disabled={isSavingName}
+                          autoFocus
+                          style={{
+                            flex: 1,
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid #d0d0d0',
+                            fontSize: '14px',
+                            background: '#fff',
+                            color: '#333',
+                            outline: 'none',
+                          }}
+                        />
+                        <button
+                          onClick={updateName}
+                          disabled={isSavingName}
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: '#1a1a1a',
+                            color: '#fff',
+                            fontSize: '13px',
+                            fontWeight: 500,
+                            cursor: isSavingName ? 'not-allowed' : 'pointer',
+                            opacity: isSavingName ? 0.6 : 1,
+                          }}
+                        >
+                          {isSavingName ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => setIsEditingName(false)}
+                          disabled={isSavingName}
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            border: '1px solid #d0d0d0',
+                            background: '#fff',
+                            color: '#666',
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <span style={currentStyles.modalValue}>{session?.user?.name}</span>
+                        <button
+                          onClick={() => {
+                            setEditNameValue(session?.user?.name || '');
+                            setIsEditingName(true);
+                          }}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid #d0d0d0',
+                            background: '#f5f5f5',
+                            color: '#555',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div style={currentStyles.modalInfoRow}>
                     <span style={currentStyles.modalLabel}>Email:</span>
@@ -2209,7 +2319,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     padding: '24px',
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '8px',
+    gap: '6px',
     boxSizing: 'border-box' as const,
   },
   chatMessagesMobile: {
@@ -2222,12 +2332,16 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     width: '100%',
     justifyContent: 'flex-end',
     maxWidth: '100%',
+    paddingTop: '1px',
+    paddingBottom: '1px',
   },
   messageRowAssistant: {
     display: 'flex',
     width: '100%',
     justifyContent: 'flex-start',
     maxWidth: '100%',
+    paddingTop: '1px',
+    paddingBottom: '1px',
   },
   messageBubbleUser: {
     padding: '14px 18px',
@@ -2250,13 +2364,11 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     wordWrap: 'break-word' as const,
     wordBreak: 'break-word' as const,
     overflowWrap: 'break-word' as const,
-    background: 'rgba(255, 255, 255, 0.7)',
-    backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
-    border: '1px solid rgba(0, 0, 0, 0.05)',
+    background: '#f0f0f0',
+    border: '1px solid #e0e0e0',
     color: '#1a1a1a',
     boxSizing: 'border-box' as const,
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
   },
   messageText: {
     wordBreak: 'normal' as const,
@@ -2264,7 +2376,8 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   messageWrapper: {
     display: 'flex',
-    flexDirection: 'column' as const,
+    flexDirection: 'row' as const,
+    alignItems: 'flex-end',
     gap: '4px',
     width: 'fit-content' as const,
     maxWidth: '90%',
@@ -2282,14 +2395,12 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-    paddingLeft: '2px',
     opacity: 0.6,
   },
   messageActionsUser: {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-    paddingRight: '2px',
     opacity: 0.6,
   },
   messageTimestamp: {
@@ -2918,8 +3029,28 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
     background: '#2a2a2a',
     border: '1px solid #444',
     color: '#ccc',
-
-d: 'rgba(255, 255, 255, 0.05)',
+  },
+  messageBubbleAssistant: {
+    ...lightStyles.messageBubbleAssistant,
+    background: '#3a3a3a',
+    border: '1px solid #4a4a4a',
+    color: '#e0e0e0',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
+  },
+  inputArea: {
+    ...lightStyles.inputArea,
+    borderTop: '1px solid #3a3a3a',
+    background: '#1a1a1a',
+  },
+  inputCard: {
+    ...lightStyles.inputCard,
+    background: '#2a2a2a',
+    border: '1px solid #3a3a3a',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+  },
+  textarea: {
+    ...lightStyles.textarea,
+    color: '#fff',
   },
   upgradeLink: {
     ...lightStyles.upgradeLink,
@@ -2937,6 +3068,18 @@ d: 'rgba(255, 255, 255, 0.05)',
   actionsModalTitle: {
     ...lightStyles.actionsModalTitle,
     color: '#fff',
+  },
+  modalValue: {
+    ...lightStyles.modalValue,
+    color: '#333',
+  },
+  modalLabel: {
+    ...lightStyles.modalLabel,
+    color: '#555',
+  },
+  modalSectionTitle: {
+    ...lightStyles.modalSectionTitle,
+    color: '#1a1a1a',
   },
   actionMenuItem: {
     ...lightStyles.actionMenuItem,
