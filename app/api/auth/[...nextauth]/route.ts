@@ -157,11 +157,12 @@ export const authOptions: NextAuthOptions = {
           last_reset_date: string | null;
           timezone: string | null;
           reset_timezone?: string | null;
+          is_new_user?: boolean;
         } | null = null;
 
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('name, plan, messages_used_today, last_reset_date, timezone, reset_timezone')
+          .select('name, plan, messages_used_today, last_reset_date, timezone, reset_timezone, is_new_user')
           .eq('id', token.id)
           .single();
 
@@ -169,7 +170,7 @@ export const authOptions: NextAuthOptions = {
           // Column doesn't exist, try without it
           const { data: fallbackData } = await supabase
             .from('users')
-            .select('name, plan, messages_used_today, last_reset_date, timezone')
+            .select('name, plan, messages_used_today, last_reset_date, timezone, is_new_user')
             .eq('id', token.id)
             .single();
           user = fallbackData;
@@ -178,10 +179,11 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (user) {
-          // Always use fresh data from database (for name/plan updates to reflect immediately)
+          // Always use fresh data from database (for name/plan/isNewUser updates to reflect immediately)
           session.user.name = user.name;
           session.user.plan = user.plan;
           session.user.timezone = user.timezone || 'UTC';
+          session.user.isNewUser = user.is_new_user || false;
 
           // SECURITY: Use reset_timezone (the timezone at last reset) for calculations
           // This prevents abuse where users change timezone to trigger early resets

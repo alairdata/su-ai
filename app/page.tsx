@@ -25,6 +25,7 @@ function HomePage() {
   const [showResetEmailSent, setShowResetEmailSent] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [showWelcome, setShowWelcome] = useState(false);
+  const [showStillThere, setShowStillThere] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [selectedTimezone, setSelectedTimezone] = useState("");
   const [isUpdatingTimezone, setIsUpdatingTimezone] = useState(false);
@@ -96,6 +97,26 @@ function HomePage() {
   useEffect(() => {
     if (session?.user && session.user.isNewUser) {
       setShowWelcome(true);
+    }
+  }, [session]);
+
+  // Check if user has been away for more than 24 hours
+  useEffect(() => {
+    if (session?.user && !session.user.isNewUser) {
+      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+      const lastVisitKey = `lastVisit_${session.user.id}`;
+      const lastVisit = localStorage.getItem(lastVisitKey);
+      const now = Date.now();
+
+      if (lastVisit) {
+        const timeSinceLastVisit = now - parseInt(lastVisit, 10);
+        if (timeSinceLastVisit > TWENTY_FOUR_HOURS) {
+          setShowStillThere(true);
+        }
+      }
+
+      // Update last visit time
+      localStorage.setItem(lastVisitKey, now.toString());
     }
   }, [session]);
 
@@ -956,6 +977,47 @@ function HomePage() {
               className="auth-btn-ripple"
             >
               Get Started
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // "Are you still there?" screen for users returning after 24+ hours
+  if (showStillThere) {
+    return (
+      <div style={currentStyles.authContainer} data-theme={theme}>
+        <div className="auth-orb auth-orb-1" />
+        <div className="auth-orb auth-orb-2" />
+        <div className="auth-orb auth-orb-3" />
+        <button onClick={toggleTheme} style={currentStyles.themeToggle}>
+          {theme === 'light' ? '🌙' : '☀️'}
+        </button>
+        <div style={currentStyles.authCard}>
+          <div className="auth-tab-content" style={currentStyles.checkEmailContainer}>
+            <div style={currentStyles.emailIconWrapper}>
+              <div style={currentStyles.emailIcon} className="email-icon-animate">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 6v6l4 2"/>
+                </svg>
+              </div>
+              <div style={currentStyles.emailIconRing} className="email-ring-animate" />
+            </div>
+            <h2 style={currentStyles.checkEmailTitle}>Are you still there?</h2>
+            <p style={currentStyles.checkEmailText}>
+              Welcome back! It&apos;s been a while since your last visit.
+            </p>
+            <p style={currentStyles.checkEmailSubtext}>
+              Ready to continue chatting with So Unfiltered AI?
+            </p>
+            <button
+              onClick={() => setShowStillThere(false)}
+              style={currentStyles.authBtn}
+              className="auth-btn-ripple"
+            >
+              Continue
             </button>
           </div>
         </div>
