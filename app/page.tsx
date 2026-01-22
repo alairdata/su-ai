@@ -620,7 +620,20 @@ function HomePage() {
   if (isAuthLoading || (!isAuthenticated && !isUnauthenticated)) {
     return (
       <div style={currentStyles.loadingContainer}>
-        <div style={currentStyles.loadingSpinner}>Loading...</div>
+        <div style={currentStyles.loadingContent}>
+          {/* Logo */}
+          <div style={currentStyles.loadingLogo} className="loading-logo-pulse">
+            ✦
+          </div>
+          {/* Brand Name */}
+          <div style={currentStyles.loadingBrand}>So Unfiltered</div>
+          {/* Animated Dots */}
+          <div style={currentStyles.loadingDots}>
+            <div className="loading-dot" style={currentStyles.loadingDot} />
+            <div className="loading-dot" style={currentStyles.loadingDot} />
+            <div className="loading-dot" style={currentStyles.loadingDot} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -1856,11 +1869,40 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#f9f9f9',
+    background: 'linear-gradient(135deg, #f8f5ef 0%, #f0ebe3 100%)',
   },
-  loadingSpinner: {
-    fontSize: '18px',
+  loadingContent: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: '16px',
+  },
+  loadingLogo: {
+    width: '64px',
+    height: '64px',
+    background: 'linear-gradient(135deg, #fff 0%, #f5f5f5 100%)',
+    border: '2px solid #e0d6c7',
+    borderRadius: '18px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '32px',
     color: '#666',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
+  },
+  loadingBrand: {
+    fontSize: '20px',
+    fontWeight: 600,
+    color: '#1a1a1a',
+    letterSpacing: '-0.02em',
+  },
+  loadingDots: {
+    display: 'flex',
+    gap: '8px',
+    marginTop: '8px',
+  },
+  loadingDot: {
+    background: '#a0a0a0',
   },
   limitWarning: {
     padding: '12px 16px',
@@ -2981,11 +3023,22 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   ...lightStyles,
   loadingContainer: {
     ...lightStyles.loadingContainer,
-    background: '#1a1a1a',
+    background: 'linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%)',
   },
-  loadingSpinner: {
-    ...lightStyles.loadingSpinner,
-    color: '#999',
+  loadingLogo: {
+    ...lightStyles.loadingLogo,
+    background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)',
+    border: '2px solid #3a3a3a',
+    color: '#888',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+  },
+  loadingBrand: {
+    ...lightStyles.loadingBrand,
+    color: '#fff',
+  },
+  loadingDot: {
+    ...lightStyles.loadingDot,
+    background: '#666',
   },
   authContainer: {
     ...lightStyles.authContainer,
