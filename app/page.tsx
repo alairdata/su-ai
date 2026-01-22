@@ -49,6 +49,7 @@ function HomePage() {
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authSuccess, setAuthSuccess] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -822,15 +823,47 @@ function HomePage() {
                           Forgot password?
                         </a>
                       </div>
-                      <input
-                        type="password"
-                        value={authPassword}
-                        onChange={(e) => setAuthPassword(e.target.value)}
-                        placeholder="••••••••"
-                        required
-                        style={currentStyles.input}
-                        className="auth-input-focus"
-                      />
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={authPassword}
+                          onChange={(e) => setAuthPassword(e.target.value)}
+                          placeholder="••••••••"
+                          required
+                          style={{...currentStyles.input, paddingRight: '44px', fontFamily: 'Inter, sans-serif'}}
+                          className="auth-input-focus"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '12px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: theme === 'dark' ? '#888' : '#666',
+                          }}
+                        >
+                          {showPassword ? (
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                              <line x1="1" y1="1" x2="23" y2="23"/>
+                            </svg>
+                          ) : (
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                              <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <button
                       type="submit"
@@ -874,16 +907,48 @@ function HomePage() {
                     </div>
                     <div style={currentStyles.formGroup}>
                       <label style={currentStyles.label}>Password</label>
-                      <input
-                        type="password"
-                        value={authPassword}
-                        onChange={(e) => setAuthPassword(e.target.value)}
-                        placeholder="••••••••"
-                        minLength={6}
-                        required
-                        style={currentStyles.input}
-                        className="auth-input-focus"
-                      />
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={authPassword}
+                          onChange={(e) => setAuthPassword(e.target.value)}
+                          placeholder="••••••••"
+                          minLength={8}
+                          required
+                          style={{...currentStyles.input, paddingRight: '44px', fontFamily: 'Inter, sans-serif'}}
+                          className="auth-input-focus"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '12px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: theme === 'dark' ? '#888' : '#666',
+                          }}
+                        >
+                          {showPassword ? (
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                              <line x1="1" y1="1" x2="23" y2="23"/>
+                            </svg>
+                          ) : (
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                              <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <button
                       type="submit"
@@ -1957,6 +2022,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     border: '1px solid #e0e0e0',
     borderRadius: '10px',
     fontSize: '16px',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
     background: '#fafafa',
     color: '#1a1a1a',
     boxSizing: 'border-box' as const,
