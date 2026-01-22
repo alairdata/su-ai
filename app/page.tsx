@@ -179,40 +179,40 @@ function HomePage() {
     const userName = session?.user?.name?.split(' ')[0] || '';
 
     const morningGreetings = [
-      "Morning already?! Howdy!",
-      "Coffee first. Talk later.",
-      "Rise and grind!",
-      "Morning! What's up?",
-      "Brain loading... Go!",
-      "Mornings suck. Anyway...",
+      "Top of the morning to ya",
+      "Fresh start, fresh ideas",
+      "Morning mode activated",
+      "Let's get this day going",
+      "Early bird energy right here",
+      "New day, new conversations",
     ];
 
     const afternoonGreetings = [
-      "Afternoon slump? Got you.",
-      "Post-lunch vibes. Shoot!",
-      "PM mode. What's good?",
-      "Still standing? Nice!",
-      "Spice up the day!",
-      "Lunch coma? Same. Go!",
+      "Afternoon vibes, let's chat",
+      "Midday check-in, what's on your mind",
+      "The day's rolling, so are we",
+      "Afternoon fuel for your thoughts",
+      "Right in the middle of it all",
+      "PM hours hitting different",
     ];
 
     const eveningGreetings = [
-      "Evening mode. Shoot!",
-      "Sun's setting. Talk!",
-      "Almost done? What's up?",
-      "Golden hour. Thoughts?",
-      "Wrapping up? Or nah?",
-      "End of day grind!",
+      "Evening wind-down mode",
+      "Golden hour thoughts welcome",
+      "Wrapping up or just getting started",
+      "Evening edition, let's go",
+      "Day's almost done, but we're not",
+      "Sunset vibes, what's up",
     ];
 
     const nightGreetings = [
-      "Midnight oil? Respect.",
-      "Night owl! What's up?",
-      "Sleep's overrated. Go!",
-      "Late night thoughts?",
-      "Built different. Shoot!",
-      "Insomnia gang! Talk.",
-      "World's asleep. Not us!",
+      "Night owl hours, respect",
+      "Burning the midnight oil together",
+      "Late night creativity unlocked",
+      "The world's quiet, let's talk",
+      "After hours, no limits",
+      "Night shift energy activated",
+      "When the stars are out, so are we",
     ];
 
     let greetings;
