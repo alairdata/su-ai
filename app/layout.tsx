@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "So Unfiltered",
+  title: "So UnFiltered AI",
   description: "Your intelligent AI assistant",
   icons: {
     icon: "/logo.png",

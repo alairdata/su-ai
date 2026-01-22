@@ -11,9 +11,9 @@ export async function sendVerificationEmail(
   
   try {
     await resend.emails.send({
-      from: 'UnFiltered-AI <noreply@app.so-unfiltered-ai.com>', // YOUR VERIFIED DOMAIN!
+      from: 'So UnFiltered AI <noreply@app.so-unfiltered-ai.com>', // YOUR VERIFIED DOMAIN!
       to: email,
-      subject: 'Verify your UnFiltered-AI account',
+      subject: 'Verify your So UnFiltered AI account',
       html: `
         <!DOCTYPE html>
         <html>
@@ -33,7 +33,7 @@ export async function sendVerificationEmail(
             <div class="container">
               <div class="header">
                 <div class="logo"></div>
-                <h1 class="title">Welcome to UnFiltered-AI!</h1>
+                <h1 class="title">Welcome to So UnFiltered AI!</h1>
               </div>
               
               <div class="content">
@@ -76,9 +76,9 @@ export async function sendPasswordResetEmail(
 
   try {
     await resend.emails.send({
-      from: 'UnFiltered-AI <noreply@app.so-unfiltered-ai.com>',
+      from: 'So UnFiltered AI <noreply@app.so-unfiltered-ai.com>',
       to: email,
-      subject: 'Reset your UnFiltered-AI password',
+      subject: 'Reset your So UnFiltered AI password',
       html: `
         <!DOCTYPE html>
         <html>
@@ -121,7 +121,7 @@ export async function sendPasswordResetEmail(
               </div>
 
               <div class="footer">
-                <p>This is an automated email from UnFiltered-AI.</p>
+                <p>This is an automated email from So UnFiltered AI.</p>
               </div>
             </div>
           </body>

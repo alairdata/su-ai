@@ -623,10 +623,10 @@ function HomePage() {
         <div style={currentStyles.loadingContent}>
           {/* Logo */}
           <div style={currentStyles.loadingLogo} className="loading-logo-pulse">
-            <img src="/logo.png" alt="So Unfiltered" style={currentStyles.loadingLogoImg} />
+            <img src="/logo.png" alt="So UnFiltered AI" style={currentStyles.loadingLogoImg} />
           </div>
           {/* Brand Name */}
-          <div style={currentStyles.loadingBrand}>So Unfiltered</div>
+          <div style={currentStyles.loadingBrand}>So UnFiltered AI</div>
           {/* Animated Dots */}
           <div style={currentStyles.loadingDots}>
             <div className="loading-dot" style={currentStyles.loadingDot} />
@@ -660,9 +660,9 @@ function HomePage() {
           {/* Logo with Glow */}
           <div style={currentStyles.authLogo}>
             <div style={currentStyles.logoIcon} className="auth-logo-glow">
-              <img src="/logo.png" alt="So Unfiltered" style={currentStyles.logoIconImg} />
+              <img src="/logo.png" alt="So UnFiltered AI" style={currentStyles.logoIconImg} />
             </div>
-            <h1 style={currentStyles.authTitle}>So Unfiltered</h1>
+            <h1 style={currentStyles.authTitle}>So UnFiltered AI</h1>
             <p style={currentStyles.authSubtitle}>
               {showForgotPassword
                 ? "Reset your password"
@@ -1044,7 +1044,7 @@ function HomePage() {
               </div>
               <div style={currentStyles.emailIconRing} className="email-ring-animate" />
             </div>
-            <h2 style={currentStyles.checkEmailTitle}>Welcome to UnFiltered-AI!</h2>
+            <h2 style={currentStyles.checkEmailTitle}>Welcome to So UnFiltered AI!</h2>
             <p style={currentStyles.checkEmailText}>
               Your account has been created successfully.
             </p>
@@ -1138,7 +1138,7 @@ function HomePage() {
               </button>
               <div style={{...currentStyles.brandContainer, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
                 <img src="/logo.png" alt="Logo" style={currentStyles.brandLogo} />
-                <span style={currentStyles.brand}>So Unfiltered</span>
+                <span style={currentStyles.brand}>So UnFiltered AI</span>
               </div>
             </div>
 
@@ -1278,7 +1278,7 @@ function HomePage() {
                   ☰
                 </button>
               )}
-              <div style={currentStyles.modelBadge}>UnFiltered-AI 5.2</div>
+              <div style={currentStyles.modelBadge}>So UnFiltered AI</div>
             </div>
             <div style={currentStyles.topBarRight}>
               <button style={currentStyles.iconBtn} onClick={toggleTheme} title="Toggle theme">
@@ -1296,7 +1296,7 @@ function HomePage() {
               {showGreeting && (
                 <div style={currentStyles.emptyState}>
                   <div style={currentStyles.greetingLogo}>
-                    <img src="/logo.png" alt="So Unfiltered" style={currentStyles.greetingLogoImg} />
+                    <img src="/logo.png" alt="So UnFiltered AI" style={currentStyles.greetingLogoImg} />
                   </div>
                   <div style={currentStyles.greetingText}>{greeting}</div>
                   {remainingMessages !== Infinity && (
@@ -1467,7 +1467,7 @@ function HomePage() {
                   </div>
                 </div>
                 <div style={currentStyles.modelSelect}>
-                  <span>UnFiltered-AI can make mistakes. Check important info.</span>
+                  <span>So UnFiltered AI can make mistakes. Check important info.</span>
                   {remainingMessages !== Infinity && canSendMessage() && !isMobile && (
                     <span style={currentStyles.remainingMessages}>
                       {" "}· {remainingMessages} messages left today

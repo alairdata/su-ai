@@ -45,7 +45,7 @@ export const PLAN_CONFIG = {
       '30x more than Free, 2x more than Pro',
       'Higher outputs for more tasks',
       'Priority access at high traffic times',
-      'Early access to advanced So Unfiltered AI features',
+      'Early access to advanced So UnFiltered AI features',
     ],
     stripePriceId: process.env.STRIPE_PLUS_PRICE_ID!,
   },
