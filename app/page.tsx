@@ -3205,6 +3205,10 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
     ...lightStyles.greetingLogoImg,
     filter: 'invert(1)',
   },
+  greetingText: {
+    ...lightStyles.greetingText,
+    color: '#fff',
+  },
   recentItem: {
     ...lightStyles.recentItem,
     color: '#fff',
