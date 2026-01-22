@@ -623,7 +623,7 @@ function HomePage() {
         <div style={currentStyles.loadingContent}>
           {/* Logo */}
           <div style={currentStyles.loadingLogo} className="loading-logo-pulse">
-            ✦
+            <img src="/logo.png" alt="So Unfiltered" style={currentStyles.loadingLogoImg} />
           </div>
           {/* Brand Name */}
           <div style={currentStyles.loadingBrand}>So Unfiltered</div>
@@ -659,8 +659,10 @@ function HomePage() {
         <div style={currentStyles.authCard}>
           {/* Logo with Glow */}
           <div style={currentStyles.authLogo}>
-            <div style={currentStyles.logoIcon} className="auth-logo-glow">✦</div>
-            <h1 style={currentStyles.authTitle}>UnFiltered-AI</h1>
+            <div style={currentStyles.logoIcon} className="auth-logo-glow">
+              <img src="/logo.png" alt="So Unfiltered" style={currentStyles.logoIconImg} />
+            </div>
+            <h1 style={currentStyles.authTitle}>So Unfiltered</h1>
             <p style={currentStyles.authSubtitle}>
               {showForgotPassword
                 ? "Reset your password"
@@ -1134,8 +1136,9 @@ function HomePage() {
               >
                 ☰
               </button>
-              <div style={{...currentStyles.brand, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
-                UnFiltered-AI
+              <div style={{...currentStyles.brandContainer, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
+                <img src="/logo.png" alt="Logo" style={currentStyles.brandLogo} />
+                <span style={currentStyles.brand}>So Unfiltered</span>
               </div>
             </div>
 
@@ -1293,11 +1296,7 @@ function HomePage() {
               {showGreeting && (
                 <div style={currentStyles.emptyState}>
                   <div style={currentStyles.greetingLogo}>
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                      <path d="M2 17l10 5 10-5"/>
-                      <path d="M2 12l10 5 10-5"/>
-                    </svg>
+                    <img src="/logo.png" alt="So Unfiltered" style={currentStyles.greetingLogoImg} />
                   </div>
                   <div style={currentStyles.greetingText}>{greeting}</div>
                   {remainingMessages !== Infinity && (
@@ -1878,17 +1877,16 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     gap: '16px',
   },
   loadingLogo: {
-    width: '64px',
-    height: '64px',
-    background: 'linear-gradient(135deg, #fff 0%, #f5f5f5 100%)',
-    border: '2px solid #e0d6c7',
-    borderRadius: '18px',
+    width: '72px',
+    height: '72px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '32px',
-    color: '#666',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
+  },
+  loadingLogoImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain' as const,
   },
   loadingBrand: {
     fontSize: '20px',
@@ -1969,17 +1967,17 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     marginBottom: '20px',
   },
   logoIcon: {
-    width: '48px',
-    height: '48px',
-    background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%)',
-    border: '2px solid #d0d0d0',
-    borderRadius: '14px',
+    width: '56px',
+    height: '56px',
     margin: '0 auto 20px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '24px',
-    color: '#666',
+  },
+  logoIconImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain' as const,
   },
   authTitle: {
     fontSize: '26px',
@@ -2250,6 +2248,16 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     padding: '4px',
     color: '#000',
   },
+  brandContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  brandLogo: {
+    width: '24px',
+    height: '24px',
+    objectFit: 'contain' as const,
+  },
   brand: {
     fontWeight: 600,
     fontSize: '16px',
@@ -2473,14 +2481,15 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   greetingLogo: {
     width: '72px',
     height: '72px',
-    background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%)',
-    border: '2px solid #d0d0d0',
-    borderRadius: '20px',
     marginBottom: '24px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#666',
+  },
+  greetingLogoImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain' as const,
   },
   greetingText: {
     fontSize: '24px',
@@ -3027,10 +3036,10 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   loadingLogo: {
     ...lightStyles.loadingLogo,
-    background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)',
-    border: '2px solid #3a3a3a',
-    color: '#888',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+  },
+  loadingLogoImg: {
+    ...lightStyles.loadingLogoImg,
+    filter: 'invert(1)',
   },
   loadingBrand: {
     ...lightStyles.loadingBrand,
@@ -3063,6 +3072,10 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   authSubtitle: {
     ...lightStyles.authSubtitle,
     color: '#999',
+  },
+  logoIconImg: {
+    ...lightStyles.logoIconImg,
+    filter: 'invert(1)',
   },
   tabContainer: {
     ...lightStyles.tabContainer,
@@ -3172,6 +3185,10 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
     ...lightStyles.brand,
     color: '#fff',
   },
+  brandLogo: {
+    ...lightStyles.brandLogo,
+    filter: 'invert(1)',
+  },
   section: {
     ...lightStyles.section,
     borderBottom: '1px solid #3a3a3a',
@@ -3183,6 +3200,10 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   sectionLabel: {
     ...lightStyles.sectionLabel,
     color: '#999',
+  },
+  greetingLogoImg: {
+    ...lightStyles.greetingLogoImg,
+    filter: 'invert(1)',
   },
   recentItem: {
     ...lightStyles.recentItem,
