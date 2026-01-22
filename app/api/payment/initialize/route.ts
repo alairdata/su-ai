@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
-import { createCheckoutSession, PLAN_CONFIG, PlanType } from '@/lib/stripe';
+import { createCheckoutSession, PlanType } from '@/lib/stripe';
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from '@/lib/rate-limit';
+import { initializePaymentSchema, validateInput } from '@/lib/validations';
 
 export async function POST(request: Request) {
   try {
@@ -24,13 +25,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const { plan } = await request.json();
+    const body = await request.json();
 
-    // Validate plan
-    if (!plan || !['Pro', 'Plus'].includes(plan)) {
-      return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
+    // Schema validation
+    const validation = validateInput(initializePaymentSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
+    const { plan } = validation.data;
     const userId = session.user.id;
     const email = session.user.email;
     const baseUrl = process.env.NEXTAUTH_URL;

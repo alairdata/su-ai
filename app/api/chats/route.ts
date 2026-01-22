@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from "@/lib/rate-limit";
+import { createChatSchema, validateInput } from "@/lib/validations";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -73,13 +74,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { title } = await req.json();
+  const body = await req.json();
+
+  // Schema validation
+  const validation = validateInput(createChatSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
+
+  const { title } = validation.data;
 
   const { data: chat, error } = await supabase
     .from("chats")
     .insert({
       user_id: session.user.id,
-      title: title || "New Chat"
+      title
     })
     .select()
     .single();

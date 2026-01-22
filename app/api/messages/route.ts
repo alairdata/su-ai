@@ -4,6 +4,7 @@ import { authOptions } from "../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
 import Anthropic from "@anthropic-ai/sdk";
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from "@/lib/rate-limit";
+import { sendMessageSchema, validateInput } from "@/lib/validations";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -39,7 +40,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { chatId, message } = await req.json();
+  const body = await req.json();
+
+  // Schema validation - type checks, length limits, UUID format
+  const validation = validateInput(sendMessageSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
+
+  const { chatId, message } = validation.data;
 
   // Check message limits
   const limit = PLAN_LIMITS[session.user.plan];

@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { isDisposableEmail } from '@/lib/disposable-emails';
 import { sendVerificationEmail } from '@/lib/email';
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit';
+import { signupSchema, validateInput } from '@/lib/validations';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,18 +25,15 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { name, email: rawEmail, password } = await request.json();
+    const body = await request.json();
 
-    // Validate inputs
-    if (!name || !rawEmail || !password) {
-      return NextResponse.json(
-        { error: 'All fields are required' },
-        { status: 400 }
-      );
+    // Schema validation - type checks, length limits, format validation
+    const validation = validateInput(signupSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    // Normalize email to lowercase for consistent storage and lookup
-    const email = rawEmail.toLowerCase().trim();
+    const { name, email, password } = validation.data;
 
     // Block disposable emails
     if (isDisposableEmail(email)) {

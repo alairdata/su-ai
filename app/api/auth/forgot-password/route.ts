@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendPasswordResetEmail } from '@/lib/email';
 import crypto from 'crypto';
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit';
+import { forgotPasswordSchema, validateInput } from '@/lib/validations';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,21 +23,21 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { email } = await req.json();
+    const body = await req.json();
 
-    if (!email) {
-      return NextResponse.json(
-        { error: 'Email is required' },
-        { status: 400 }
-      );
+    // Schema validation
+    const validation = validateInput(forgotPasswordSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    // Check if user exists (normalize email for consistent lookup)
-    const normalizedEmail = email.toLowerCase().trim();
+    const { email } = validation.data;
+
+    // Check if user exists
     const { data: user, error } = await supabase
       .from('users')
       .select('id, name, email')
-      .eq('email', normalizedEmail)
+      .eq('email', email)
       .single();
 
     // Always return success to prevent email enumeration

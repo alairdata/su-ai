@@ -2,21 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
+import { updateTimezoneSchema, validateInput } from "@/lib/validations";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
-
-// Valid IANA timezone check
-function isValidTimezone(tz: string): boolean {
-  try {
-    Intl.DateTimeFormat(undefined, { timeZone: tz });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 // POST - Update user's timezone
 export async function POST(req: NextRequest) {
@@ -26,16 +17,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { timezone } = await req.json();
+  const body = await req.json();
 
-  if (!timezone || typeof timezone !== "string") {
-    return NextResponse.json({ error: "Timezone is required" }, { status: 400 });
+  // Schema validation - includes IANA timezone check
+  const validation = validateInput(updateTimezoneSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  // Validate timezone is a real IANA timezone (prevents manipulation)
-  if (!isValidTimezone(timezone)) {
-    return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
-  }
+  const { timezone } = validation.data;
 
   // Only update the timezone preference - does NOT reset message counts
   const { error } = await supabase
