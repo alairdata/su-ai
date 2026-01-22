@@ -66,6 +66,10 @@ const plan = z.enum(['Pro', 'Plus'], {
   message: 'Invalid plan. Must be Pro or Plus',
 });
 
+const anyPlan = z.enum(['Free', 'Pro', 'Plus'], {
+  message: 'Invalid plan',
+});
+
 // ============================================
 // Auth Schemas
 // ============================================
@@ -138,6 +142,10 @@ export const initializePaymentSchema = z.object({
 
 export const verifyPaymentSchema = z.object({
   session_id: z.string().min(1, 'Session ID is required').max(500),
+}).strict();
+
+export const upgradePlanSchema = z.object({
+  plan: anyPlan,
 }).strict();
 
 // ============================================

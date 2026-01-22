@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
 import { updateNameSchema, validateInput } from "@/lib/validations";
+import { sanitizeErrorForClient } from "@/lib/env";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
     .eq("id", session.user.id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: sanitizeErrorForClient(error) }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, name });

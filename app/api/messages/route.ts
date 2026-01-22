@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import Anthropic from "@anthropic-ai/sdk";
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from "@/lib/rate-limit";
 import { sendMessageSchema, validateInput } from "@/lib/validations";
+import { sanitizeErrorForClient } from "@/lib/env";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
     });
 
   if (userMsgError) {
-    return NextResponse.json({ error: userMsgError.message }, { status: 500 });
+    return NextResponse.json({ error: sanitizeErrorForClient(userMsgError) }, { status: 500 });
   }
 
   // Get all messages for context

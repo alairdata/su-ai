@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
+import { deleteChatSchema, validateInput } from "@/lib/validations";
+import { sanitizeErrorForClient } from "@/lib/env";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,7 +17,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { chatId } = await req.json();
+  const body = await req.json();
+
+  // Schema validation
+  const validation = validateInput(deleteChatSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
+
+  const { chatId } = validation.data;
 
   // Fetch chat with messages before deleting
   const { data: chat } = await supabase
@@ -30,7 +40,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (!chat || chat.user_id !== session.user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "Chat not found" }, { status: 403 });
   }
 
   // Save to deleted_chats table (audit log)
@@ -55,7 +65,7 @@ export async function POST(req: NextRequest) {
     .eq("id", chatId);
 
   if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    return NextResponse.json({ error: sanitizeErrorForClient(deleteError) }, { status: 500 });
   }
 
   // Cleanup: Remove entries older than 30 days from deleted_chats

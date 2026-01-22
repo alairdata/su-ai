@@ -4,6 +4,7 @@ import { authOptions } from "../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from "@/lib/rate-limit";
 import { createChatSchema, validateInput } from "@/lib/validations";
+import { sanitizeErrorForClient } from "@/lib/env";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
     .order("created_at", { referencedTable: "messages", ascending: true });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: sanitizeErrorForClient(error) }, { status: 500 });
   }
 
   return NextResponse.json({ chats });
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: sanitizeErrorForClient(error) }, { status: 500 });
   }
 
   return NextResponse.json({ chat });

@@ -4,6 +4,7 @@ import { authOptions } from '../../auth/[...nextauth]/route';
 import { createCheckoutSession, PlanType } from '@/lib/stripe';
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from '@/lib/rate-limit';
 import { initializePaymentSchema, validateInput } from '@/lib/validations';
+import { sanitizeErrorForClient } from '@/lib/env';
 
 export async function POST(request: Request) {
   try {
@@ -60,10 +61,8 @@ export async function POST(request: Request) {
       session_id: checkoutSession.id,
     });
   } catch (error) {
-    console.error('Payment initialization error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to initialize payment', details: errorMessage },
+      { error: sanitizeErrorForClient(error) },
       { status: 500 }
     );
   }
