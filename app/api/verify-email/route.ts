@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
       .insert([
         {
           name: pendingUser.name,
+          original_name: pendingUser.name, // Store original name at signup
           email: pendingUser.email,
           password_hash: pendingUser.password_hash,
           plan: 'Free',
