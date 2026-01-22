@@ -124,28 +124,39 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, user, account }) {
       if (user) {
-        // For credentials login, user object has our custom fields
+        // Initial login - set token.id
         if (account?.provider === "credentials") {
           token.id = user.id;
-          token.plan = user.plan;
-          token.messagesUsedToday = user.messagesUsedToday;
-          token.isNewUser = false;
         } else {
-          // For OAuth login, we need to fetch user data from database
+          // For OAuth login, get user ID from database
           const { data: dbUser } = await supabase
             .from('users')
-            .select('id, plan, messages_used_today, is_new_user')
+            .select('id')
             .eq('email', user.email?.toLowerCase())
             .single();
 
           if (dbUser) {
             token.id = dbUser.id;
-            token.plan = dbUser.plan;
-            token.messagesUsedToday = dbUser.messages_used_today;
-            token.isNewUser = dbUser.is_new_user || false;
           }
         }
       }
+
+      // Always fetch fresh plan data from database on every JWT refresh
+      // This ensures plan changes sync across all devices immediately
+      if (token.id) {
+        const { data: freshUser } = await supabase
+          .from('users')
+          .select('plan, messages_used_today, is_new_user')
+          .eq('id', token.id)
+          .single();
+
+        if (freshUser) {
+          token.plan = freshUser.plan;
+          token.messagesUsedToday = freshUser.messages_used_today;
+          token.isNewUser = freshUser.is_new_user || false;
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {
