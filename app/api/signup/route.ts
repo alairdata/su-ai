@@ -4,6 +4,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { isDisposableEmail } from '@/lib/disposable-emails';
 import { sendVerificationEmail } from '@/lib/email';
+import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,6 +12,17 @@ const supabase = createClient(
 );
 
 export async function POST(request: Request) {
+  // Rate limiting - 5 signups per hour per IP
+  const clientIP = getClientIP(request);
+  const rateLimitResult = rateLimit(`signup:${clientIP}`, RATE_LIMITS.signup);
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: 'Too many signup attempts. Please try again later.' },
+      { status: 429, headers: rateLimitHeaders(rateLimitResult) }
+    );
+  }
+
   try {
     const { name, email: rawEmail, password } = await request.json();
 

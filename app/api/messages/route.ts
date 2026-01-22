@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
 import Anthropic from "@anthropic-ai/sdk";
+import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from "@/lib/rate-limit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,9 +22,21 @@ const PLAN_LIMITS: Record<string, number> = {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  
+
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limiting - 60 messages per minute per user
+  const clientIP = getClientIP(req);
+  const rateLimitKey = getUserIPKey(session.user.id, clientIP, 'messages');
+  const rateLimitResult = rateLimit(rateLimitKey, RATE_LIMITS.messages);
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down." },
+      { status: 429, headers: rateLimitHeaders(rateLimitResult) }
+    );
   }
 
   const { chatId, message } = await req.json();

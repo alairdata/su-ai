@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import { createCheckoutSession, PLAN_CONFIG, PlanType } from '@/lib/stripe';
+import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
   try {
@@ -9,6 +10,18 @@ export async function POST(request: Request) {
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Rate limiting - 10 payment attempts per 5 minutes
+    const clientIP = getClientIP(request);
+    const rateLimitKey = getUserIPKey(session.user.id, clientIP, 'payment');
+    const rateLimitResult = rateLimit(rateLimitKey, RATE_LIMITS.payment);
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many payment attempts. Please try again later.' },
+        { status: 429, headers: rateLimitHeaders(rateLimitResult) }
+      );
     }
 
     const { plan } = await request.json();

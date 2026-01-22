@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendPasswordResetEmail } from '@/lib/email';
 import crypto from 'crypto';
+import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS } from '@/lib/rate-limit';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,6 +10,17 @@ const supabase = createClient(
 );
 
 export async function POST(req: NextRequest) {
+  // Rate limiting - 3 password reset requests per hour per IP
+  const clientIP = getClientIP(req);
+  const rateLimitResult = rateLimit(`password-reset:${clientIP}`, RATE_LIMITS.passwordReset);
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: 'Too many password reset attempts. Please try again later.' },
+      { status: 429, headers: rateLimitHeaders(rateLimitResult) }
+    );
+  }
+
   try {
     const { email } = await req.json();
 

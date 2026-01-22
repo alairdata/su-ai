@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from "@/lib/rate-limit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,11 +10,23 @@ const supabase = createClient(
 );
 
 // GET - Load all chats for the user
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  
+
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limiting - 30 requests per minute
+  const clientIP = getClientIP(req);
+  const rateLimitKey = getUserIPKey(session.user.id, clientIP, 'chats-get');
+  const rateLimitResult = rateLimit(rateLimitKey, RATE_LIMITS.chats);
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down." },
+      { status: 429, headers: rateLimitHeaders(rateLimitResult) }
+    );
   }
 
   const { data: chats, error } = await supabase
@@ -43,9 +56,21 @@ export async function GET(_req: NextRequest) {
 // POST - Create a new chat
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  
+
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limiting - 30 chat creations per minute
+  const clientIP = getClientIP(req);
+  const rateLimitKey = getUserIPKey(session.user.id, clientIP, 'chats-post');
+  const rateLimitResult = rateLimit(rateLimitKey, RATE_LIMITS.chats);
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down." },
+      { status: 429, headers: rateLimitHeaders(rateLimitResult) }
+    );
   }
 
   const { title } = await req.json();
