@@ -1467,21 +1467,11 @@ function HomePage() {
                   </div>
                 </div>
                 <div style={currentStyles.modelSelect}>
-                  {isMobile ? (
-                    <span>
-                      {remainingMessages !== Infinity
-                        ? `${remainingMessages} messages left today`
-                        : "Unlimited messages"}
+                  <span>So UnFiltered AI can make mistakes.</span>
+                  {remainingMessages !== Infinity && canSendMessage() && (
+                    <span style={currentStyles.remainingMessages}>
+                      {" "}· {remainingMessages} messages left today
                     </span>
-                  ) : (
-                    <>
-                      <span>So UnFiltered AI can make mistakes. Check important info.</span>
-                      {remainingMessages !== Infinity && canSendMessage() && (
-                        <span style={currentStyles.remainingMessages}>
-                          {" "}· {remainingMessages} messages left today
-                        </span>
-                      )}
-                    </>
                   )}
                 </div>
               </div>
