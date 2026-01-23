@@ -541,23 +541,22 @@ function HomePage() {
 
   const upgradePlan = async (newPlan: "Free" | "Pro" | "Plus") => {
   if (!session?.user) return;
-  
-  // Downgrade to Free - no payment needed
-  if (newPlan === "Free") {
-    try {
-      const res = await fetch("/api/upgrade-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: newPlan }),
-      });
 
-      if (res.ok) {
-        await updateSession();
-        setShowAccountModal(false);
-      }
-    } catch (error) {
-      console.error("Failed to downgrade plan:", error);
+  // Downgrade to Free - cancel subscription if active
+  if (newPlan === "Free") {
+    // If user has an active subscription, use cancel flow instead
+    if (session.user.plan !== "Free") {
+      const confirmed = window.confirm(
+        "This will cancel your subscription. You'll keep access until the end of your billing period, then be downgraded to Free. Continue?"
+      );
+      if (!confirmed) return;
+
+      // Use the cancel subscription flow
+      await cancelSubscription();
+      return;
     }
+
+    // Already on Free, nothing to do
     return;
   }
 

@@ -86,6 +86,9 @@ export function sanitizeErrorForClient(error: unknown): string {
       'Invalid plan',
       'Chat not found',
       'User not found',
+      'Missing price ID',
+      'STRIPE_',
+      'Stripe',
     ];
 
     for (const safeError of safeErrors) {
