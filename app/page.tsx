@@ -511,11 +511,14 @@ function HomePage() {
     setShowChatActionsModal(false);
   };
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = () => {
     if (chatToDelete) {
-      await deleteChat(chatToDelete);
+      // Close modal immediately (optimistic)
       setShowDeleteModal(false);
+      const chatId = chatToDelete;
       setChatToDelete(null);
+      // Delete in background
+      deleteChat(chatId);
     }
   };
 
@@ -1536,8 +1539,12 @@ function HomePage() {
               <div style={currentStyles.modalBody}>
                 <div style={currentStyles.modalSection}>
                   <h3 style={currentStyles.modalSectionTitle}>Profile Information</h3>
-                  <div style={currentStyles.modalInfoRow}>
-                    <span style={currentStyles.modalLabel}>Name:</span>
+                  <div style={{
+                    ...currentStyles.modalInfoRow,
+                    alignItems: 'center',
+                    gap: '12px',
+                  }}>
+                    <span style={{ ...currentStyles.modalLabel, flexShrink: 0, minWidth: '50px' }}>Name:</span>
                     {isEditingName ? (
                       <div style={{
                         display: 'flex',
@@ -1545,6 +1552,7 @@ function HomePage() {
                         alignItems: 'center',
                         flex: 1,
                         minWidth: 0,
+                        justifyContent: 'flex-end',
                       }}>
                         <input
                           type="text"
@@ -1559,8 +1567,9 @@ function HomePage() {
                           style={{
                             flex: 1,
                             minWidth: 0,
-                            padding: '8px 12px',
-                            borderRadius: '8px',
+                            maxWidth: '200px',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
                             border: '1px solid #d0d0d0',
                             fontSize: '14px',
                             background: theme === 'dark' ? '#2a2a2a' : '#fff',
@@ -1576,9 +1585,9 @@ function HomePage() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '8px',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '6px',
                             border: 'none',
                             background: '#10b981',
                             color: '#fff',
@@ -1588,11 +1597,11 @@ function HomePage() {
                           }}
                         >
                           {isSavingName ? (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
                               <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
                             </svg>
                           ) : (
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="20 6 9 17 4 12" />
                             </svg>
                           )}
@@ -1605,9 +1614,9 @@ function HomePage() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '8px',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '6px',
                             border: '1px solid #d0d0d0',
                             background: theme === 'dark' ? '#3a3a3a' : '#fff',
                             color: theme === 'dark' ? '#fff' : '#666',
@@ -1615,14 +1624,14 @@ function HomePage() {
                             flexShrink: 0,
                           }}
                         >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="18" y1="6" x2="6" y2="18" />
                             <line x1="6" y1="6" x2="18" y2="18" />
                           </svg>
                         </button>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'flex-end', flex: 1 }}>
                         <span style={currentStyles.modalValue}>{session?.user?.name}</span>
                         <button
                           onClick={() => {
@@ -1634,16 +1643,17 @@ function HomePage() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            width: '28px',
-                            height: '28px',
+                            width: '26px',
+                            height: '26px',
                             borderRadius: '6px',
                             border: '1px solid #d0d0d0',
                             background: theme === 'dark' ? '#3a3a3a' : '#f5f5f5',
                             color: theme === 'dark' ? '#ccc' : '#555',
                             cursor: 'pointer',
+                            flexShrink: 0,
                           }}
                         >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                           </svg>
@@ -1902,15 +1912,16 @@ function HomePage() {
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <>
-          <div style={currentStyles.modalOverlay} />
+          <div style={currentStyles.modalOverlay} onClick={handleDeleteCancel} />
           <div style={currentStyles.deleteModalContainer}>
             <div style={currentStyles.deleteModalContent}>
               <div style={currentStyles.deleteModalHeader}>
-                <h3 style={currentStyles.deleteModalTitle}>Delete Chat?</h3>
+                <div style={{ fontSize: '32px', marginBottom: '8px' }}>🗑️</div>
+                <h3 style={currentStyles.deleteModalTitle}>Delete this chat?</h3>
               </div>
               <div style={currentStyles.deleteModalBody}>
                 <p style={currentStyles.deleteModalText}>
-                  Are you sure you want to delete this chat? This action cannot be undone.
+                  This conversation will be <strong>permanently deleted</strong> and cannot be recovered. Are you sure you want to continue?
                 </p>
               </div>
               <div style={currentStyles.deleteModalFooter}>
@@ -1918,13 +1929,13 @@ function HomePage() {
                   onClick={handleDeleteCancel}
                   style={currentStyles.deleteCancelBtn}
                 >
-                  Cancel
+                  No, keep it
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
                   style={currentStyles.deleteConfirmBtn}
                 >
-                  Delete
+                  Yes, delete
                 </button>
               </div>
             </div>
