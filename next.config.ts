@@ -29,8 +29,10 @@ try {
     // Hides source maps from generated client bundles
     hideSourceMaps: true,
 
-    // Automatically tree-shake Sentry logger statements to reduce bundle size
-    disableLogger: true,
+    // Tree-shake Sentry logger statements to reduce bundle size
+    bundleSizeOptimizations: {
+      excludeDebugStatements: true,
+    },
   };
 
   finalConfig = withSentryConfig(nextConfig, sentryWebpackPluginOptions);

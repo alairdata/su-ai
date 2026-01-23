@@ -34,3 +34,5 @@ try {
 } catch {
   // Sentry not installed - continue without it
 }
+
+export {};
