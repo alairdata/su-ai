@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
 import Anthropic from "@anthropic-ai/sdk";
+import { webSearch, formatSearchResults } from "@/lib/search";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,6 +14,24 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 });
 
+// Web search tool definition
+const tools: Anthropic.Tool[] = [
+  {
+    name: "web_search",
+    description: "Search the web for current information, news, events, or any topic that requires up-to-date data. Use this when the user asks about recent events, current prices, live scores, weather, news, or anything that might have changed after your knowledge cutoff.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description: "The search query to look up on the web"
+        }
+      },
+      required: ["query"]
+    }
+  }
+];
+
 // 🔴 YOUR CUSTOM PROMPT - KEPT EXACTLY AS YOU HAD IT
 const SYSTEM_PROMPT = `
 You're a no-nonsense AI that cuts through the crap. When the user sends a greeting, please be patient and respond honestly while adding a mix of fun relatability and analogies to it in addition to making an effort to understand exactly why a user is sending a message. Dissect it carefully and strategically: are they dragging a problem, worried about something, struggling, excited or simply exchanging pleasantries. When giving responses, think all factors of human life and advice accordingly, feel free to bring up terms from psychology to help them see the light of course in layman terms. It doesn't mean that you are a therapist, just a brutally honest and informed Ai that knows its stuff. Also use curse words when needed to drive your point home making your words hit hard. But keep it short and clear. No long speeches; get straight to the point. Being unfiltered doesn't mean being mean—be tough, but don't just attack.
@@ -20,6 +39,8 @@ You're a no-nonsense AI that cuts through the crap. When the user sends a greeti
 In the end, your goal is to spark self-reflection and action. You might come off as harsh, but your aim is to light a fire under their asses with tough love. Be blunt and confrontational, and clearly recommend necessary changes—remind them complacency is a trap. When they deserve commendation, give it dramatically.
 
 Foster self-awareness and urgency while holding them accountable. Be real and relentless—challenge them to step up and take charge of their lives. Never beat around the bush. Note: ensure proper paragraphing to hit the points home to the user.
+
+You have access to a web_search tool. Use it when users ask about current events, news, prices, weather, sports scores, or anything that requires up-to-date information beyond your knowledge cutoff.
 `;
 
 export async function POST(req: NextRequest) {
@@ -79,36 +100,106 @@ export async function POST(req: NextRequest) {
       content: userMessage,
     }).then(() => {});
 
-    // Create streaming response
-    const stream = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1024,
-      stream: true,
-      system: SYSTEM_PROMPT,
-      messages: [
-        ...allMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-        { role: "user" as const, content: userMessage }
-      ],
-    });
+    // Build messages for API
+    const apiMessages: Anthropic.MessageParam[] = [
+      ...allMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      { role: "user" as const, content: userMessage }
+    ];
 
     // Track full response for saving to database
     let fullResponse = "";
     const userId = session.user.id;
     const messagesUsedToday = session.user.messagesUsedToday;
 
-    // Create a TransformStream to process the response
     const encoder = new TextEncoder();
 
     const readableStream = new ReadableStream({
       async start(controller) {
         try {
-          for await (const event of stream) {
-            if (event.type === "content_block_delta") {
-              const delta = event.delta as { type: string; text?: string };
-              if (delta.type === "text_delta" && delta.text) {
-                fullResponse += delta.text;
-                // Send each text chunk as SSE
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: delta.text })}\n\n`));
+          let currentMessages = [...apiMessages];
+          let continueLoop = true;
+
+          while (continueLoop) {
+            const stream = await anthropic.messages.create({
+              model: "claude-sonnet-4-20250514",
+              max_tokens: 1024,
+              stream: true,
+              system: SYSTEM_PROMPT,
+              tools: tools,
+              messages: currentMessages,
+            });
+
+            let toolUseBlock: { id: string; name: string; input: Record<string, unknown> } | null = null;
+            let currentToolInput = "";
+
+            for await (const event of stream) {
+              if (event.type === "content_block_start") {
+                const block = event.content_block;
+                if (block.type === "tool_use") {
+                  toolUseBlock = { id: block.id, name: block.name, input: {} };
+                }
+              } else if (event.type === "content_block_delta") {
+                const delta = event.delta as { type: string; text?: string; partial_json?: string };
+                if (delta.type === "text_delta" && delta.text) {
+                  fullResponse += delta.text;
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: delta.text })}\n\n`));
+                } else if (delta.type === "input_json_delta" && delta.partial_json) {
+                  currentToolInput += delta.partial_json;
+                }
+              } else if (event.type === "content_block_stop") {
+                if (toolUseBlock && currentToolInput) {
+                  try {
+                    toolUseBlock.input = JSON.parse(currentToolInput);
+                  } catch {
+                    toolUseBlock.input = {};
+                  }
+                }
+              } else if (event.type === "message_stop") {
+                // Check if we need to handle tool use
+                if (toolUseBlock) {
+                  // Send searching indicator
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ searching: true, query: toolUseBlock.input.query })}\n\n`));
+
+                  // Execute the search
+                  const searchQuery = (toolUseBlock.input.query as string) || "";
+                  const searchResults = await webSearch(searchQuery);
+                  const formattedResults = formatSearchResults(searchResults);
+
+                  // Add assistant's tool use and tool result to messages
+                  currentMessages = [
+                    ...currentMessages,
+                    {
+                      role: "assistant" as const,
+                      content: [
+                        {
+                          type: "tool_use" as const,
+                          id: toolUseBlock.id,
+                          name: toolUseBlock.name,
+                          input: toolUseBlock.input
+                        }
+                      ]
+                    },
+                    {
+                      role: "user" as const,
+                      content: [
+                        {
+                          type: "tool_result" as const,
+                          tool_use_id: toolUseBlock.id,
+                          content: formattedResults
+                        }
+                      ]
+                    }
+                  ];
+
+                  // Reset for next iteration
+                  toolUseBlock = null;
+                  currentToolInput = "";
+
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ searching: false })}\n\n`));
+                } else {
+                  // No tool use, we're done
+                  continueLoop = false;
+                }
               }
             }
           }

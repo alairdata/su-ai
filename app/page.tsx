@@ -61,6 +61,8 @@ function HomePage() {
     currentChat,
     currentChatId,
     isLoading: chatLoading,
+    isSearching,
+    searchQuery,
     messagesEndRef,
     sendMessage,
     createNewChat,
@@ -1388,8 +1390,37 @@ function HomePage() {
                     </div>
                   ))}
 
+                  {/* Show searching indicator when AI is searching the web */}
+                  {isSearching && (
+                    <div style={currentStyles.messageRowAssistant}>
+                      <div style={{
+                        ...currentStyles.messageBubbleAssistant,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '12px 16px',
+                      }}>
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          style={{ animation: 'spin 1s linear infinite' }}
+                        >
+                          <circle cx="11" cy="11" r="8" />
+                          <path d="m21 21-4.35-4.35" />
+                        </svg>
+                        <span style={{ fontSize: '14px', color: '#666' }}>
+                          Searching the web{searchQuery ? ` for "${searchQuery}"` : ''}...
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Only show typing indicator if loading AND last message is not already an assistant message */}
-                  {chatLoading && messages.length > 0 && messages[messages.length - 1].role !== 'assistant' && (
+                  {chatLoading && !isSearching && messages.length > 0 && messages[messages.length - 1].role !== 'assistant' && (
                     <div style={currentStyles.messageRowAssistant}>
                       <div style={currentStyles.messageBubbleAssistant}>
                         <div style={currentStyles.typingIndicator}>

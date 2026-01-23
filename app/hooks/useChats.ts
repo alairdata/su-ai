@@ -26,6 +26,8 @@ export function useChats() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [localMessagesUsed, setLocalMessagesUsed] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const previousMessageCountRef = useRef(0);
@@ -249,6 +251,11 @@ export function useChats() {
             try {
               const data = JSON.parse(line.slice(6));
 
+              if (data.searching !== undefined) {
+                setIsSearching(data.searching);
+                setSearchQuery(data.query || null);
+              }
+
               if (data.text) {
                 streamedContent += data.text;
                 // Update assistant message content in real-time
@@ -311,6 +318,8 @@ export function useChats() {
       );
     } finally {
       setIsLoading(false);
+      setIsSearching(false);
+      setSearchQuery(null);
     }
   };
 
@@ -362,6 +371,8 @@ export function useChats() {
     currentChat,
     currentChatId,
     isLoading,
+    isSearching,
+    searchQuery,
     messagesEndRef,
     sendMessage,
     createNewChat,
