@@ -172,7 +172,8 @@ function HomePage() {
   }, [isAuthenticated, isUnauthenticated]);
 
   const messages = currentChat?.messages ?? [];
-  const showGreeting = !currentChat || messages.length === 0;
+  // Don't show greeting if we're loading (sending first message to new chat)
+  const showGreeting = !chatLoading && (!currentChat || messages.length === 0);
   const remainingMessages = getRemainingMessages();
 
   // Dynamic greeting based on time of day
@@ -1497,8 +1498,12 @@ function HomePage() {
                     </div>
                   )}
 
-                  {/* Only show typing indicator if loading AND last message is not already an assistant message */}
-                  {chatLoading && !isSearching && messages.length > 0 && messages[messages.length - 1].role !== 'assistant' && (
+                  {/* Show typing indicator when loading and waiting for response */}
+                  {chatLoading && !isSearching && (
+                    messages.length === 0 ||
+                    messages[messages.length - 1].role === 'user' ||
+                    !messages[messages.length - 1].content
+                  ) && (
                     <div style={currentStyles.messageRowAssistant}>
                       <div style={currentStyles.messageBubbleAssistant}>
                         <div style={currentStyles.typingIndicator}>
