@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
         })
         .eq("id", user.id);
 
-      const periodEnd = new Date(subscription.current_period_end * 1000);
+      const periodEnd = new Date(((subscription as { current_period_end?: number }).current_period_end || Date.now() / 1000) * 1000);
       const formattedDate = periodEnd.toLocaleDateString('en-US', {
         month: 'long',
         day: 'numeric',
