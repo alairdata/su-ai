@@ -242,7 +242,7 @@ function HomePage() {
   // Calculate progress percentage
   const getProgressPercentage = () => {
     if (!session?.user) return 0;
-    const limits: Record<string, number> = { Free: 10, Pro: 150, Plus: 300 };
+    const limits: Record<string, number> = { Free: 10, Pro: 100, Plus: 300 };
     const limit = limits[session.user.plan as keyof typeof limits];
     if (limit === Infinity) return 100;
     return (session.user.messagesUsedToday / limit) * 100;
@@ -1189,15 +1189,22 @@ function HomePage() {
                       />
                       <button
                         onClick={() => handleRenameSubmit(chat.id)}
-                        style={currentStyles.renameBtn}
+                        style={currentStyles.renameIconBtn}
+                        title="Save"
                       >
-                        ✓
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
                       </button>
                       <button
                         onClick={handleRenameCancel}
-                        style={currentStyles.cancelBtn}
+                        style={currentStyles.cancelIconBtn}
+                        title="Cancel"
                       >
-                        ✕
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
                       </button>
                     </div>
                   ) : (
@@ -1262,7 +1269,7 @@ function HomePage() {
             <div style={{...currentStyles.userInfo, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
               <div style={{ fontSize: 13, color: theme === 'dark' ? '#fff' : '#1a1a1a' }}>{session?.user?.name}</div>
               <div style={{ fontSize: 11, color: theme === 'dark' ? '#999' : '#666' }}>
-                {session?.user?.plan} plan • {session?.user?.messagesUsedToday}/{session?.user?.plan === 'Free' ? 10 : session?.user?.plan === 'Pro' ? 150 : 300} msgs
+                {session?.user?.plan} plan • {session?.user?.messagesUsedToday}/{session?.user?.plan === 'Free' ? 10 : session?.user?.plan === 'Pro' ? 100 : 300} msgs
               </div>
             </div>
           </div>
@@ -1532,77 +1539,114 @@ function HomePage() {
                   <div style={currentStyles.modalInfoRow}>
                     <span style={currentStyles.modalLabel}>Name:</span>
                     {isEditingName ? (
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1 }}>
+                      <div style={{
+                        display: 'flex',
+                        gap: '8px',
+                        alignItems: 'center',
+                        flex: 1,
+                        minWidth: 0,
+                      }}>
                         <input
                           type="text"
                           value={editNameValue}
                           onChange={(e) => setEditNameValue(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && updateName()}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') updateName();
+                            if (e.key === 'Escape') setIsEditingName(false);
+                          }}
                           disabled={isSavingName}
                           autoFocus
                           style={{
                             flex: 1,
+                            minWidth: 0,
                             padding: '8px 12px',
                             borderRadius: '8px',
                             border: '1px solid #d0d0d0',
                             fontSize: '14px',
-                            background: '#fff',
-                            color: '#333',
+                            background: theme === 'dark' ? '#2a2a2a' : '#fff',
+                            color: theme === 'dark' ? '#fff' : '#333',
                             outline: 'none',
                           }}
                         />
                         <button
                           onClick={updateName}
                           disabled={isSavingName}
+                          title="Save"
                           style={{
-                            padding: '8px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '32px',
+                            height: '32px',
                             borderRadius: '8px',
                             border: 'none',
-                            background: '#1a1a1a',
+                            background: '#10b981',
                             color: '#fff',
-                            fontSize: '13px',
-                            fontWeight: 500,
                             cursor: isSavingName ? 'not-allowed' : 'pointer',
                             opacity: isSavingName ? 0.6 : 1,
+                            flexShrink: 0,
                           }}
                         >
-                          {isSavingName ? 'Saving...' : 'Save'}
+                          {isSavingName ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                              <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                            </svg>
+                          ) : (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
                         </button>
                         <button
                           onClick={() => setIsEditingName(false)}
                           disabled={isSavingName}
+                          title="Cancel"
                           style={{
-                            padding: '8px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '32px',
+                            height: '32px',
                             borderRadius: '8px',
                             border: '1px solid #d0d0d0',
-                            background: '#fff',
-                            color: '#666',
-                            fontSize: '13px',
+                            background: theme === 'dark' ? '#3a3a3a' : '#fff',
+                            color: theme === 'dark' ? '#fff' : '#666',
                             cursor: 'pointer',
+                            flexShrink: 0,
                           }}
                         >
-                          Cancel
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
                         </button>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <span style={currentStyles.modalValue}>{session?.user?.name}</span>
                         <button
                           onClick={() => {
                             setEditNameValue(session?.user?.name || '');
                             setIsEditingName(true);
                           }}
+                          title="Edit name"
                           style={{
-                            padding: '4px 10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '28px',
+                            height: '28px',
                             borderRadius: '6px',
                             border: '1px solid #d0d0d0',
-                            background: '#f5f5f5',
-                            color: '#555',
-                            fontSize: '12px',
+                            background: theme === 'dark' ? '#3a3a3a' : '#f5f5f5',
+                            color: theme === 'dark' ? '#ccc' : '#555',
                             cursor: 'pointer',
                           }}
                         >
-                          Edit
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
                         </button>
                       </div>
                     )}
@@ -1691,7 +1735,7 @@ function HomePage() {
                     <div style={currentStyles.planBadgeLarge}>{session?.user?.plan}</div>
                     <div style={currentStyles.planDescription}>
                       {session?.user?.plan === "Free" && `${session.user.messagesUsedToday}/10 messages used today`}
-                      {session?.user?.plan === "Pro" && `${session.user.messagesUsedToday}/150 messages used today`}
+                      {session?.user?.plan === "Pro" && `${session.user.messagesUsedToday}/100 messages used today`}
                       {session?.user?.plan === "Plus" && `${session.user.messagesUsedToday}/300 messages used today`}
                     </div>
 
@@ -1737,8 +1781,8 @@ function HomePage() {
                       <h5 style={currentStyles.planCardTitle}>Pro</h5>
                       <div style={currentStyles.planPrice}>$0.99<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
-                        <li style={currentStyles.planFeature}>150 messages per day</li>
-                        <li style={currentStyles.planFeature}>15x more than Free</li>
+                        <li style={currentStyles.planFeature}>100 messages per day</li>
+                        <li style={currentStyles.planFeature}>10x more than Free</li>
                         <li style={currentStyles.planFeature}>Expanded memory and context</li>
                         <li style={currentStyles.planFeature}>Early access to new features</li>
                         <li style={currentStyles.planFeature}>Advanced reasoning models</li>
@@ -1763,7 +1807,7 @@ function HomePage() {
                       <ul style={currentStyles.planFeatures}>
                         <li style={currentStyles.planFeature}>Everything in Pro</li>
                         <li style={currentStyles.planFeature}>300 messages per day</li>
-                        <li style={currentStyles.planFeature}>30x more than Free, 2x more than Pro</li>
+                        <li style={currentStyles.planFeature}>30x more than Free, 3x more than Pro</li>
                         <li style={currentStyles.planFeature}>Higher outputs for more tasks</li>
                         <li style={currentStyles.planFeature}>Priority access at high traffic</li>
                         <li style={currentStyles.planFeature}>Early access to advanced features</li>
@@ -2370,18 +2414,47 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   renameWrapper: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
+    gap: '6px',
     width: '100%',
-    padding: '4px',
+    padding: '4px 8px',
+    boxSizing: 'border-box' as const,
   },
   renameInput: {
     flex: 1,
-    padding: '6px 8px',
-    border: '1px solid #1a1a1a',
-    borderRadius: '4px',
-    fontSize: '16px',
+    minWidth: 0,
+    padding: '6px 10px',
+    border: '1px solid #d0d0d0',
+    borderRadius: '6px',
+    fontSize: '13px',
     outline: 'none',
     fontFamily: 'inherit',
+    background: '#fff',
+  },
+  renameIconBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '28px',
+    height: '28px',
+    background: '#10b981',
+    border: 'none',
+    color: 'white',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+  cancelIconBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '28px',
+    height: '28px',
+    background: '#ef4444',
+    border: 'none',
+    color: 'white',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    flexShrink: 0,
   },
   renameBtn: {
     background: '#10b981',

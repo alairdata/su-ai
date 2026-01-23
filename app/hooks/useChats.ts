@@ -328,6 +328,15 @@ export function useChats() {
   };
 
   const renameChat = async (chatId: string, newTitle: string) => {
+    // Optimistic update - instant UI feedback
+    const previousChats = [...chats];
+    setChats(prev =>
+      prev.map(c =>
+        c.id === chatId ? { ...c, title: newTitle } : c
+      )
+    );
+
+    // API call in background
     try {
       const res = await fetch('/api/chats/rename', {
         method: 'POST',
@@ -335,19 +344,27 @@ export function useChats() {
         body: JSON.stringify({ chatId, title: newTitle }),
       });
 
-      if (res.ok) {
-        setChats(prev =>
-          prev.map(c =>
-            c.id === chatId ? { ...c, title: newTitle } : c
-          )
-        );
+      if (!res.ok) {
+        // Revert on failure
+        setChats(previousChats);
       }
     } catch (error) {
       console.error('Failed to rename chat:', error);
+      setChats(previousChats);
     }
   };
 
   const deleteChat = async (chatId: string) => {
+    // Optimistic update - instant UI feedback
+    const previousChats = [...chats];
+    const wasCurrentChat = currentChatId === chatId;
+
+    setChats(prev => prev.filter(c => c.id !== chatId));
+    if (wasCurrentChat) {
+      setCurrentChatId(null);
+    }
+
+    // API call in background
     try {
       const res = await fetch('/api/chats/delete', {
         method: 'POST',
@@ -355,14 +372,19 @@ export function useChats() {
         body: JSON.stringify({ chatId }),
       });
 
-      if (res.ok) {
-        setChats(prev => prev.filter(c => c.id !== chatId));
-        if (currentChatId === chatId) {
-          setCurrentChatId(null);
+      if (!res.ok) {
+        // Revert on failure
+        setChats(previousChats);
+        if (wasCurrentChat) {
+          setCurrentChatId(chatId);
         }
       }
     } catch (error) {
       console.error('Failed to delete chat:', error);
+      setChats(previousChats);
+      if (wasCurrentChat) {
+        setCurrentChatId(chatId);
+      }
     }
   };
 
