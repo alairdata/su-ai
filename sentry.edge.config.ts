@@ -1,14 +1,19 @@
-import * as Sentry from "@sentry/nextjs";
+// Sentry edge configuration - only runs if @sentry/nextjs is installed
+try {
+  const Sentry = require("@sentry/nextjs");
 
-Sentry.init({
-  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  Sentry.init({
+    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-  // Performance Monitoring
-  tracesSampleRate: 0.1,
+    // Performance Monitoring
+    tracesSampleRate: 0.1,
 
-  // Set environment
-  environment: process.env.NODE_ENV,
+    // Set environment
+    environment: process.env.NODE_ENV,
 
-  // Only send errors in production
-  enabled: process.env.NODE_ENV === "production",
-});
+    // Only send errors in production
+    enabled: process.env.NODE_ENV === "production",
+  });
+} catch {
+  // Sentry not installed - continue without it
+}
