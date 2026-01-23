@@ -1393,7 +1393,9 @@ function HomePage() {
                   ...currentStyles.chatMessages,
                   ...(isMobile ? currentStyles.chatMessagesMobile : {})
                 }}>
-                  {messages.map((m, idx) => (
+                  {messages
+                    .filter(m => m.role === 'user' || m.content) // Skip empty assistant messages (typing indicator handles those)
+                    .map((m, idx) => (
                     <div
                       key={m.id || idx}
                       style={m.role === "user" ? currentStyles.messageRowUser : currentStyles.messageRowAssistant}
