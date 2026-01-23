@@ -1,25 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
-
 export default function Error({
-  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    // Try to log error to Sentry if available
-    try {
-      const Sentry = require("@sentry/nextjs");
-      Sentry.captureException(error);
-    } catch {
-      // Sentry not available, just log to console
-      console.error("Error:", error);
-    }
-  }, [error]);
-
   return (
     <div style={{
       minHeight: '100vh',
@@ -49,7 +35,7 @@ export default function Error({
           fontSize: '14px',
           lineHeight: 1.5,
         }}>
-          Don't worry, we've been notified. Try refreshing or click below.
+          Try refreshing or click below.
         </p>
         <button
           onClick={() => reset()}

@@ -1,25 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
-
 export default function GlobalError({
-  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    // Try to log error to Sentry if available
-    try {
-      const Sentry = require("@sentry/nextjs");
-      Sentry.captureException(error);
-    } catch {
-      // Sentry not available, just log to console
-      console.error("Global error:", error);
-    }
-  }, [error]);
-
   return (
     <html>
       <body>
@@ -51,7 +37,7 @@ export default function GlobalError({
               marginBottom: '24px',
               lineHeight: 1.5,
             }}>
-              We've been notified and are working on it. Please try again.
+              Please try again.
             </p>
             <button
               onClick={() => reset()}
