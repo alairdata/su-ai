@@ -545,43 +545,112 @@ function HomePage() {
   const upgradePlan = async (newPlan: "Free" | "Pro" | "Plus") => {
   if (!session?.user) return;
 
-  // Downgrade to Free - cancel subscription if active
+  const currentPlan = session.user.plan;
+
+  // Same plan - nothing to do
+  if (currentPlan === newPlan) return;
+
+  // DOWNGRADE TO FREE
   if (newPlan === "Free") {
-    // If user has an active subscription, use cancel flow instead
-    if (session.user.plan !== "Free") {
+    if (currentPlan !== "Free") {
+      const planName = currentPlan;
       const confirmed = window.confirm(
-        "This will cancel your subscription. You'll keep access until the end of your billing period, then be downgraded to Free. Continue?"
+        `Your ${planName} subscription will remain active until the end of your billing period. After that, you'll be on the Free plan with 10 messages/day.\n\nContinue with cancellation?`
       );
       if (!confirmed) return;
-
-      // Use the cancel subscription flow
       await cancelSubscription();
-      return;
     }
-
-    // Already on Free, nothing to do
     return;
   }
 
-  // Upgrade to Pro or Plus - redirect to Stripe checkout
-  try {
-    const res = await fetch("/api/payment/initialize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan: newPlan }),
-    });
+  // UPGRADE FROM FREE - go to Stripe checkout
+  if (currentPlan === "Free") {
+    try {
+      const res = await fetch("/api/payment/initialize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: newPlan }),
+      });
 
-    const data = await res.json();
-    console.log("Payment initialize response:", data);
-
-    if (data.success && data.authorization_url) {
-      window.location.href = data.authorization_url;
-    } else {
-      alert(data.error || data.message || "Failed to initialize payment. Check console for details.");
+      const data = await res.json();
+      if (data.success && data.authorization_url) {
+        window.location.href = data.authorization_url;
+      } else {
+        alert(data.error || "Failed to initialize payment.");
+      }
+    } catch (error) {
+      console.error("Failed to initialize payment:", error);
+      alert("Network error. Please try again.");
     }
-  } catch (error) {
-    console.error("Failed to initialize payment:", error);
-    alert("Network error: " + (error instanceof Error ? error.message : "Unknown error"));
+    return;
+  }
+
+  // UPGRADE: Pro → Plus (with proration)
+  if (currentPlan === "Pro" && newPlan === "Plus") {
+    const confirmed = window.confirm(
+      "Upgrade to Plus for $9.99/month!\n\nYou'll be charged the prorated difference for the rest of this billing period, then $9.99/month going forward.\n\nContinue with upgrade?"
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch("/api/subscription/change-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPlan: "Plus" }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message || "Successfully upgraded to Plus!");
+        await updateSession();
+        setShowAccountModal(false);
+      } else if (data.redirect === "checkout") {
+        // No active subscription, go to checkout
+        const checkoutRes = await fetch("/api/payment/initialize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan: newPlan }),
+        });
+        const checkoutData = await checkoutRes.json();
+        if (checkoutData.authorization_url) {
+          window.location.href = checkoutData.authorization_url;
+        }
+      } else {
+        alert(data.error || "Failed to upgrade. Please try again.");
+      }
+    } catch (error) {
+      console.error("Failed to upgrade:", error);
+      alert("Network error. Please try again.");
+    }
+    return;
+  }
+
+  // DOWNGRADE: Plus → Pro (scheduled for end of period)
+  if (currentPlan === "Plus" && newPlan === "Pro") {
+    const confirmed = window.confirm(
+      "Downgrade to Pro ($0.99/month)?\n\nYour Plus subscription will remain active until the end of your billing period. After that, you'll be on the Pro plan with 150 messages/day.\n\nContinue?"
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch("/api/subscription/change-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPlan: "Pro" }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message || "Your plan will be changed at the end of your billing period.");
+        await updateSession();
+      } else {
+        alert(data.error || "Failed to change plan. Please try again.");
+      }
+    } catch (error) {
+      console.error("Failed to change plan:", error);
+      alert("Network error. Please try again.");
+    }
+    return;
   }
 };
 

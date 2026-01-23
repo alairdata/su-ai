@@ -153,6 +153,26 @@ async function updateUserSubscription(userId: string, subscription: Stripe.Subsc
     updateData.subscription_status = 'canceling';
   }
 
+  // Check if plan changed (from metadata or price lookup)
+  const newPlan = subscription.metadata?.plan;
+  if (newPlan && ['Pro', 'Plus'].includes(newPlan)) {
+    updateData.plan = newPlan;
+    // If it was a scheduled downgrade that's now active
+    if (subscription.metadata?.scheduledDowngrade === 'true' && !subscription.cancel_at_period_end) {
+      updateData.subscription_status = 'active';
+    }
+  }
+
+  // Also check current price to determine plan
+  const currentPriceId = subscription.items?.data?.[0]?.price?.id;
+  if (currentPriceId) {
+    if (currentPriceId === process.env.STRIPE_PRO_PRICE_ID) {
+      updateData.plan = 'Pro';
+    } else if (currentPriceId === process.env.STRIPE_PLUS_PRICE_ID) {
+      updateData.plan = 'Plus';
+    }
+  }
+
   const { error } = await supabase
     .from('users')
     .update(updateData)
@@ -160,6 +180,8 @@ async function updateUserSubscription(userId: string, subscription: Stripe.Subsc
 
   if (error) {
     console.error('Failed to update subscription:', error);
+  } else {
+    console.log(`User ${userId} subscription updated:`, updateData);
   }
 }
 
