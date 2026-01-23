@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     if (isUpgrade) {
       // UPGRADE: Pro → Plus
       // Update subscription immediately with proration
-      const updatedSubscription = await stripe.subscriptions.update(
+      await stripe.subscriptions.update(
         user.stripe_subscription_id,
         {
           items: [{
@@ -77,12 +77,16 @@ export async function POST(req: NextRequest) {
         }
       );
 
+      // Get updated subscription to get new period end
+      const updatedSub = await stripe.subscriptions.retrieve(user.stripe_subscription_id);
+      const periodEnd = (updatedSub as { current_period_end?: number }).current_period_end;
+
       // Update user in database
       await supabase
         .from("users")
         .update({
           plan: newPlan,
-          current_period_end: new Date(updatedSubscription.current_period_end * 1000).toISOString(),
+          current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
         })
         .eq("id", user.id);
 
