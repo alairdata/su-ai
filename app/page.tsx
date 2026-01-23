@@ -1637,10 +1637,10 @@ function HomePage() {
                             flex: 1,
                             minWidth: 0,
                             maxWidth: '200px',
-                            padding: '6px 10px',
+                            padding: '5px 10px',
                             borderRadius: '6px',
                             border: '1px solid #d0d0d0',
-                            fontSize: '14px',
+                            fontSize: '16px', // 16px prevents iOS zoom
                             background: theme === 'dark' ? '#2a2a2a' : '#fff',
                             color: theme === 'dark' ? '#fff' : '#333',
                             outline: 'none',
