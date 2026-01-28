@@ -17,7 +17,7 @@ type Chat = {
 
 const PLAN_LIMITS: Record<string, number> = {
   'Free': 10,
-  'Pro': 150,
+  'Pro': 100,
   'Plus': 300
 };
 

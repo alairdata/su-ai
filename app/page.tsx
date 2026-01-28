@@ -637,7 +637,7 @@ function HomePage() {
   // DOWNGRADE: Plus → Pro (scheduled for end of period)
   if (currentPlan === "Plus" && newPlan === "Pro") {
     const confirmed = window.confirm(
-      "Downgrade to Pro ($0.99/month)?\n\nYour Plus subscription will remain active until the end of your billing period. After that, you'll be on the Pro plan with 150 messages/day.\n\nContinue?"
+      "Downgrade to Pro ($0.99/month)?\n\nYour Plus subscription will remain active until the end of your billing period. After that, you'll be on the Pro plan with 100 messages/day.\n\nContinue?"
     );
     if (!confirmed) return;
 
