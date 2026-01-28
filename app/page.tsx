@@ -1237,12 +1237,6 @@ function HomePage() {
                   New chat
                 </div>
               </div>
-              <div style={currentStyles.navItem} onClick={() => window.open('mailto:support@sounfiltered.ai', '_blank')}>
-                <div style={currentStyles.navIcon}>?</div>
-                <div style={{...currentStyles.navText, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
-                  Support
-                </div>
-              </div>
             </div>
 
             <div style={{...currentStyles.sectionLabel, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
@@ -1943,26 +1937,80 @@ function HomePage() {
                     </div>
                   </div>
 
-                  {/* Cancel Subscription Button - only show for paid plans */}
-                  {session?.user?.plan !== "Free" && (
-                    <button
-                      style={{
-                        ...currentStyles.cancelSubscriptionBtn,
-                        opacity: isCancellingSubscription ? 0.6 : 1,
-                        cursor: isCancellingSubscription ? 'not-allowed' : 'pointer',
-                      }}
-                      onClick={cancelSubscription}
-                      disabled={isCancellingSubscription}
-                    >
-                      {isCancellingSubscription ? "Cancelling..." : "Cancel Subscription"}
-                    </button>
-                  )}
                 </div>
 
+                {/* Support Section */}
                 <div style={currentStyles.modalSection}>
-                  <button style={currentStyles.logoutBtn} onClick={handleLogout}>
-                    Logout
-                  </button>
+                  <h3 style={currentStyles.modalSectionTitle}>Need Help?</h3>
+                  <p style={{ fontSize: '14px', color: theme === 'dark' ? '#aaa' : '#666', marginBottom: '12px' }}>
+                    We&apos;re here to help with any questions or issues.
+                  </p>
+                  <a
+                    href="mailto:support@sounfiltered.ai"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 16px',
+                      background: theme === 'dark' ? '#3a3a3a' : '#f5f5f5',
+                      borderRadius: '8px',
+                      color: theme === 'dark' ? '#fff' : '#333',
+                      textDecoration: 'none',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                      <polyline points="22,6 12,13 2,6"/>
+                    </svg>
+                    support@sounfiltered.ai
+                  </a>
+                </div>
+
+                {/* Account Actions - subtle at bottom */}
+                <div style={{
+                  marginTop: '24px',
+                  paddingTop: '16px',
+                  borderTop: `1px solid ${theme === 'dark' ? '#333' : '#eee'}`,
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: '16px',
+                    flexWrap: 'wrap',
+                  }}>
+                    <button
+                      onClick={handleLogout}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: theme === 'dark' ? '#666' : '#999',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        padding: '4px 8px',
+                      }}
+                    >
+                      Log out
+                    </button>
+                    {session?.user?.plan !== "Free" && (
+                      <button
+                        onClick={cancelSubscription}
+                        disabled={isCancellingSubscription}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: theme === 'dark' ? '#666' : '#999',
+                          fontSize: '12px',
+                          cursor: isCancellingSubscription ? 'not-allowed' : 'pointer',
+                          padding: '4px 8px',
+                          opacity: isCancellingSubscription ? 0.5 : 1,
+                        }}
+                      >
+                        {isCancellingSubscription ? "Cancelling..." : "Cancel subscription"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
