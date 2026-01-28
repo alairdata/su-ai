@@ -21,16 +21,45 @@ const PLAN_LIMITS: Record<string, number> = {
   'Plus': 300
 };
 
+// Helper to safely access localStorage (handles SSR)
+const getStoredChatId = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem('currentChatId');
+  } catch {
+    return null;
+  }
+};
+
+const setStoredChatId = (chatId: string | null) => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (chatId && !chatId.startsWith('temp-')) {
+      localStorage.setItem('currentChatId', chatId);
+    } else {
+      localStorage.removeItem('currentChatId');
+    }
+  } catch {
+    // Ignore localStorage errors
+  }
+};
+
 export function useChats() {
   const { data: session } = useSession();
   const [chats, setChats] = useState<Chat[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [currentChatId, setCurrentChatIdState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [localMessagesUsed, setLocalMessagesUsed] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const previousMessageCountRef = useRef(0);
+
+  // Wrapper to persist currentChatId to localStorage
+  const setCurrentChatId = (chatId: string | null) => {
+    setCurrentChatIdState(chatId);
+    setStoredChatId(chatId);
+  };
 
   // Sync local message count from session on initial load or user change
   const userId = session?.user?.id ?? null;
@@ -41,6 +70,11 @@ export function useChats() {
     // Only sync when user changes (login) or on first load
     if (userId && userId !== lastUserIdRef.current) {
       setLocalMessagesUsed(sessionMessagesUsed);
+      // Clear stored chat when user changes (different user logging in)
+      if (lastUserIdRef.current !== null) {
+        setStoredChatId(null);
+        setCurrentChatIdState(null);
+      }
       lastUserIdRef.current = userId;
     }
   }, [userId, sessionMessagesUsed]);
@@ -56,6 +90,12 @@ export function useChats() {
         // Only show chats that have messages
         const chatsWithMessages = (data.chats || []).filter((chat: Chat) => chat.messages && chat.messages.length > 0);
         setChats(chatsWithMessages);
+
+        // Restore last active chat from localStorage
+        const storedChatId = getStoredChatId();
+        if (storedChatId && chatsWithMessages.some((c: Chat) => c.id === storedChatId)) {
+          setCurrentChatIdState(storedChatId);
+        }
       } catch (error) {
         console.error('Failed to load chats:', error);
       }
