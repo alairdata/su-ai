@@ -39,7 +39,8 @@ function HomePage() {
     confirmText: string;
     onConfirm: () => void;
     isDestructive?: boolean;
-  }>({ show: false, title: '', message: '', confirmText: 'Confirm', onConfirm: () => {} });
+    isLoading?: boolean;
+  }>({ show: false, title: '', message: '', confirmText: 'Confirm', onConfirm: () => {}, isLoading: false });
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
   const [selectedChatForActions, setSelectedChatForActions] = useState<{id: string, title: string} | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -564,11 +565,15 @@ function HomePage() {
 
   // Helper to show confirmation modal
   const showConfirm = (title: string, message: string, confirmText: string, onConfirm: () => void, isDestructive = false) => {
-    setConfirmModal({ show: true, title, message, confirmText, onConfirm, isDestructive });
+    setConfirmModal({ show: true, title, message, confirmText, onConfirm, isDestructive, isLoading: false });
   };
 
   const closeConfirmModal = () => {
-    setConfirmModal(prev => ({ ...prev, show: false }));
+    setConfirmModal(prev => ({ ...prev, show: false, isLoading: false }));
+  };
+
+  const setConfirmLoading = (loading: boolean) => {
+    setConfirmModal(prev => ({ ...prev, isLoading: loading }));
   };
 
   const upgradePlan = async (newPlan: "Free" | "Pro" | "Plus") => {
@@ -582,14 +587,16 @@ function HomePage() {
     // DOWNGRADE TO FREE
     if (newPlan === "Free") {
       if (currentPlan !== "Free") {
+        // Prevent if already canceling
+        if (session.user.subscriptionStatus === 'canceling') {
+          showConfirm("Already Scheduled", "You've already scheduled a cancellation. Your subscription will end at the end of your billing period.", "OK", closeConfirmModal);
+          return;
+        }
         showConfirm(
           "Cancel Subscription?",
           `Your ${currentPlan} subscription will remain active until the end of your billing period. After that, you'll be on the Free plan with 10 messages/day.`,
           "Cancel Subscription",
-          async () => {
-            closeConfirmModal();
-            await doCancelSubscription();
-          },
+          doCancelSubscription,
           true
         );
       }
@@ -625,7 +632,7 @@ function HomePage() {
         "Upgrade to Plus for $9.99/month!\n\nYou'll be charged the prorated difference for the rest of this billing period, then $9.99/month going forward.",
         "Upgrade",
         async () => {
-          closeConfirmModal();
+          setConfirmLoading(true);
           try {
             const res = await fetch("/api/subscription/change-plan", {
               method: "POST",
@@ -635,7 +642,15 @@ function HomePage() {
 
             const data = await res.json();
             if (data.success) {
-              showConfirm("Success!", data.message || "Successfully upgraded to Plus!", "OK", closeConfirmModal);
+              setConfirmModal({
+                show: true,
+                title: "Success!",
+                message: data.message || "Successfully upgraded to Plus!",
+                confirmText: "OK",
+                onConfirm: closeConfirmModal,
+                isDestructive: false,
+                isLoading: false,
+              });
               await updateSession();
             } else if (data.redirect === "checkout") {
               const checkoutRes = await fetch("/api/payment/initialize", {
@@ -648,11 +663,27 @@ function HomePage() {
                 window.location.href = checkoutData.authorization_url;
               }
             } else {
-              showConfirm("Error", data.error || "Failed to upgrade. Please try again.", "OK", closeConfirmModal);
+              setConfirmModal({
+                show: true,
+                title: "Error",
+                message: data.error || "Failed to upgrade. Please try again.",
+                confirmText: "OK",
+                onConfirm: closeConfirmModal,
+                isDestructive: false,
+                isLoading: false,
+              });
             }
           } catch (error) {
             console.error("Failed to upgrade:", error);
-            showConfirm("Error", "Network error. Please try again.", "OK", closeConfirmModal);
+            setConfirmModal({
+              show: true,
+              title: "Error",
+              message: "Network error. Please try again.",
+              confirmText: "OK",
+              onConfirm: closeConfirmModal,
+              isDestructive: false,
+              isLoading: false,
+            });
           }
         }
       );
@@ -661,12 +692,18 @@ function HomePage() {
 
     // DOWNGRADE: Plus → Pro (scheduled for end of period)
     if (currentPlan === "Plus" && newPlan === "Pro") {
+      // Prevent downgrade if already downgrading
+      if (session.user.subscriptionStatus === 'downgrading') {
+        showConfirm("Already Scheduled", "You've already scheduled a downgrade to Pro. It will take effect at the end of your billing period.", "OK", closeConfirmModal);
+        return;
+      }
+
       showConfirm(
         "Downgrade to Pro",
         "Your Plus subscription will remain active until the end of your billing period. After that, you'll be on the Pro plan ($0.99/month) with 100 messages/day.",
         "Downgrade",
         async () => {
-          closeConfirmModal();
+          setConfirmLoading(true);
           try {
             const res = await fetch("/api/subscription/change-plan", {
               method: "POST",
@@ -676,14 +713,38 @@ function HomePage() {
 
             const data = await res.json();
             if (data.success) {
-              showConfirm("Plan Changed", data.message || "Your plan will change at the end of your billing period.", "OK", closeConfirmModal);
+              setConfirmModal({
+                show: true,
+                title: "Plan Changed",
+                message: data.message || "Your plan will change at the end of your billing period.",
+                confirmText: "OK",
+                onConfirm: closeConfirmModal,
+                isDestructive: false,
+                isLoading: false,
+              });
               await updateSession();
             } else {
-              showConfirm("Error", data.error || "Failed to change plan. Please try again.", "OK", closeConfirmModal);
+              setConfirmModal({
+                show: true,
+                title: "Error",
+                message: data.error || "Failed to change plan. Please try again.",
+                confirmText: "OK",
+                onConfirm: closeConfirmModal,
+                isDestructive: false,
+                isLoading: false,
+              });
             }
           } catch (error) {
             console.error("Failed to change plan:", error);
-            showConfirm("Error", "Network error. Please try again.", "OK", closeConfirmModal);
+            setConfirmModal({
+              show: true,
+              title: "Error",
+              message: "Network error. Please try again.",
+              confirmText: "OK",
+              onConfirm: closeConfirmModal,
+              isDestructive: false,
+              isLoading: false,
+            });
           }
         },
         true
@@ -696,6 +757,8 @@ function HomePage() {
   const doCancelSubscription = async () => {
     if (!session?.user || session.user.plan === "Free") return;
 
+    // Show loading in the modal immediately
+    setConfirmLoading(true);
     setIsCancellingSubscription(true);
 
     try {
@@ -707,14 +770,39 @@ function HomePage() {
       const data = await res.json();
 
       if (res.ok) {
-        showConfirm("Subscription Cancelled", "Your subscription has been cancelled. You'll retain access until the end of your billing period.", "OK", closeConfirmModal);
+        // Show success modal
+        setConfirmModal({
+          show: true,
+          title: "Subscription Cancelled",
+          message: "Your subscription has been cancelled. You'll retain access until the end of your billing period.",
+          confirmText: "OK",
+          onConfirm: closeConfirmModal,
+          isDestructive: false,
+          isLoading: false,
+        });
         await updateSession();
       } else {
-        showConfirm("Error", data.error || "Failed to cancel subscription", "OK", closeConfirmModal);
+        setConfirmModal({
+          show: true,
+          title: "Error",
+          message: data.error || "Failed to cancel subscription",
+          confirmText: "OK",
+          onConfirm: closeConfirmModal,
+          isDestructive: false,
+          isLoading: false,
+        });
       }
     } catch (error) {
       console.error("Failed to cancel subscription:", error);
-      showConfirm("Error", "Failed to cancel subscription. Please try again.", "OK", closeConfirmModal);
+      setConfirmModal({
+        show: true,
+        title: "Error",
+        message: "Failed to cancel subscription. Please try again.",
+        confirmText: "OK",
+        onConfirm: closeConfirmModal,
+        isDestructive: false,
+        isLoading: false,
+      });
     } finally {
       setIsCancellingSubscription(false);
     }
@@ -728,10 +816,7 @@ function HomePage() {
       "Cancel Subscription?",
       "Are you sure you want to cancel your subscription? You'll keep access until the end of your current billing period.",
       "Cancel Subscription",
-      async () => {
-        closeConfirmModal();
-        await doCancelSubscription();
-      },
+      doCancelSubscription,
       true
     );
   };
@@ -1970,7 +2055,7 @@ function HomePage() {
                       )}
                     </div>
 
-                    <div style={{...currentStyles.planCard, ...(session?.user?.plan === "Pro" ? currentStyles.planCardActive : {})}}>
+                    <div style={{...currentStyles.planCard, ...(session?.user?.plan === "Pro" || session?.user?.subscriptionStatus === 'downgrading' ? currentStyles.planCardActive : {})}}>
                       <h5 style={currentStyles.planCardTitle}>Pro</h5>
                       <div style={currentStyles.planPrice}>$0.99<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
@@ -1981,7 +2066,22 @@ function HomePage() {
                         <li style={currentStyles.planFeature}>Advanced reasoning models</li>
                         <li style={currentStyles.planFeature}>Memory across conversations</li>
                       </ul>
-                      {session?.user?.plan !== "Pro" && (
+                      {/* Show downgrading indicator */}
+                      {session?.user?.subscriptionStatus === 'downgrading' && session?.user?.currentPeriodEnd && (
+                        <div style={{
+                          padding: '8px 12px',
+                          background: theme === 'dark' ? 'rgba(59, 130, 246, 0.15)' : '#eff6ff',
+                          border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.3)' : '#93c5fd'}`,
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          color: theme === 'dark' ? '#93c5fd' : '#1e40af',
+                          marginBottom: '8px',
+                          textAlign: 'center',
+                        }}>
+                          Switching to this plan on {new Date(session.user.currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </div>
+                      )}
+                      {session?.user?.plan !== "Pro" && session?.user?.subscriptionStatus !== 'downgrading' && (
                         <button
                           style={currentStyles.planBtn}
                           onClick={() => upgradePlan("Pro")}
@@ -1989,7 +2089,7 @@ function HomePage() {
                           {session?.user?.plan === "Free" ? "Upgrade to Pro" : "Switch to Pro"}
                         </button>
                       )}
-                      {session?.user?.plan === "Pro" && (
+                      {(session?.user?.plan === "Pro" || session?.user?.subscriptionStatus === 'downgrading') && (
                         <div style={currentStyles.planBtnSpacer} />
                       )}
                     </div>
@@ -2183,41 +2283,52 @@ function HomePage() {
       {/* Generic Confirmation Modal */}
       {confirmModal.show && (
         <>
-          <div style={currentStyles.modalOverlay} onClick={closeConfirmModal} />
+          <div style={currentStyles.modalOverlay} onClick={confirmModal.isLoading ? undefined : closeConfirmModal} />
           <div style={currentStyles.deleteModalContainer}>
             <div style={currentStyles.deleteModalContent}>
               <div style={currentStyles.deleteModalHeader}>
                 <h3 style={currentStyles.deleteModalTitle}>{confirmModal.title}</h3>
               </div>
               <div style={currentStyles.deleteModalBody}>
-                <p style={{
-                  ...currentStyles.deleteModalText,
-                  whiteSpace: 'pre-line'
-                }}>
-                  {confirmModal.message}
-                </p>
-              </div>
-              <div style={currentStyles.deleteModalFooter}>
-                {confirmModal.confirmText !== "OK" && (
-                  <button
-                    onClick={closeConfirmModal}
-                    style={currentStyles.deleteCancelBtn}
-                  >
-                    Cancel
-                  </button>
+                {confirmModal.isLoading ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '20px 0' }}>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={theme === 'dark' ? '#93c5fd' : '#3b82f6'} strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                      <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                    </svg>
+                    <p style={{ ...currentStyles.deleteModalText, margin: 0 }}>Processing...</p>
+                  </div>
+                ) : (
+                  <p style={{
+                    ...currentStyles.deleteModalText,
+                    whiteSpace: 'pre-line'
+                  }}>
+                    {confirmModal.message}
+                  </p>
                 )}
-                <button
-                  onClick={confirmModal.onConfirm}
-                  style={confirmModal.isDestructive ? currentStyles.deleteConfirmBtn : {
-                    ...currentStyles.deleteCancelBtn,
-                    background: '#10b981',
-                    color: '#fff',
-                    border: 'none',
-                  }}
-                >
-                  {confirmModal.confirmText}
-                </button>
               </div>
+              {!confirmModal.isLoading && (
+                <div style={currentStyles.deleteModalFooter}>
+                  {confirmModal.confirmText !== "OK" && (
+                    <button
+                      onClick={closeConfirmModal}
+                      style={currentStyles.deleteCancelBtn}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    onClick={confirmModal.onConfirm}
+                    style={confirmModal.isDestructive ? currentStyles.deleteConfirmBtn : {
+                      ...currentStyles.deleteCancelBtn,
+                      background: '#10b981',
+                      color: '#fff',
+                      border: 'none',
+                    }}
+                  >
+                    {confirmModal.confirmText}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </>
