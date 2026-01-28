@@ -1391,6 +1391,20 @@ function HomePage() {
               onScroll={handleScroll}
               style={currentStyles.messagesArea}
             >
+              {/* Show loading state while waiting for stored chat to load */}
+              {(!isChatsLoaded || isWaitingForStoredChat) && (
+                <div style={currentStyles.emptyState}>
+                  <div style={{
+                    width: 40,
+                    height: 40,
+                    border: '3px solid transparent',
+                    borderTopColor: theme === 'dark' ? '#fff' : '#333',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                </div>
+              )}
+
               {showGreeting && (
                 <div style={currentStyles.emptyState}>
                   <div style={currentStyles.greetingLogo}>
@@ -1405,7 +1419,7 @@ function HomePage() {
                 </div>
               )}
 
-              {!showGreeting && (
+              {!showGreeting && isChatsLoaded && !isWaitingForStoredChat && (
                 <div style={{
                   ...currentStyles.chatMessages,
                   ...(isMobile ? currentStyles.chatMessagesMobile : {})
