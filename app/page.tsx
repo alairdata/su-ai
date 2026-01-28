@@ -175,8 +175,9 @@ function HomePage() {
 
   const messages = currentChat?.messages ?? [];
   // Don't show greeting while chats are loading (prevents flash when restoring from localStorage)
-  // Also don't show if we're sending a message
-  const showGreeting = isChatsLoaded && !chatLoading && (!currentChat || messages.length === 0);
+  // Also don't show if we're sending a message or waiting for a stored chat to load
+  const isWaitingForStoredChat = currentChatId && !currentChat;
+  const showGreeting = isChatsLoaded && !chatLoading && !isWaitingForStoredChat && (!currentChat || messages.length === 0);
   const remainingMessages = getRemainingMessages();
 
   // Dynamic greeting based on time of day
