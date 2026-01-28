@@ -291,6 +291,7 @@ export function useChats() {
       }
 
       let streamedContent = '';
+      let receivedDone = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -340,6 +341,7 @@ export function useChats() {
               }
 
               if (data.done) {
+                receivedDone = true;
                 // Update local message count
                 setLocalMessagesUsed(prev => (prev ?? 0) + 1);
               }
@@ -356,6 +358,29 @@ export function useChats() {
               throw parseError;
             }
           }
+        }
+      }
+
+      // If stream ended without receiving done signal, fetch the actual response from DB
+      if (!receivedDone && realChatId) {
+        try {
+          const chatRes = await fetch(`/api/chats/${realChatId}`);
+          if (chatRes.ok) {
+            const chatData = await chatRes.json();
+            if (chatData.chat?.messages) {
+              setChats(prev =>
+                prev.map(c =>
+                  c.id === realChatId
+                    ? { ...c, messages: chatData.chat.messages, title: chatData.chat.title || c.title }
+                    : c
+                )
+              );
+              setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+            }
+          }
+        } catch {
+          // Recovery failed, but don't throw - the message might still be there on refresh
+          console.warn('Stream interrupted - response may be available on refresh');
         }
       }
 
