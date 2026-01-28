@@ -47,7 +47,8 @@ const setStoredChatId = (chatId: string | null) => {
 export function useChats() {
   const { data: session } = useSession();
   const [chats, setChats] = useState<Chat[]>([]);
-  const [currentChatId, setCurrentChatIdState] = useState<string | null>(null);
+  // Initialize from localStorage immediately to avoid flash
+  const [currentChatId, setCurrentChatIdState] = useState<string | null>(() => getStoredChatId());
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
@@ -91,10 +92,10 @@ export function useChats() {
         const chatsWithMessages = (data.chats || []).filter((chat: Chat) => chat.messages && chat.messages.length > 0);
         setChats(chatsWithMessages);
 
-        // Restore last active chat from localStorage
+        // Validate stored chat ID still exists (clear if chat was deleted)
         const storedChatId = getStoredChatId();
-        if (storedChatId && chatsWithMessages.some((c: Chat) => c.id === storedChatId)) {
-          setCurrentChatIdState(storedChatId);
+        if (storedChatId && !chatsWithMessages.some((c: Chat) => c.id === storedChatId)) {
+          setCurrentChatId(null);
         }
       } catch (error) {
         console.error('Failed to load chats:', error);
