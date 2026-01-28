@@ -50,6 +50,7 @@ export function useChats() {
   // Initialize from localStorage immediately to avoid flash
   const [currentChatId, setCurrentChatIdState] = useState<string | null>(() => getStoredChatId());
   const [isLoading, setIsLoading] = useState(false);
+  const [isChatsLoaded, setIsChatsLoaded] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [localMessagesUsed, setLocalMessagesUsed] = useState<number | null>(null);
@@ -99,6 +100,8 @@ export function useChats() {
         }
       } catch (error) {
         console.error('Failed to load chats:', error);
+      } finally {
+        setIsChatsLoaded(true);
       }
     };
 
@@ -461,6 +464,7 @@ export function useChats() {
     currentChat,
     currentChatId,
     isLoading,
+    isChatsLoaded,
     isSearching,
     searchQuery,
     messagesEndRef,
