@@ -60,7 +60,7 @@ export const authOptions: NextAuthOptions = {
             throw new Error("Please verify your email before logging in. Check your inbox.");
           }
 
-          throw new Error("Invalid email or password");
+          throw new Error("NO_ACCOUNT");
         }
 
         const isValidPassword = await bcrypt.compare(

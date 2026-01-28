@@ -151,21 +151,15 @@ export function useChats() {
 
   const sendMessage = async (input: string) => {
     if (!input.trim() || isLoading || !canSendMessage()) return;
-    
-    let activeChatId = currentChatId;
-
-    // Create new chat if none exists
-    if (!activeChatId) {
-      const newChatId = await createNewChat();
-      if (!newChatId) return;
-      activeChatId = newChatId;
-    }
 
     setIsLoading(true);
 
-    // Check if this is the first message
-    const existingChat = chats.find(c => c.id === activeChatId);
-    const isFirstMessage = !existingChat || existingChat.messages.length === 0;
+    let activeChatId = currentChatId;
+    let needsNewChat = false;
+
+    // Check if this is the first message (new chat)
+    const existingChat = activeChatId ? chats.find(c => c.id === activeChatId) : null;
+    const isFirstMessage = !activeChatId || !existingChat || existingChat.messages.length === 0;
 
     // Optimistically add user message
     const optimisticMessage: Message = {
@@ -174,27 +168,6 @@ export function useChats() {
       content: input,
       created_at: new Date().toISOString(),
     };
-
-    if (isFirstMessage) {
-      // Create the chat in UI with smart title
-      const smartTitle = generateTitleFromText(input);
-      const newChat: Chat = {
-        id: activeChatId!,
-        title: smartTitle,
-        messages: [optimisticMessage],
-        created_at: new Date().toISOString(),
-      };
-      setChats(prev => [newChat, ...prev]);
-    } else {
-      // Add message to existing chat
-      setChats(prev =>
-        prev.map(c =>
-          c.id === activeChatId
-            ? { ...c, messages: [...c.messages, optimisticMessage] }
-            : c
-        )
-      );
-    }
 
     // Create assistant message placeholder for streaming
     const assistantMessageId = `msg-${Date.now()}`;
@@ -205,21 +178,57 @@ export function useChats() {
       created_at: new Date().toISOString(),
     };
 
-    // Add empty assistant message immediately
-    setChats(prev =>
-      prev.map(c =>
-        c.id === activeChatId
-          ? { ...c, messages: [...c.messages, assistantMessage] }
-          : c
-      )
-    );
+    if (!activeChatId) {
+      // Generate optimistic ID for instant UI update
+      const optimisticId = `temp-chat-${Date.now()}`;
+      activeChatId = optimisticId;
+      needsNewChat = true;
+      setCurrentChatId(optimisticId);
+    }
+
+    if (isFirstMessage) {
+      // Create the chat in UI with smart title immediately
+      const smartTitle = generateTitleFromText(input);
+      const newChat: Chat = {
+        id: activeChatId!,
+        title: smartTitle,
+        messages: [optimisticMessage, assistantMessage],
+        created_at: new Date().toISOString(),
+      };
+      setChats(prev => [newChat, ...prev]);
+    } else {
+      // Add both messages to existing chat immediately
+      setChats(prev =>
+        prev.map(c =>
+          c.id === activeChatId
+            ? { ...c, messages: [...c.messages, optimisticMessage, assistantMessage] }
+            : c
+        )
+      );
+    }
+
+    let realChatId = activeChatId;
 
     try {
+      // Create chat in background if needed, then send message
+      if (needsNewChat) {
+        const newChatId = await createNewChat();
+        if (!newChatId) {
+          throw new Error('Failed to create chat');
+        }
+        realChatId = newChatId;
+        // Update the optimistic chat ID with real ID
+        setChats(prev => prev.map(c =>
+          c.id === activeChatId ? { ...c, id: realChatId } : c
+        ));
+        setCurrentChatId(realChatId);
+      }
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chatId: activeChatId,
+          chatId: realChatId,
           message: input
         }),
       });
@@ -261,7 +270,7 @@ export function useChats() {
                 // Update assistant message content in real-time
                 setChats(prev =>
                   prev.map(c =>
-                    c.id === activeChatId
+                    c.id === realChatId
                       ? {
                           ...c,
                           messages: c.messages.map(m =>
@@ -279,7 +288,7 @@ export function useChats() {
                 // Update chat title
                 setChats(prev =>
                   prev.map(c =>
-                    c.id === activeChatId
+                    c.id === realChatId
                       ? { ...c, title: data.title }
                       : c
                   )
@@ -294,8 +303,13 @@ export function useChats() {
               if (data.error) {
                 throw new Error(data.error);
               }
-            } catch {
-              // Skip invalid JSON lines
+            } catch (parseError) {
+              // Only skip JSON parse errors (incomplete chunks), re-throw everything else
+              if (parseError instanceof SyntaxError) {
+                // Skip incomplete JSON chunks
+                continue;
+              }
+              throw parseError;
             }
           }
         }
@@ -303,10 +317,15 @@ export function useChats() {
 
     } catch (error) {
       console.error('Error sending message:', error);
-      // Remove both messages on error
-      setChats(prev =>
-        prev.map(c =>
-          c.id === activeChatId
+      // Remove failed chat or messages on error
+      setChats(prev => {
+        // If it was a new chat that failed, remove the whole chat
+        if (needsNewChat) {
+          return prev.filter(c => c.id !== activeChatId && c.id !== realChatId);
+        }
+        // Otherwise just remove the failed messages
+        return prev.map(c =>
+          (c.id === activeChatId || c.id === realChatId)
             ? {
                 ...c,
                 messages: c.messages.filter(m =>
@@ -314,8 +333,11 @@ export function useChats() {
                 )
               }
             : c
-        )
-      );
+        );
+      });
+      if (needsNewChat) {
+        setCurrentChatId(null);
+      }
     } finally {
       setIsLoading(false);
       setIsSearching(false);
@@ -401,6 +423,7 @@ export function useChats() {
     isSearching,
     searchQuery,
     messagesEndRef,
+    messagesUsed,
     sendMessage,
     createNewChat,
     startNewChat,

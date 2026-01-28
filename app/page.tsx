@@ -64,6 +64,7 @@ function HomePage() {
     isSearching,
     searchQuery,
     messagesEndRef,
+    messagesUsed,
     sendMessage,
     startNewChat,
     selectChat,
@@ -246,7 +247,7 @@ function HomePage() {
     const limits: Record<string, number> = { Free: 10, Pro: 100, Plus: 300 };
     const limit = limits[session.user.plan as keyof typeof limits];
     if (limit === Infinity) return 100;
-    return (session.user.messagesUsedToday / limit) * 100;
+    return (messagesUsed / limit) * 100;
   };
 
   // Auto-detect and save user's timezone
@@ -328,7 +329,12 @@ function HomePage() {
     });
 
     if (result?.error) {
-      setAuthError(result.error);
+      if (result.error === "NO_ACCOUNT") {
+        setAuthError("Account not found. Please sign up to create an account.");
+        setAuthMode("signup");
+      } else {
+        setAuthError(result.error);
+      }
     } else {
       setAuthEmail("");
       setAuthPassword("");
@@ -472,19 +478,21 @@ function HomePage() {
     const messageToSend = input;
     setInput("");
 
-    // Reset textarea height to default
+    // Reset textarea height to single row
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = '24px';
     }
 
     await sendMessage(messageToSend);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    // Ctrl+Enter or Cmd+Enter to send
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleSend();
     }
+    // Plain Enter just creates a new line (default behavior)
   };
 
   const handleRenameStart = (chatId: string, currentTitle: string) => {
@@ -1226,6 +1234,12 @@ function HomePage() {
                   New chat
                 </div>
               </div>
+              <div style={currentStyles.navItem} onClick={() => window.open('mailto:support@sounfiltered.ai', '_blank')}>
+                <div style={currentStyles.navIcon}>?</div>
+                <div style={{...currentStyles.navText, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
+                  Support
+                </div>
+              </div>
             </div>
 
             <div style={{...currentStyles.sectionLabel, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
@@ -1342,7 +1356,7 @@ function HomePage() {
             <div style={{...currentStyles.userInfo, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
               <div style={{ fontSize: 13, color: theme === 'dark' ? '#fff' : '#1a1a1a' }}>{session?.user?.name}</div>
               <div style={{ fontSize: 11, color: theme === 'dark' ? '#999' : '#666' }}>
-                {session?.user?.plan} plan • {session?.user?.messagesUsedToday}/{session?.user?.plan === 'Free' ? 10 : session?.user?.plan === 'Pro' ? 100 : 300} msgs
+                {session?.user?.plan} plan • {messagesUsed}/{session?.user?.plan === 'Free' ? 10 : session?.user?.plan === 'Pro' ? 100 : 300} msgs
               </div>
             </div>
           </div>
@@ -1820,9 +1834,9 @@ function HomePage() {
                   <div style={currentStyles.planCurrentBadge}>
                     <div style={currentStyles.planBadgeLarge}>{session?.user?.plan}</div>
                     <div style={currentStyles.planDescription}>
-                      {session?.user?.plan === "Free" && `${session.user.messagesUsedToday}/10 messages used today`}
-                      {session?.user?.plan === "Pro" && `${session.user.messagesUsedToday}/100 messages used today`}
-                      {session?.user?.plan === "Plus" && `${session.user.messagesUsedToday}/300 messages used today`}
+                      {session?.user?.plan === "Free" && `${messagesUsed}/10 messages used today`}
+                      {session?.user?.plan === "Pro" && `${messagesUsed}/100 messages used today`}
+                      {session?.user?.plan === "Plus" && `${messagesUsed}/300 messages used today`}
                     </div>
 
                     {/* Progress Bar */}
@@ -2512,7 +2526,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     padding: '6px 10px',
     border: '1px solid #d0d0d0',
     borderRadius: '6px',
-    fontSize: '13px',
+    fontSize: '16px', // 16px prevents iOS auto-zoom
     outline: 'none',
     fontFamily: 'inherit',
     background: '#fff',
