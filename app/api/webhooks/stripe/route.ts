@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyWebhookSignature, stripe } from '@/lib/stripe';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import { sendSubscriptionEmail } from '@/lib/email';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -114,6 +115,26 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     console.error('Failed to update after checkout completed:', error);
   } else {
     console.log(`User ${userId} upgraded to ${plan}`);
+
+    // Send subscription welcome email
+    try {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('name, email')
+        .eq('id', userId)
+        .single();
+
+      if (userData?.email && plan) {
+        await sendSubscriptionEmail(
+          userData.email,
+          userData.name || 'there',
+          plan,
+          'subscribed'
+        );
+      }
+    } catch (emailError) {
+      console.error('Failed to send subscription email:', emailError);
+    }
   }
 }
 
@@ -204,6 +225,15 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     userIdToUpdate = user.id;
   }
 
+  // Get user info before downgrading (for email)
+  const { data: userData } = await supabase
+    .from('users')
+    .select('name, email, plan')
+    .eq('id', userIdToUpdate)
+    .single();
+
+  const previousPlan = userData?.plan;
+
   // Downgrade to Free plan
   const { error } = await supabase
     .from('users')
@@ -219,6 +249,22 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     console.error('Failed to cancel subscription:', error);
   } else {
     console.log(`User ${userIdToUpdate} downgraded to Free`);
+
+    // Send subscription ended email (different from cancellation email)
+    // Note: The cancellation confirmation email was already sent when they initiated cancellation
+    // This is for when the subscription actually ends
+    if (userData?.email && previousPlan && previousPlan !== 'Free') {
+      try {
+        await sendSubscriptionEmail(
+          userData.email,
+          userData.name || 'there',
+          previousPlan,
+          'cancelled'
+        );
+      } catch (emailError) {
+        console.error('Failed to send subscription ended email:', emailError);
+      }
+    }
   }
 }
 

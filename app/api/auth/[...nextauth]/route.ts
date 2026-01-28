@@ -176,11 +176,13 @@ export const authOptions: NextAuthOptions = {
           timezone: string | null;
           reset_timezone?: string | null;
           is_new_user?: boolean;
+          subscription_status?: string | null;
+          current_period_end?: string | null;
         } | null = null;
 
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('name, plan, messages_used_today, last_reset_date, timezone, reset_timezone, is_new_user')
+          .select('name, plan, messages_used_today, last_reset_date, timezone, reset_timezone, is_new_user, subscription_status, current_period_end')
           .eq('id', token.id)
           .single();
 
@@ -188,7 +190,7 @@ export const authOptions: NextAuthOptions = {
           // Column doesn't exist, try without it
           const { data: fallbackData } = await supabase
             .from('users')
-            .select('name, plan, messages_used_today, last_reset_date, timezone, is_new_user')
+            .select('name, plan, messages_used_today, last_reset_date, timezone, is_new_user, subscription_status, current_period_end')
             .eq('id', token.id)
             .single();
           user = fallbackData;
@@ -202,6 +204,8 @@ export const authOptions: NextAuthOptions = {
           session.user.plan = user.plan;
           session.user.timezone = user.timezone || 'UTC';
           session.user.isNewUser = user.is_new_user || false;
+          session.user.subscriptionStatus = user.subscription_status || undefined;
+          session.user.currentPeriodEnd = user.current_period_end || undefined;
 
           // VIP override: Give Plus access to special email addresses
           const userEmail = session.user.email?.toLowerCase();

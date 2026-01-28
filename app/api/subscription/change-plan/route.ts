@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
 import { stripe, PLAN_CONFIG } from "@/lib/stripe";
+import { sendSubscriptionEmail } from "@/lib/email";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -87,8 +88,23 @@ export async function POST(req: NextRequest) {
         .update({
           plan: newPlan,
           current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+          subscription_status: 'active', // Clear any canceling status
         })
         .eq("id", user.id);
+
+      // Send upgrade email
+      try {
+        if (session.user.email) {
+          await sendSubscriptionEmail(
+            session.user.email,
+            session.user.name || 'there',
+            newPlan,
+            'upgraded'
+          );
+        }
+      } catch (emailError) {
+        console.error('Failed to send upgrade email:', emailError);
+      }
 
       return NextResponse.json({
         success: true,
@@ -131,6 +147,21 @@ export async function POST(req: NextRequest) {
         day: 'numeric',
         year: 'numeric'
       });
+
+      // Send downgrade email
+      try {
+        if (session.user.email) {
+          await sendSubscriptionEmail(
+            session.user.email,
+            session.user.name || 'there',
+            newPlan,
+            'downgraded',
+            periodEnd.toISOString()
+          );
+        }
+      } catch (emailError) {
+        console.error('Failed to send downgrade email:', emailError);
+      }
 
       return NextResponse.json({
         success: true,

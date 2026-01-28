@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import { createClient } from '@supabase/supabase-js';
 import { cancelSubscriptionAtPeriodEnd } from '@/lib/stripe';
+import { sendSubscriptionEmail } from '@/lib/email';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -58,6 +59,29 @@ export async function POST() {
     const periodEnd = subscriptionItem?.current_period_end
       ? new Date(subscriptionItem.current_period_end * 1000).toISOString()
       : user.current_period_end;
+
+    // Send cancellation email
+    try {
+      // Get user's name and email for the email
+      const { data: userData } = await supabase
+        .from('users')
+        .select('name, email, plan')
+        .eq('id', session.user.id)
+        .single();
+
+      if (userData?.email) {
+        await sendSubscriptionEmail(
+          userData.email,
+          userData.name || 'there',
+          userData.plan || 'subscription',
+          'cancelled',
+          periodEnd || undefined
+        );
+      }
+    } catch (emailError) {
+      // Log but don't fail the cancellation if email fails
+      console.error('Failed to send cancellation email:', emailError);
+    }
 
     return NextResponse.json({
       success: true,

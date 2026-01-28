@@ -135,3 +135,74 @@ export async function sendPasswordResetEmail(
     return { success: false, error };
   }
 }
+
+export async function sendSubscriptionEmail(
+  email: string,
+  name: string,
+  plan: string,
+  type: 'subscribed' | 'cancelled' | 'upgraded' | 'downgraded',
+  periodEnd?: string
+) {
+  const titles: Record<string, string> = {
+    subscribed: `Welcome to ${plan}!`,
+    cancelled: 'Subscription Cancelled',
+    upgraded: `Upgraded to ${plan}!`,
+    downgraded: `Plan Changed to ${plan}`,
+  };
+
+  const messages: Record<string, string> = {
+    subscribed: `Thanks for subscribing to the ${plan} plan! You now have access to all ${plan} features.`,
+    cancelled: `Your subscription has been cancelled. You'll continue to have access until ${periodEnd ? new Date(periodEnd).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the end of your billing period'}.`,
+    upgraded: `You've successfully upgraded to the ${plan} plan! Enjoy your new features.`,
+    downgraded: `Your plan will change to ${plan} at the end of your current billing period.`,
+  };
+
+  try {
+    await resend.emails.send({
+      from: 'So UnFiltered AI <noreply@app.so-unfiltered-ai.com>',
+      to: email,
+      subject: `So UnFiltered AI - ${titles[type]}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body { font-family: 'Inter', -apple-system, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; }
+              .header { text-align: center; margin-bottom: 30px; }
+              .logo { width: 64px; height: 64px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px; margin: 0 auto 20px; }
+              .title { font-size: 24px; font-weight: 700; color: #000; margin-bottom: 10px; }
+              .content { background: #f9f9f9; padding: 30px; border-radius: 12px; margin-bottom: 30px; }
+              .footer { text-align: center; font-size: 12px; color: #999; }
+              .plan-badge { display: inline-block; padding: 8px 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px; font-weight: 600; margin: 10px 0; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <div class="logo"></div>
+                <h1 class="title">${titles[type]}</h1>
+              </div>
+
+              <div class="content">
+                <p>Hey ${name},</p>
+                <p>${messages[type]}</p>
+                ${type !== 'cancelled' ? `<p style="text-align: center;"><span class="plan-badge">${plan} Plan</span></p>` : ''}
+                ${type === 'cancelled' ? '<p style="font-size: 13px; color: #666; margin-top: 20px;">If you change your mind, you can resubscribe anytime from your account settings.</p>' : ''}
+              </div>
+
+              <div class="footer">
+                <p>Questions? Reply to this email or contact support@sounfiltered.ai</p>
+              </div>
+            </div>
+          </body>
+        </html>
+      `,
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to send subscription email:', error);
+    return { success: false, error };
+  }
+}

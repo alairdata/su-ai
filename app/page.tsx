@@ -1886,6 +1886,51 @@ function HomePage() {
                       {session?.user?.plan === "Pro" && `${messagesUsed}/100 messages used today`}
                       {session?.user?.plan === "Plus" && `${messagesUsed}/300 messages used today`}
                     </div>
+                    {/* Cancellation Status Indicator */}
+                    {session?.user?.subscriptionStatus === 'canceling' && session?.user?.currentPeriodEnd && (
+                      <div style={{
+                        marginTop: '12px',
+                        padding: '10px 14px',
+                        background: theme === 'dark' ? 'rgba(251, 191, 36, 0.15)' : '#fffbeb',
+                        border: `1px solid ${theme === 'dark' ? 'rgba(251, 191, 36, 0.3)' : '#fcd34d'}`,
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        color: theme === 'dark' ? '#fcd34d' : '#92400e',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="8" x2="12" y2="12"/>
+                            <line x1="12" y1="16" x2="12.01" y2="16"/>
+                          </svg>
+                          <span>
+                            Cancelling at end of billing period ({new Date(session.user.currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {/* Downgrading Status Indicator */}
+                    {session?.user?.subscriptionStatus === 'downgrading' && session?.user?.currentPeriodEnd && (
+                      <div style={{
+                        marginTop: '12px',
+                        padding: '10px 14px',
+                        background: theme === 'dark' ? 'rgba(59, 130, 246, 0.15)' : '#eff6ff',
+                        border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.3)' : '#93c5fd'}`,
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        color: theme === 'dark' ? '#93c5fd' : '#1e40af',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 8 12 12 14 14"/>
+                          </svg>
+                          <span>
+                            Downgrading to Pro on {new Date(session.user.currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Progress Bar */}
                     {session?.user && (
@@ -2030,7 +2075,7 @@ function HomePage() {
                     >
                       Log out
                     </button>
-                    {session?.user?.plan !== "Free" && (
+                    {session?.user?.plan !== "Free" && session?.user?.subscriptionStatus !== 'canceling' && (
                       <button
                         onClick={cancelSubscription}
                         disabled={isCancellingSubscription}
