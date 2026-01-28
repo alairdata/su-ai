@@ -65,7 +65,7 @@ function HomePage() {
     searchQuery,
     messagesEndRef,
     sendMessage,
-    createNewChat,
+    startNewChat,
     selectChat,
     renameChat,
     deleteChat,
@@ -1218,7 +1218,7 @@ function HomePage() {
 
             <div style={currentStyles.section}>
               <div style={currentStyles.navItem} onClick={() => {
-                createNewChat();
+                startNewChat();
                 if (isMobile) setSidebarOpen(false);
               }}>
                 <div style={currentStyles.navIcon}>+</div>

@@ -327,6 +327,11 @@ export function useChats() {
     setCurrentChatId(id);
   };
 
+  // Instant UI action - just clears the current chat
+  const startNewChat = () => {
+    setCurrentChatId(null);
+  };
+
   const renameChat = async (chatId: string, newTitle: string) => {
     // Optimistic update - instant UI feedback
     const previousChats = [...chats];
@@ -398,6 +403,7 @@ export function useChats() {
     messagesEndRef,
     sendMessage,
     createNewChat,
+    startNewChat,
     selectChat,
     renameChat,
     deleteChat,
