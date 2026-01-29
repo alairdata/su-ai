@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Script from 'next/script';
@@ -55,7 +55,25 @@ declare global {
   }
 }
 
+// Wrapper component to handle Suspense for useSearchParams
 export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<CheckoutLoading />}>
+      <CheckoutContent />
+    </Suspense>
+  );
+}
+
+function CheckoutLoading() {
+  return (
+    <div style={styles.loadingContainer}>
+      <div style={styles.spinner} />
+      <p>Loading...</p>
+    </div>
+  );
+}
+
+function CheckoutContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
