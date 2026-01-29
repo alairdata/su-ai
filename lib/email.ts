@@ -192,7 +192,7 @@ export async function sendSubscriptionEmail(
               </div>
 
               <div class="footer">
-                <p>Questions? Reply to this email or contact support@sounfiltered.ai</p>
+                <p>Questions? Reply to this email or contact sounfilteredai@gmail.com</p>
               </div>
             </div>
           </body>
