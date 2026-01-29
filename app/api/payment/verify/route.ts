@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import { createClient } from '@supabase/supabase-js';
-import { getCheckoutSession } from '@/lib/stripe';
-import Stripe from 'stripe';
+import { verifyTransaction, getNextBillingDate } from '@/lib/paystack';
+import { sendSubscriptionEmail } from '@/lib/email';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,29 +21,31 @@ export async function POST(request: Request) {
       );
     }
 
-    const { session_id } = await request.json();
+    const { reference } = await request.json();
 
-    if (!session_id) {
+    if (!reference) {
       return NextResponse.json(
-        { error: 'Missing session_id' },
+        { error: 'Missing reference' },
         { status: 400 }
       );
     }
 
-    // Retrieve the Stripe Checkout Session
-    const checkoutSession = await getCheckoutSession(session_id);
+    // Verify the transaction with Paystack
+    const paystackResponse = await verifyTransaction(reference);
 
-    console.log('Stripe session verification:', {
-      sessionId: checkoutSession.id,
-      paymentStatus: checkoutSession.payment_status,
-      status: checkoutSession.status,
+    console.log('Paystack verification response:', {
+      reference,
+      status: paystackResponse.data.status,
+      amount: paystackResponse.data.amount,
     });
 
     // Check payment status
-    if (checkoutSession.payment_status === 'paid' && checkoutSession.status === 'complete') {
-      const metadata = checkoutSession.metadata;
-      const plan = metadata?.plan as string;
-      const userId = metadata?.userId as string;
+    if (paystackResponse.data.status === 'success') {
+      const metadata = paystackResponse.data.metadata as { userId?: string; plan?: string };
+      const plan = metadata?.plan;
+      const userId = metadata?.userId;
+      const authorization = paystackResponse.data.authorization;
+      const customer = paystackResponse.data.customer;
 
       // Verify the user matches
       if (userId !== session.user.id) {
@@ -55,30 +57,34 @@ export async function POST(request: Request) {
 
       if (!plan) {
         return NextResponse.json(
-          { error: 'Plan not found in session' },
+          { error: 'Plan not found in transaction' },
           { status: 400 }
         );
       }
 
-      // Get subscription details
-      const subscription = checkoutSession.subscription as Stripe.Subscription;
-      const customer = checkoutSession.customer as Stripe.Customer;
+      // Check if authorization is reusable (for recurring billing)
+      if (!authorization?.reusable) {
+        console.warn('Authorization is not reusable for user:', userId);
+      }
 
-      // Calculate subscription period end from Stripe subscription item
-      const subscriptionItem = subscription?.items?.data?.[0];
-      const currentPeriodEnd = subscriptionItem?.current_period_end
-        ? new Date(subscriptionItem.current_period_end * 1000)
-        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Fallback: 30 days from now
+      // Calculate next billing date (30 days from now)
+      const currentPeriodEnd = getNextBillingDate();
 
-      // Update user's plan and subscription info in database
+      // Update user's plan and save authorization for recurring billing
       const { error: updateError } = await supabase
         .from('users')
         .update({
           plan: plan,
-          stripe_customer_id: typeof customer === 'string' ? customer : customer?.id,
-          stripe_subscription_id: typeof subscription === 'string' ? subscription : subscription?.id,
           subscription_status: 'active',
           current_period_end: currentPeriodEnd.toISOString(),
+          // Paystack-specific fields
+          paystack_customer_code: customer?.customer_code || null,
+          paystack_authorization: authorization?.authorization_code || null,
+          paystack_card_last4: authorization?.last4 || null,
+          paystack_card_brand: authorization?.card_type || null,
+          // Clear any Stripe fields if migrating
+          stripe_customer_id: null,
+          stripe_subscription_id: null,
         })
         .eq('id', userId);
 
@@ -90,28 +96,49 @@ export async function POST(request: Request) {
         );
       }
 
+      // Send subscription welcome email
+      try {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('name, email')
+          .eq('id', userId)
+          .single();
+
+        if (userData?.email) {
+          await sendSubscriptionEmail(
+            userData.email,
+            userData.name || 'there',
+            plan,
+            'subscribed'
+          );
+        }
+      } catch (emailError) {
+        console.error('Failed to send subscription email:', emailError);
+      }
+
+      console.log('User subscription updated:', {
+        userId,
+        plan,
+        currentPeriodEnd: currentPeriodEnd.toISOString(),
+        hasAuthorization: !!authorization?.authorization_code,
+      });
+
       return NextResponse.json({
         success: true,
         plan: plan,
         message: 'Payment verified and plan updated!',
       });
-    } else if (checkoutSession.payment_status === 'unpaid' || checkoutSession.status === 'open') {
+    } else if (paystackResponse.data.status === 'abandoned') {
       return NextResponse.json({
         success: false,
-        status: 'pending',
-        message: 'Payment still processing',
-      });
-    } else if (checkoutSession.status === 'expired') {
-      return NextResponse.json({
-        success: false,
-        status: 'failed',
-        message: 'Checkout session expired',
+        status: 'abandoned',
+        message: 'Payment was abandoned',
       });
     } else {
       return NextResponse.json({
         success: false,
-        status: checkoutSession.status || 'unknown',
-        message: `Payment status: ${checkoutSession.payment_status}`,
+        status: paystackResponse.data.status,
+        message: `Payment status: ${paystackResponse.data.status}`,
       });
     }
   } catch (error) {

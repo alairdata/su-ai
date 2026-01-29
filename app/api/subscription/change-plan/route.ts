@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
-import { stripe, PLAN_CONFIG } from "@/lib/stripe";
+import {
+  chargeAuthorization,
+  generateReference,
+  getNextBillingDate,
+  PLAN_CONFIG,
+  usdToGhsPesewas,
+  PlanType
+} from "@/lib/paystack";
 import { sendSubscriptionEmail } from "@/lib/email";
 
 const supabase = createClient(
@@ -18,7 +25,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { newPlan, action } = await req.json();
+    const { newPlan } = await req.json();
 
     if (!["Pro", "Plus"].includes(newPlan)) {
       return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
@@ -27,20 +34,12 @@ export async function POST(req: NextRequest) {
     // Get user's current subscription info
     const { data: user, error: userError } = await supabase
       .from("users")
-      .select("id, plan, stripe_subscription_id, stripe_customer_id, current_period_end")
+      .select("id, email, name, plan, subscription_status, current_period_end, paystack_authorization")
       .eq("id", session.user.id)
       .single();
 
     if (userError || !user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    // If no active subscription, they need to go through checkout
-    if (!user.stripe_subscription_id) {
-      return NextResponse.json({
-        error: "No active subscription",
-        redirect: "checkout"
-      }, { status: 400 });
     }
 
     const currentPlan = user.plan;
@@ -51,57 +50,85 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Already on this plan" }, { status: 400 });
     }
 
-    // Get the new price ID
-    const newPriceId = PLAN_CONFIG[newPlan as keyof typeof PLAN_CONFIG].stripePriceId;
-    if (!newPriceId) {
-      return NextResponse.json({ error: "Price not configured" }, { status: 500 });
+    if (currentPlan === "Free") {
+      // Need to go through checkout first
+      return NextResponse.json({
+        error: "No active subscription",
+        redirect: "checkout"
+      }, { status: 400 });
     }
 
-    // Get current subscription
-    const subscription = await stripe.subscriptions.retrieve(user.stripe_subscription_id);
+    if (!user.paystack_authorization) {
+      // Need to re-subscribe through checkout
+      return NextResponse.json({
+        error: "No payment method on file",
+        redirect: "checkout"
+      }, { status: 400 });
+    }
 
     if (isUpgrade) {
       // UPGRADE: Pro → Plus
-      // Update subscription immediately with proration
-      await stripe.subscriptions.update(
-        user.stripe_subscription_id,
-        {
-          items: [{
-            id: subscription.items.data[0].id,
-            price: newPriceId,
-          }],
-          proration_behavior: 'always_invoice', // Charge the difference immediately
+      // Charge the difference immediately
+      const proDiff = PLAN_CONFIG.Plus.priceUSD - PLAN_CONFIG.Pro.priceUSD;
+
+      // Calculate prorated amount based on days remaining
+      const now = new Date();
+      const periodEnd = new Date(user.current_period_end);
+      const totalDays = 30;
+      const daysRemaining = Math.max(0, Math.ceil((periodEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+      const proratedAmount = (proDiff * daysRemaining) / totalDays;
+
+      const amountToCharge = await usdToGhsPesewas(proratedAmount);
+      const reference = generateReference(`upgrade_${user.id.slice(0, 8)}`);
+
+      console.log('Upgrade charge:', {
+        userId: user.id,
+        from: currentPlan,
+        to: newPlan,
+        daysRemaining,
+        proratedUSD: proratedAmount.toFixed(2),
+        amountPesewas: amountToCharge,
+      });
+
+      // Only charge if there's a meaningful amount (more than ~$0.10)
+      if (amountToCharge > 150) { // ~$0.10 in GHS
+        const chargeResult = await chargeAuthorization({
+          email: user.email,
+          amount: amountToCharge,
+          authorization_code: user.paystack_authorization,
+          reference,
           metadata: {
             userId: user.id,
             plan: newPlan,
+            type: 'upgrade',
+            previousPlan: currentPlan,
           },
+        });
+
+        if (chargeResult.data.status !== 'success') {
+          return NextResponse.json({
+            error: "Failed to charge for upgrade. Please try again.",
+          }, { status: 400 });
         }
-      );
+      }
 
-      // Get updated subscription to get new period end
-      const updatedSub = await stripe.subscriptions.retrieve(user.stripe_subscription_id);
-      const periodEnd = (updatedSub as { current_period_end?: number }).current_period_end;
-
-      // Update user in database
+      // Update user plan immediately
       await supabase
         .from("users")
         .update({
           plan: newPlan,
-          current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
           subscription_status: 'active', // Clear any canceling status
         })
         .eq("id", user.id);
 
       // Send upgrade email
       try {
-        if (session.user.email) {
-          await sendSubscriptionEmail(
-            session.user.email,
-            session.user.name || 'there',
-            newPlan,
-            'upgraded'
-          );
-        }
+        await sendSubscriptionEmail(
+          user.email,
+          user.name || 'there',
+          newPlan,
+          'upgraded'
+        );
       } catch (emailError) {
         console.error('Failed to send upgrade email:', emailError);
       }
@@ -115,25 +142,7 @@ export async function POST(req: NextRequest) {
 
     } else if (isDowngrade) {
       // DOWNGRADE: Plus → Pro
-      // Schedule the change for end of billing period
-      await stripe.subscriptions.update(
-        user.stripe_subscription_id,
-        {
-          items: [{
-            id: subscription.items.data[0].id,
-            price: newPriceId,
-          }],
-          proration_behavior: 'none', // Don't prorate, just schedule
-          billing_cycle_anchor: 'unchanged', // Change takes effect at next billing
-          metadata: {
-            userId: user.id,
-            plan: newPlan,
-            scheduledDowngrade: 'true',
-          },
-        }
-      );
-
-      // Update user to show pending downgrade
+      // Schedule the change for end of billing period (just update status)
       await supabase
         .from("users")
         .update({
@@ -141,7 +150,7 @@ export async function POST(req: NextRequest) {
         })
         .eq("id", user.id);
 
-      const periodEnd = new Date(((subscription as { current_period_end?: number }).current_period_end || Date.now() / 1000) * 1000);
+      const periodEnd = new Date(user.current_period_end);
       const formattedDate = periodEnd.toLocaleDateString('en-US', {
         month: 'long',
         day: 'numeric',
@@ -150,15 +159,13 @@ export async function POST(req: NextRequest) {
 
       // Send downgrade email
       try {
-        if (session.user.email) {
-          await sendSubscriptionEmail(
-            session.user.email,
-            session.user.name || 'there',
-            newPlan,
-            'downgraded',
-            periodEnd.toISOString()
-          );
-        }
+        await sendSubscriptionEmail(
+          user.email,
+          user.name || 'there',
+          newPlan,
+          'downgraded',
+          periodEnd.toISOString()
+        );
       } catch (emailError) {
         console.error('Failed to send downgrade email:', emailError);
       }

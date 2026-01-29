@@ -603,25 +603,9 @@ function HomePage() {
       return;
     }
 
-    // UPGRADE FROM FREE - go to Stripe checkout
+    // UPGRADE FROM FREE - go to custom checkout page
     if (currentPlan === "Free") {
-      try {
-        const res = await fetch("/api/payment/initialize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ plan: newPlan }),
-        });
-
-        const data = await res.json();
-        if (data.success && data.authorization_url) {
-          window.location.href = data.authorization_url;
-        } else {
-          showConfirm("Error", data.error || "Failed to initialize payment.", "OK", closeConfirmModal);
-        }
-      } catch (error) {
-        console.error("Failed to initialize payment:", error);
-        showConfirm("Error", "Network error. Please try again.", "OK", closeConfirmModal);
-      }
+      window.location.href = `/checkout?plan=${newPlan}`;
       return;
     }
 
@@ -653,15 +637,8 @@ function HomePage() {
               });
               await updateSession();
             } else if (data.redirect === "checkout") {
-              const checkoutRes = await fetch("/api/payment/initialize", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ plan: "Plus" }),
-              });
-              const checkoutData = await checkoutRes.json();
-              if (checkoutData.authorization_url) {
-                window.location.href = checkoutData.authorization_url;
-              }
+              // Redirect to custom checkout page
+              window.location.href = `/checkout?plan=Plus`;
             } else {
               setConfirmModal({
                 show: true,

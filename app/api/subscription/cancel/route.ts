@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import { createClient } from '@supabase/supabase-js';
-import { cancelSubscriptionAtPeriodEnd } from '@/lib/stripe';
 import { sendSubscriptionEmail } from '@/lib/email';
 
 const supabase = createClient(
@@ -24,21 +23,26 @@ export async function POST() {
     // Get user's subscription info from database
     const { data: user, error: fetchError } = await supabase
       .from('users')
-      .select('stripe_subscription_id, current_period_end')
+      .select('plan, current_period_end, paystack_authorization')
       .eq('id', session.user.id)
       .single();
 
-    if (fetchError || !user?.stripe_subscription_id) {
+    if (fetchError || !user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 400 }
+      );
+    }
+
+    if (user.plan === 'Free') {
       return NextResponse.json(
         { error: 'No active subscription found' },
         { status: 400 }
       );
     }
 
-    // Cancel the subscription at period end via Stripe
-    const subscription = await cancelSubscriptionAtPeriodEnd(user.stripe_subscription_id);
-
-    // Update subscription status to canceling
+    // Simply mark the subscription as canceling
+    // The cron job will handle the actual cancellation at period end
     const { error: updateError } = await supabase
       .from('users')
       .update({
@@ -54,15 +58,10 @@ export async function POST() {
       );
     }
 
-    // Get period end from subscription item
-    const subscriptionItem = subscription.items?.data?.[0];
-    const periodEnd = subscriptionItem?.current_period_end
-      ? new Date(subscriptionItem.current_period_end * 1000).toISOString()
-      : user.current_period_end;
+    const periodEnd = user.current_period_end;
 
     // Send cancellation email
     try {
-      // Get user's name and email for the email
       const { data: userData } = await supabase
         .from('users')
         .select('name, email, plan')
@@ -79,9 +78,10 @@ export async function POST() {
         );
       }
     } catch (emailError) {
-      // Log but don't fail the cancellation if email fails
       console.error('Failed to send cancellation email:', emailError);
     }
+
+    console.log('Subscription cancelled for user:', session.user.id);
 
     return NextResponse.json({
       success: true,

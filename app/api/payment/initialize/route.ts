@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
-import { createCheckoutSession, PlanType } from '@/lib/stripe';
+import {
+  initializeTransaction,
+  PLAN_CONFIG,
+  usdToGhsPesewas,
+  generateReference,
+  PlanType
+} from '@/lib/paystack';
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from '@/lib/rate-limit';
 import { initializePaymentSchema, validateInput } from '@/lib/validations';
 import { sanitizeErrorForClient } from '@/lib/env';
@@ -35,32 +41,49 @@ export async function POST(request: Request) {
     }
 
     const { plan } = validation.data;
+    const planConfig = PLAN_CONFIG[plan as PlanType];
+
+    if (!planConfig || plan === 'Free') {
+      return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
+    }
+
     const userId = session.user.id;
     const email = session.user.email;
-    const baseUrl = process.env.NEXTAUTH_URL;
 
-    // Create Stripe Checkout Session
-    const checkoutSession = await createCheckoutSession({
+    // Convert USD price to GHS pesewas (live rate)
+    const amountInPesewas = await usdToGhsPesewas(planConfig.priceUSD);
+    const reference = generateReference(`${plan.toLowerCase()}_${userId.slice(0, 8)}`);
+
+    // Initialize Paystack transaction
+    const paystackResponse = await initializeTransaction({
       email,
-      userId,
-      plan: plan as PlanType,
-      successUrl: `${baseUrl}/payment/callback?session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${baseUrl}/?canceled=true`,
+      amount: amountInPesewas,
+      reference,
+      metadata: {
+        userId,
+        plan,
+        priceUSD: planConfig.priceUSD,
+      },
     });
 
-    console.log('Stripe checkout session created:', {
-      sessionId: checkoutSession.id,
+    console.log('Paystack transaction initialized:', {
+      reference,
       plan,
       userId,
+      amountPesewas: amountInPesewas,
     });
 
-    // Return the checkout URL (compatible with existing frontend)
+    // Return data for Paystack popup
     return NextResponse.json({
       success: true,
-      authorization_url: checkoutSession.url,
-      session_id: checkoutSession.id,
+      reference: paystackResponse.data.reference,
+      access_code: paystackResponse.data.access_code,
+      authorization_url: paystackResponse.data.authorization_url,
+      amount: amountInPesewas,
+      public_key: process.env.PAYSTACK_PUBLIC_KEY,
     });
   } catch (error) {
+    console.error('Payment initialization error:', error);
     return NextResponse.json(
       { error: sanitizeErrorForClient(error) },
       { status: 500 }

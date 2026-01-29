@@ -13,20 +13,20 @@ function PaymentCallbackContent() {
 
   useEffect(() => {
     const verifyPayment = async () => {
-      // Stripe sends back session_id as query parameter
-      let sessionId = searchParams.get('session_id');
+      // Paystack sends back reference and trxref as query parameters
+      let reference = searchParams.get('reference') || searchParams.get('trxref');
 
       // Also check sessionStorage (for cases where URL params are lost)
-      if (!sessionId && typeof window !== 'undefined') {
-        sessionId = sessionStorage.getItem('stripe_session_id');
-        if (sessionId) {
-          sessionStorage.removeItem('stripe_session_id');
+      if (!reference && typeof window !== 'undefined') {
+        reference = sessionStorage.getItem('paystack_reference');
+        if (reference) {
+          sessionStorage.removeItem('paystack_reference');
         }
       }
 
-      if (!sessionId) {
+      if (!reference) {
         setStatus('error');
-        setMessage('Invalid payment session');
+        setMessage('Invalid payment reference');
         return;
       }
 
@@ -34,7 +34,7 @@ function PaymentCallbackContent() {
         const res = await fetch('/api/payment/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId }),
+          body: JSON.stringify({ reference }),
         });
 
         const data = await res.json();
@@ -46,10 +46,9 @@ function PaymentCallbackContent() {
           setTimeout(() => {
             router.push('/');
           }, 2500);
-        } else if (data.status === 'pending') {
-          // Still processing - keep checking
-          setMessage('Payment is still processing...');
-          setTimeout(() => verifyPayment(), 3000);
+        } else if (data.status === 'pending' || data.status === 'abandoned') {
+          setStatus('error');
+          setMessage(data.message || 'Payment was not completed');
         } else {
           setStatus('error');
           setMessage(data.error || data.message || 'Payment verification failed');
