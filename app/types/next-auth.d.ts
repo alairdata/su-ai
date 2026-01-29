@@ -11,6 +11,7 @@ declare module "next-auth" {
       messagesUsedToday: number;
       totalMessages: number;
       isNewUser?: boolean;
+      isDeleted?: boolean;
       timezone?: string;
       subscriptionStatus?: string;
       currentPeriodEnd?: string;
@@ -25,6 +26,7 @@ declare module "next-auth" {
     messagesUsedToday: number;
     totalMessages: number;
     isNewUser?: boolean;
+    isDeleted?: boolean;
     timezone?: string;
     subscriptionStatus?: string;
     currentPeriodEnd?: string;

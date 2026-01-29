@@ -114,6 +114,14 @@ function HomePage() {
     }
   }, [session]);
 
+  // Auto-logout if user was deleted from database
+  useEffect(() => {
+    if (session?.user?.isDeleted) {
+      console.log('User deleted from database, signing out...');
+      signOut({ callbackUrl: '/' });
+    }
+  }, [session]);
+
   // Check if user has been away for more than 24 hours
   useEffect(() => {
     if (session?.user && !session.user.isNewUser) {

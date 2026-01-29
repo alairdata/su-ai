@@ -200,6 +200,16 @@ export const authOptions: NextAuthOptions = {
           user = userData;
         }
 
+        // If user doesn't exist in database (deleted), invalidate the session
+        if (!user) {
+          console.log('User not found in database, invalidating session:', token.id);
+          // Return session with deleted flag - client will handle logout
+          session.user.id = '';
+          session.user.plan = 'Free';
+          session.user.isDeleted = true;
+          return session;
+        }
+
         if (user) {
           // Always use fresh data from database (for name/plan/isNewUser updates to reflect immediately)
           session.user.name = user.name;
