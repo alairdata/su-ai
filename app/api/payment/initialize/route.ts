@@ -54,11 +54,15 @@ export async function POST(request: Request) {
     const amountInPesewas = await usdToGhsPesewas(planConfig.priceUSD);
     const reference = generateReference(`${plan.toLowerCase()}_${userId.slice(0, 8)}`);
 
+    // Get the base URL for callback
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.so-unfiltered-ai.com';
+
     // Initialize Paystack transaction
     const paystackResponse = await initializeTransaction({
       email,
       amount: amountInPesewas,
       reference,
+      callback_url: `${baseUrl}/payment/callback`,
       metadata: {
         userId,
         plan,

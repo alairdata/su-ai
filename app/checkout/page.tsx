@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Script from 'next/script';
 
 // Plan configuration (must match server-side)
 const PLAN_CONFIG = {
@@ -35,22 +34,6 @@ const PLAN_CONFIG = {
 
 type PaidPlan = 'Pro' | 'Plus';
 
-// Declare Paystack types
-declare global {
-  interface Window {
-    PaystackPop: {
-      setup: (config: {
-        key: string;
-        email: string;
-        access_code: string;
-        callback: (response: { reference: string }) => void;
-        onClose: () => void;
-      }) => {
-        openIframe: () => void;
-      };
-    };
-  }
-}
 
 // Wrapper component to handle Suspense for useSearchParams
 export default function CheckoutPage() {
@@ -79,7 +62,6 @@ function CheckoutContent() {
   const [selectedPlan, setSelectedPlan] = useState<PaidPlan>(planParam || 'Pro');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [paystackLoaded, setPaystackLoaded] = useState(false);
 
   const plan = PLAN_CONFIG[selectedPlan];
 
@@ -98,7 +80,7 @@ function CheckoutContent() {
   }, [session, router]);
 
   const handlePayment = async () => {
-    if (!session?.user?.email || !paystackLoaded) return;
+    if (!session?.user?.email) return;
 
     setIsLoading(true);
     setError(null);
@@ -117,40 +99,8 @@ function CheckoutContent() {
         throw new Error(data.error || 'Failed to initialize payment');
       }
 
-      // Open Paystack popup using access_code from server initialization
-      const handler = window.PaystackPop.setup({
-        key: data.public_key,
-        email: session.user.email,
-        access_code: data.access_code,
-        callback: (response: { reference: string }) => {
-          // Verify payment on server (handle async inside)
-          fetch('/api/payment/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reference: response.reference }),
-          })
-            .then((verifyRes) => verifyRes.json())
-            .then((verifyData) => {
-              if (verifyData.success) {
-                // Redirect to success page or home
-                router.push('/?subscribed=true');
-              } else {
-                setError(verifyData.message || 'Payment verification failed');
-              }
-            })
-            .catch(() => {
-              setError('Failed to verify payment. Please contact support.');
-            })
-            .finally(() => {
-              setIsLoading(false);
-            });
-        },
-        onClose: () => {
-          setIsLoading(false);
-        },
-      });
-
-      handler.openIframe();
+      // Redirect to Paystack checkout page
+      window.location.href = data.authorization_url;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setIsLoading(false);
@@ -171,13 +121,7 @@ function CheckoutContent() {
   }
 
   return (
-    <>
-      <Script
-        src="https://js.paystack.co/v1/inline.js"
-        onLoad={() => setPaystackLoaded(true)}
-      />
-
-      <div style={styles.container}>
+    <div style={styles.container}>
         <div style={styles.card}>
           {/* Header */}
           <div style={styles.header}>
@@ -241,11 +185,11 @@ function CheckoutContent() {
           {/* Subscribe Button */}
           <button
             onClick={handlePayment}
-            disabled={isLoading || !paystackLoaded}
+            disabled={isLoading}
             style={{
               ...styles.subscribeButton,
-              opacity: isLoading || !paystackLoaded ? 0.7 : 1,
-              cursor: isLoading || !paystackLoaded ? 'not-allowed' : 'pointer',
+              opacity: isLoading ? 0.7 : 1,
+              cursor: isLoading ? 'not-allowed' : 'pointer',
             }}
           >
             {isLoading ? (
@@ -273,7 +217,7 @@ function CheckoutContent() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
