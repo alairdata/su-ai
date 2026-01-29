@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     const { plan } = validation.data;
     const planConfig = PLAN_CONFIG[plan as PlanType];
 
-    if (!planConfig || plan === 'Free') {
+    if (!planConfig) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
     }
 
