@@ -41,11 +41,7 @@ declare global {
     PaystackPop: {
       setup: (config: {
         key: string;
-        email: string;
-        amount: number;
-        currency: string;
-        ref: string;
-        metadata: Record<string, unknown>;
+        access_code: string;
         callback: (response: { reference: string }) => void;
         onClose: () => void;
       }) => {
@@ -120,24 +116,10 @@ function CheckoutContent() {
         throw new Error(data.error || 'Failed to initialize payment');
       }
 
-      // Open Paystack popup
+      // Open Paystack popup using access_code from server initialization
       const handler = window.PaystackPop.setup({
         key: data.public_key,
-        email: session.user.email,
-        amount: data.amount, // Amount in pesewas
-        currency: 'GHS',
-        ref: data.reference,
-        metadata: {
-          userId: session.user.id,
-          plan: selectedPlan,
-          custom_fields: [
-            {
-              display_name: "Plan",
-              variable_name: "plan",
-              value: selectedPlan
-            }
-          ]
-        },
+        access_code: data.access_code,
         callback: (response: { reference: string }) => {
           // Verify payment on server (handle async inside)
           fetch('/api/payment/verify', {
