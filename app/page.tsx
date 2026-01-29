@@ -2383,12 +2383,12 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   authContainer: {
     minHeight: '100dvh',
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
-    padding: '20px',
+    padding: '40px 20px',
     background: '#f8f9fa',
     position: 'relative' as const,
-    overflow: 'hidden',
+    overflowY: 'auto' as const,
   },
   authThemeToggle: {
     position: 'absolute' as const,
@@ -2407,6 +2407,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     width: '100%',
     maxWidth: '400px',
     padding: '36px 32px',
+    margin: 'auto',
     background: 'rgba(255, 255, 255, 0.65)',
     borderRadius: '24px',
     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
