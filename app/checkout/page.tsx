@@ -3,28 +3,6 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Script from 'next/script';
-
-// Declare Paystack types
-declare global {
-  interface Window {
-    PaystackPop: {
-      setup: (config: {
-        key: string;
-        email: string;
-        amount: number;
-        currency: string;
-        ref: string;
-        channels: string[];
-        metadata: Record<string, unknown>;
-        callback: (response: { reference: string }) => void;
-        onClose: () => void;
-      }) => {
-        openIframe: () => void;
-      };
-    };
-  }
-}
 
 // Plan configuration (must match server-side)
 const PLAN_CONFIG = {
@@ -84,7 +62,6 @@ function CheckoutContent() {
   const [selectedPlan, setSelectedPlan] = useState<PaidPlan>(planParam || 'Pro');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [paystackLoaded, setPaystackLoaded] = useState(false);
 
   const plan = PLAN_CONFIG[selectedPlan];
 
@@ -103,13 +80,13 @@ function CheckoutContent() {
   }, [session, router]);
 
   const handlePayment = async () => {
-    if (!session?.user?.email || !paystackLoaded) return;
+    if (!session?.user?.email) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      // Get payment details from server (amount in pesewas, reference, public key)
+      // Initialize transaction on server
       const res = await fetch('/api/payment/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -122,53 +99,8 @@ function CheckoutContent() {
         throw new Error(data.error || 'Failed to initialize payment');
       }
 
-      // Open Paystack popup with all payment channels
-      const handler = window.PaystackPop.setup({
-        key: data.public_key,
-        email: session.user.email,
-        amount: data.amount,
-        currency: 'GHS',
-        ref: data.reference,
-        channels: ['card', 'mobile_money'],
-        metadata: {
-          userId: session.user.id,
-          plan: selectedPlan,
-          custom_fields: [
-            {
-              display_name: "Plan",
-              variable_name: "plan",
-              value: selectedPlan
-            }
-          ]
-        },
-        callback: (response: { reference: string }) => {
-          // Verify payment on server
-          fetch('/api/payment/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reference: response.reference }),
-          })
-            .then((verifyRes) => verifyRes.json())
-            .then((verifyData) => {
-              if (verifyData.success) {
-                router.push('/?subscribed=true');
-              } else {
-                setError(verifyData.message || 'Payment verification failed');
-              }
-            })
-            .catch(() => {
-              setError('Failed to verify payment. Please contact support.');
-            })
-            .finally(() => {
-              setIsLoading(false);
-            });
-        },
-        onClose: () => {
-          setIsLoading(false);
-        },
-      });
-
-      handler.openIframe();
+      // Redirect to Paystack checkout page
+      window.location.href = data.authorization_url;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setIsLoading(false);
@@ -189,12 +121,7 @@ function CheckoutContent() {
   }
 
   return (
-    <>
-      <Script
-        src="https://js.paystack.co/v1/inline.js"
-        onLoad={() => setPaystackLoaded(true)}
-      />
-      <div style={styles.container}>
+    <div style={styles.container}>
         <div style={styles.card}>
           {/* Header */}
           <div style={styles.header}>
@@ -258,11 +185,11 @@ function CheckoutContent() {
           {/* Subscribe Button */}
           <button
             onClick={handlePayment}
-            disabled={isLoading || !paystackLoaded}
+            disabled={isLoading}
             style={{
               ...styles.subscribeButton,
-              opacity: isLoading || !paystackLoaded ? 0.7 : 1,
-              cursor: isLoading || !paystackLoaded ? 'not-allowed' : 'pointer',
+              opacity: isLoading ? 0.7 : 1,
+              cursor: isLoading ? 'not-allowed' : 'pointer',
             }}
           >
             {isLoading ? (
@@ -289,8 +216,7 @@ function CheckoutContent() {
             <strong>{session.user.email}</strong>
           </div>
         </div>
-      </div>
-    </>
+    </div>
   );
 }
 
