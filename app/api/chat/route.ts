@@ -214,6 +214,8 @@ export async function POST(req: NextRequest) {
             supabase.from("users").update({
               messages_used_today: messagesUsedToday + 1
             }).eq("id", userId),
+            // Increment total_messages atomically using RPC
+            supabase.rpc('increment_total_messages', { user_id_param: userId }),
           ];
 
           // Generate title for first message (using Haiku for speed)

@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 // Plan configuration (must match server-side)
 const PLAN_CONFIG = {
   Pro: {
-    priceUSD: 0.99,
+    priceUSD: 4.99,
     name: 'Pro Plan',
     features: [
       '100 messages per day',
@@ -143,7 +143,7 @@ function CheckoutContent() {
                 ...(selectedPlan === 'Pro' ? styles.planTabActive : {}),
               }}
             >
-              Pro - $0.99/mo
+              Pro - $4.99/mo
             </button>
             <button
               onClick={() => setSelectedPlan('Plus')}

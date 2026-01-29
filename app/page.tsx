@@ -677,7 +677,7 @@ function HomePage() {
 
       showConfirm(
         "Downgrade to Pro",
-        "Your Plus subscription will remain active until the end of your billing period. After that, you'll be on the Pro plan ($0.99/month) with 100 messages/day.",
+        "Your Plus subscription will remain active until the end of your billing period. After that, you'll be on the Pro plan ($4.99/month) with 100 messages/day.",
         "Downgrade",
         async () => {
           setConfirmLoading(true);
@@ -2027,7 +2027,7 @@ function HomePage() {
 
                     <div style={{...currentStyles.planCard, ...(session?.user?.plan === "Pro" || session?.user?.subscriptionStatus === 'downgrading' ? currentStyles.planCardActive : {})}}>
                       <h5 style={currentStyles.planCardTitle}>Pro</h5>
-                      <div style={currentStyles.planPrice}>$0.99<span style={currentStyles.planPricePeriod}>/mo</span></div>
+                      <div style={currentStyles.planPrice}>$4.99<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
                         <li style={currentStyles.planFeature}>100 messages per day</li>
                         <li style={currentStyles.planFeature}>10x more than Free</li>

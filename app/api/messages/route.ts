@@ -113,13 +113,17 @@ export async function POST(req: NextRequest) {
         content: assistantMessage
       });
 
-    // Increment message count
-    await supabase
-      .from("users")
-      .update({ 
-        messages_used_today: session.user.messagesUsedToday + 1 
-      })
-      .eq("id", session.user.id);
+    // Increment message count (daily and total)
+    await Promise.all([
+      supabase
+        .from("users")
+        .update({
+          messages_used_today: session.user.messagesUsedToday + 1
+        })
+        .eq("id", session.user.id),
+      // Increment total_messages atomically using RPC
+      supabase.rpc('increment_total_messages', { user_id_param: session.user.id }),
+    ]);
 
     // Update chat title if it's the first message
     if (allMessages && allMessages.length === 1) {

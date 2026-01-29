@@ -19,7 +19,7 @@ export const PLAN_CONFIG = {
     ],
   },
   Pro: {
-    priceUSD: 0.99,
+    priceUSD: 4.99,
     messagesPerDay: 100,
     name: 'Pro Plan',
     description: '100 messages per day - 10x more than Free',

@@ -20,7 +20,7 @@ export const PLAN_CONFIG = {
     stripePriceId: null,
   },
   Pro: {
-    priceUSD: 0.99,
+    priceUSD: 4.99,
     messagesPerDay: 150,
     name: 'Pro Plan',
     description: '150 messages per day - 15x more than Free',

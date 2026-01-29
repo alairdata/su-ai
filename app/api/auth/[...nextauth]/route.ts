@@ -78,6 +78,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           plan: user.plan,
           messagesUsedToday: user.messages_used_today,
+          totalMessages: user.total_messages || 0,
         };
       },
     }),
@@ -172,6 +173,7 @@ export const authOptions: NextAuthOptions = {
           name: string;
           plan: "Free" | "Pro" | "Plus";
           messages_used_today: number;
+          total_messages: number;
           last_reset_date: string | null;
           timezone: string | null;
           reset_timezone?: string | null;
@@ -182,7 +184,7 @@ export const authOptions: NextAuthOptions = {
 
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('name, plan, messages_used_today, last_reset_date, timezone, reset_timezone, is_new_user, subscription_status, current_period_end')
+          .select('name, plan, messages_used_today, total_messages, last_reset_date, timezone, reset_timezone, is_new_user, subscription_status, current_period_end')
           .eq('id', token.id)
           .single();
 
@@ -190,7 +192,7 @@ export const authOptions: NextAuthOptions = {
           // Column doesn't exist, try without it
           const { data: fallbackData } = await supabase
             .from('users')
-            .select('name, plan, messages_used_today, last_reset_date, timezone, is_new_user, subscription_status, current_period_end')
+            .select('name, plan, messages_used_today, total_messages, last_reset_date, timezone, is_new_user, subscription_status, current_period_end')
             .eq('id', token.id)
             .single();
           user = fallbackData;
@@ -206,6 +208,7 @@ export const authOptions: NextAuthOptions = {
           session.user.isNewUser = user.is_new_user || false;
           session.user.subscriptionStatus = user.subscription_status || undefined;
           session.user.currentPeriodEnd = user.current_period_end || undefined;
+          session.user.totalMessages = user.total_messages || 0;
 
           // VIP override: Give Plus access to special email addresses
           const userEmail = session.user.email?.toLowerCase();

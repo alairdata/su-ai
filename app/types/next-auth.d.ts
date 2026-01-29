@@ -9,6 +9,7 @@ declare module "next-auth" {
       name: string;
       plan: "Free" | "Pro" | "Plus";
       messagesUsedToday: number;
+      totalMessages: number;
       isNewUser?: boolean;
       timezone?: string;
       subscriptionStatus?: string;
@@ -22,6 +23,7 @@ declare module "next-auth" {
     name: string;
     plan: "Free" | "Pro" | "Plus";
     messagesUsedToday: number;
+    totalMessages: number;
     isNewUser?: boolean;
     timezone?: string;
     subscriptionStatus?: string;
