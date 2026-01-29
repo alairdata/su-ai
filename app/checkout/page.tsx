@@ -41,6 +41,7 @@ declare global {
     PaystackPop: {
       setup: (config: {
         key: string;
+        email: string;
         access_code: string;
         callback: (response: { reference: string }) => void;
         onClose: () => void;
@@ -119,6 +120,7 @@ function CheckoutContent() {
       // Open Paystack popup using access_code from server initialization
       const handler = window.PaystackPop.setup({
         key: data.public_key,
+        email: session.user.email,
         access_code: data.access_code,
         callback: (response: { reference: string }) => {
           // Verify payment on server (handle async inside)
