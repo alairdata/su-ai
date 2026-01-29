@@ -315,9 +315,10 @@ export function useChats() {
               if (data.text) {
                 streamedContent += data.text;
                 // Update assistant message content in real-time
+                // Check both activeChatId and realChatId in case ID update hasn't propagated
                 setChats(prev =>
                   prev.map(c =>
-                    c.id === realChatId
+                    (c.id === realChatId || c.id === activeChatId)
                       ? {
                           ...c,
                           messages: c.messages.map(m =>
@@ -333,9 +334,10 @@ export function useChats() {
 
               if (data.title) {
                 // Update chat title
+                // Check both IDs in case update hasn't propagated
                 setChats(prev =>
                   prev.map(c =>
-                    c.id === realChatId
+                    (c.id === realChatId || c.id === activeChatId)
                       ? { ...c, title: data.title }
                       : c
                   )
@@ -370,10 +372,11 @@ export function useChats() {
           if (chatRes.ok) {
             const chatData = await chatRes.json();
             if (chatData.chat?.messages) {
+              // Check both IDs in case update hasn't propagated
               setChats(prev =>
                 prev.map(c =>
-                  c.id === realChatId
-                    ? { ...c, messages: chatData.chat.messages, title: chatData.chat.title || c.title }
+                  (c.id === realChatId || c.id === activeChatId)
+                    ? { ...c, id: realChatId, messages: chatData.chat.messages, title: chatData.chat.title || c.title }
                     : c
                 )
               );
