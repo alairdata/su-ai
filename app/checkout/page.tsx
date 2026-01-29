@@ -328,7 +328,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   subscribeButton: {
     width: '100%',
     padding: '16px 24px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: '#1a1a1a',
     color: '#fff',
     border: 'none',
     borderRadius: '10px',
@@ -387,7 +387,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     width: '40px',
     height: '40px',
     border: '3px solid #e5e7eb',
-    borderTopColor: '#667eea',
+    borderTopColor: '#1a1a1a',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite',
   },
