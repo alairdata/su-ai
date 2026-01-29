@@ -185,8 +185,7 @@ function HomePage() {
   const messages = currentChat?.messages ?? [];
   // Don't show greeting while chats are loading (prevents flash when restoring from localStorage)
   // Also don't show if we're waiting for a stored chat to load
-  // But NOT when chatLoading - that means we're actively sending and the optimistic chat is being created
-  const isWaitingForStoredChat = currentChatId && !currentChat && !chatLoading;
+  const isWaitingForStoredChat = currentChatId && !currentChat;
   const showGreeting = isChatsLoaded && !chatLoading && !isWaitingForStoredChat && (!currentChat || messages.length === 0);
   const remainingMessages = getRemainingMessages();
 
