@@ -227,7 +227,7 @@ export function useChats() {
       const optimisticId = `temp-chat-${Date.now()}`;
       activeChatId = optimisticId;
       needsNewChat = true;
-      setCurrentChatId(optimisticId);
+      // Don't setCurrentChatId yet - wait until chat is added to avoid race condition
     }
 
     if (isFirstMessage) {
@@ -239,7 +239,9 @@ export function useChats() {
         messages: [optimisticMessage, assistantMessage],
         created_at: new Date().toISOString(),
       };
+      // Add chat FIRST, then set currentChatId to avoid race condition
       setChats(prev => [newChat, ...prev]);
+      setCurrentChatId(activeChatId!);
     } else {
       // Add both messages to existing chat immediately
       setChats(prev =>
