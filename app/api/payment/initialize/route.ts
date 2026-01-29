@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import {
-  initializeTransaction,
   PLAN_CONFIG,
   usdToGhsPesewas,
   generateReference,
@@ -48,41 +47,23 @@ export async function POST(request: Request) {
     }
 
     const userId = session.user.id;
-    const email = session.user.email;
 
     // Convert USD price to GHS pesewas (live rate)
     const amountInPesewas = await usdToGhsPesewas(planConfig.priceUSD);
     const reference = generateReference(`${plan.toLowerCase()}_${userId.slice(0, 8)}`);
 
-    // Get the base URL for callback
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.so-unfiltered-ai.com';
-
-    // Initialize Paystack transaction
-    const paystackResponse = await initializeTransaction({
-      email,
-      amount: amountInPesewas,
-      reference,
-      callback_url: `${baseUrl}/payment/callback`,
-      metadata: {
-        userId,
-        plan,
-        priceUSD: planConfig.priceUSD,
-      },
-    });
-
-    console.log('Paystack transaction initialized:', {
+    console.log('Payment details prepared:', {
       reference,
       plan,
       userId,
       amountPesewas: amountInPesewas,
     });
 
-    // Return data for Paystack popup
+    // Return data for Paystack popup (no server-side initialization)
+    // The popup will handle the full transaction
     return NextResponse.json({
       success: true,
-      reference: paystackResponse.data.reference,
-      access_code: paystackResponse.data.access_code,
-      authorization_url: paystackResponse.data.authorization_url,
+      reference,
       amount: amountInPesewas,
       public_key: process.env.PAYSTACK_PUBLIC_KEY,
     });
