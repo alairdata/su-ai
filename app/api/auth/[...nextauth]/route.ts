@@ -188,26 +188,26 @@ export const authOptions: NextAuthOptions = {
           .eq('id', token.id)
           .single();
 
-        if (userError && userError.message.includes('reset_timezone')) {
-          // Column doesn't exist, try without it
-          const { data: fallbackData } = await supabase
+        if (userError) {
+          // Try without newer columns that might not exist
+          const { data: fallbackData, error: fallbackError } = await supabase
             .from('users')
-            .select('name, plan, messages_used_today, total_messages, last_reset_date, timezone, is_new_user, subscription_status, current_period_end')
+            .select('name, plan, messages_used_today, last_reset_date, timezone, is_new_user, subscription_status, current_period_end')
             .eq('id', token.id)
             .single();
-          user = fallbackData;
+
+          if (fallbackError && fallbackError.code === 'PGRST116') {
+            // PGRST116 = no rows returned = user actually deleted
+            console.log('User not found in database, invalidating session:', token.id);
+            session.user.id = '';
+            session.user.plan = 'Free';
+            session.user.isDeleted = true;
+            return session;
+          }
+
+          user = fallbackData ? { ...fallbackData, total_messages: 0 } : null;
         } else {
           user = userData;
-        }
-
-        // If user doesn't exist in database (deleted), invalidate the session
-        if (!user) {
-          console.log('User not found in database, invalidating session:', token.id);
-          // Return session with deleted flag - client will handle logout
-          session.user.id = '';
-          session.user.plan = 'Free';
-          session.user.isDeleted = true;
-          return session;
         }
 
         if (user) {
