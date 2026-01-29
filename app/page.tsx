@@ -1517,11 +1517,9 @@ function HomePage() {
                   ...currentStyles.chatMessages,
                   ...(isMobile ? currentStyles.chatMessagesMobile : {})
                 }}>
-                  {messages
-                    .filter(m => m.role === 'user' || m.content) // Skip empty assistant messages (typing indicator handles those)
-                    .map((m, idx) => (
+                  {messages.map((m) => (
                     <div
-                      key={m.id || idx}
+                      key={m.id}
                       style={m.role === "user" ? currentStyles.messageRowUser : currentStyles.messageRowAssistant}
                     >
                       {m.role === "user" ? (
@@ -1529,14 +1527,14 @@ function HomePage() {
                         <div style={currentStyles.messageWrapperUser}>
                           <div style={currentStyles.messageActionsUser}>
                             <button
-                              onClick={() => handleCopyMessage(m.content, m.id || String(idx))}
+                              onClick={() => handleCopyMessage(m.content, m.id)}
                               style={{
                                 ...currentStyles.actionButton,
                                 ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {})
                               }}
                               title="Copy message"
                             >
-                              {copiedMessageId === (m.id || String(idx)) ? (
+                              {copiedMessageId === m.id ? (
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <polyline points="20 6 9 17 4 12"/>
                                 </svg>
@@ -1559,37 +1557,48 @@ function HomePage() {
                             className="message-bubble"
                             style={currentStyles.messageBubbleAssistant}
                           >
-                            <div style={currentStyles.messageText}>
-                              <ReactMarkdown
-                                components={{
-                                  p: ({ children }) => <p style={{ margin: 0, display: 'block' }}>{children}</p>,
+                            {m.content ? (
+                              <div style={currentStyles.messageText}>
+                                <ReactMarkdown
+                                  components={{
+                                    p: ({ children }) => <p style={{ margin: '0 0 0.75em 0', display: 'block' }}>{children}</p>,
+                                  }}
+                                >
+                                  {m.content}
+                                </ReactMarkdown>
+                              </div>
+                            ) : (
+                              /* Typing indicator for empty assistant messages */
+                              <div style={currentStyles.typingIndicator}>
+                                <span className="typing-dot" />
+                                <span className="typing-dot" />
+                                <span className="typing-dot" />
+                              </div>
+                            )}
+                          </div>
+                          {m.content && (
+                            <div style={currentStyles.messageActions}>
+                              <button
+                                onClick={() => handleCopyMessage(m.content, m.id)}
+                                style={{
+                                  ...currentStyles.actionButton,
+                                  ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {})
                                 }}
+                                title="Copy message"
                               >
-                                {m.content}
-                              </ReactMarkdown>
+                                {copiedMessageId === m.id ? (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                  </svg>
+                                ) : (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                  </svg>
+                                )}
+                              </button>
                             </div>
-                          </div>
-                          <div style={currentStyles.messageActions}>
-                            <button
-                              onClick={() => handleCopyMessage(m.content, m.id || String(idx))}
-                              style={{
-                                ...currentStyles.actionButton,
-                                ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {})
-                              }}
-                              title="Copy message"
-                            >
-                              {copiedMessageId === (m.id || String(idx)) ? (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <polyline points="20 6 9 17 4 12"/>
-                                </svg>
-                              ) : (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                                </svg>
-                              )}
-                            </button>
-                          </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1624,22 +1633,6 @@ function HomePage() {
                     </div>
                   )}
 
-                  {/* Show typing indicator when loading and waiting for response */}
-                  {chatLoading && !isSearching && (
-                    messages.length === 0 ||
-                    messages[messages.length - 1].role === 'user' ||
-                    !messages[messages.length - 1].content
-                  ) && (
-                    <div style={currentStyles.messageRowAssistant}>
-                      <div style={currentStyles.messageBubbleAssistant}>
-                        <div style={currentStyles.typingIndicator}>
-                          <span className="typing-dot" />
-                          <span className="typing-dot" />
-                          <span className="typing-dot" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
                   <div ref={messagesEndRef} />
                 </div>
