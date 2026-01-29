@@ -56,6 +56,8 @@ export function useChats() {
   const [localMessagesUsed, setLocalMessagesUsed] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const previousMessageCountRef = useRef(0);
+  // Track pending chat ID during temp->real ID transition
+  const pendingChatIdRef = useRef<string | null>(null);
 
   // Wrapper to persist currentChatId to localStorage
   const setCurrentChatId = (chatId: string | null) => {
@@ -120,8 +122,9 @@ export function useChats() {
     previousMessageCountRef.current = currentMessageCount;
   }, [chats, currentChatId]);
 
-  const currentChat = currentChatId 
-    ? chats.find((c) => c.id === currentChatId) || null 
+  // Find current chat - check both currentChatId and pendingChatIdRef for ID transitions
+  const currentChat = currentChatId
+    ? chats.find((c) => c.id === currentChatId || c.id === pendingChatIdRef.current) || null
     : null;
 
   // Use local count for real-time updates
@@ -227,7 +230,8 @@ export function useChats() {
       const optimisticId = `temp-chat-${Date.now()}`;
       activeChatId = optimisticId;
       needsNewChat = true;
-      // Don't setCurrentChatId yet - wait until chat is added to avoid race condition
+      // Track pending ID for lookups during ID transition
+      pendingChatIdRef.current = optimisticId;
     }
 
     if (isFirstMessage) {
@@ -268,6 +272,8 @@ export function useChats() {
           c.id === activeChatId ? { ...c, id: realChatId } : c
         ));
         setCurrentChatId(realChatId);
+        // Clear pending ref after transition complete
+        pendingChatIdRef.current = null;
       }
 
       const res = await fetch('/api/chat', {
@@ -416,6 +422,7 @@ export function useChats() {
       setIsLoading(false);
       setIsSearching(false);
       setSearchQuery(null);
+      pendingChatIdRef.current = null;
     }
   };
 
