@@ -216,7 +216,6 @@ function CheckoutContent() {
             <strong>{session.user.email}</strong>
           </div>
         </div>
-      </div>
     </div>
   );
 }
