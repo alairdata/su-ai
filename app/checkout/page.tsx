@@ -138,27 +138,28 @@ function CheckoutContent() {
             }
           ]
         },
-        callback: async (response) => {
-          // Verify payment on server
-          try {
-            const verifyRes = await fetch('/api/payment/verify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ reference: response.reference }),
+        callback: (response: { reference: string }) => {
+          // Verify payment on server (handle async inside)
+          fetch('/api/payment/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reference: response.reference }),
+          })
+            .then((verifyRes) => verifyRes.json())
+            .then((verifyData) => {
+              if (verifyData.success) {
+                // Redirect to success page or home
+                router.push('/?subscribed=true');
+              } else {
+                setError(verifyData.message || 'Payment verification failed');
+              }
+            })
+            .catch(() => {
+              setError('Failed to verify payment. Please contact support.');
+            })
+            .finally(() => {
+              setIsLoading(false);
             });
-
-            const verifyData = await verifyRes.json();
-
-            if (verifyData.success) {
-              // Redirect to success page or home
-              router.push('/?subscribed=true');
-            } else {
-              setError(verifyData.message || 'Payment verification failed');
-            }
-          } catch (err) {
-            setError('Failed to verify payment. Please contact support.');
-          }
-          setIsLoading(false);
         },
         onClose: () => {
           setIsLoading(false);
