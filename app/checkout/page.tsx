@@ -260,6 +260,9 @@ function CheckoutContent() {
           <p style={styles.note}>
             Secure payment powered by Paystack. Cancel anytime.
           </p>
+          <p style={styles.currencyNote}>
+            The payment screen will show the amount in local currency (GHS) — this is simply the converted equivalent of your USD price.
+          </p>
 
           {/* User Info */}
           <div style={styles.userInfo}>
@@ -406,6 +409,14 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: '13px',
     color: '#888',
     marginTop: '16px',
+    marginBottom: '0',
+  },
+  currencyNote: {
+    textAlign: 'center',
+    fontSize: '12px',
+    color: '#999',
+    marginTop: '8px',
+    fontStyle: 'italic',
   },
   userInfo: {
     display: 'flex',
