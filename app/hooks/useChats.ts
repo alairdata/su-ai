@@ -112,8 +112,8 @@ export function useChats() {
 
   // Smart auto-scroll: only when message count increases
   useEffect(() => {
-    const currentChat = chats.find(c => c.id === currentChatId);
-    const currentMessageCount = currentChat?.messages.length || 0;
+    const chat = chats.find(c => c.id === currentChatId || c.id === pendingChatIdRef.current);
+    const currentMessageCount = chat?.messages.length || 0;
 
     if (currentMessageCount > previousMessageCountRef.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -205,7 +205,10 @@ export function useChats() {
     let needsNewChat = false;
 
     // Check if this is the first message (new chat)
-    const existingChat = activeChatId ? chats.find(c => c.id === activeChatId) : null;
+    // Check both activeChatId and pendingChatIdRef for robustness
+    const existingChat = activeChatId
+      ? chats.find(c => c.id === activeChatId || c.id === pendingChatIdRef.current)
+      : null;
     const isFirstMessage = !activeChatId || !existingChat || existingChat.messages.length === 0;
 
     // Optimistically add user message
@@ -248,9 +251,10 @@ export function useChats() {
       setCurrentChatId(activeChatId!);
     } else {
       // Add both messages to existing chat immediately
+      // Check both IDs for robustness during any potential ID transitions
       setChats(prev =>
         prev.map(c =>
-          c.id === activeChatId
+          (c.id === activeChatId || c.id === pendingChatIdRef.current)
             ? { ...c, messages: [...c.messages, optimisticMessage, assistantMessage] }
             : c
         )
