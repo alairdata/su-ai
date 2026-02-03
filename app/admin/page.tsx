@@ -504,11 +504,12 @@ export default function AdminPage() {
 
 const styles: { [key: string]: React.CSSProperties } = {
   container: {
-    minHeight: "100vh",
+    height: "100vh",
     background: "#f8f5ef",
     padding: "24px",
     paddingBottom: "48px",
     fontFamily: "Inter, -apple-system, sans-serif",
+    overflowY: "auto",
   },
   header: {
     display: "flex",
