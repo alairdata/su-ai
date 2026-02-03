@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
       groupBy = "day";
   }
 
-  // Fetch users for signup trend
+  // Fetch users for signup trend (within period)
   const { data: users, error: usersError } = await supabase
     .from("users")
     .select("created_at")
@@ -69,20 +69,42 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Failed to fetch history" }, { status: 500 });
   }
 
-  // Fetch messages for message trend
+  // Fetch ALL users for cumulative count (for avg calculation)
+  const { data: allUsers } = await supabase
+    .from("users")
+    .select("created_at")
+    .order("created_at", { ascending: true });
+
+  // Fetch messages for message trend (within period)
   const { data: messages, error: messagesError } = await supabase
     .from("messages")
     .select("created_at")
     .gte("created_at", startDate.toISOString())
     .order("created_at", { ascending: true });
 
+  // Fetch ALL messages for cumulative count
+  const { data: allMessages } = await supabase
+    .from("messages")
+    .select("created_at")
+    .order("created_at", { ascending: true });
+
   // Group data by time period
   const userTrend = groupDataByPeriod(users || [], groupBy, startDate, now);
   const messageTrend = groupDataByPeriod(messages || [], groupBy, startDate, now);
 
+  // Calculate avg messages per user trend
+  const avgTrend = calculateAvgTrend(
+    allUsers || [],
+    allMessages || [],
+    groupBy,
+    startDate,
+    now
+  );
+
   return NextResponse.json({
     userTrend,
     messageTrend,
+    avgTrend,
     period,
     hasMessages: !messagesError && messages !== null
   });
@@ -158,4 +180,56 @@ function getGroupKey(date: Date, groupBy: "hour" | "day" | "week" | "month"): st
     default:
       return date.toISOString().split('T')[0];
   }
+}
+
+function calculateAvgTrend(
+  allUsers: DataPoint[],
+  allMessages: DataPoint[],
+  groupBy: "hour" | "day" | "week" | "month",
+  startDate: Date,
+  endDate: Date
+): { label: string; avg: number }[] {
+  const result: { label: string; avg: number }[] = [];
+
+  // Generate all time points
+  const timePoints: Date[] = [];
+  const current = new Date(startDate);
+  while (current <= endDate) {
+    timePoints.push(new Date(current));
+    switch (groupBy) {
+      case "hour":
+        current.setHours(current.getHours() + 1);
+        break;
+      case "day":
+        current.setDate(current.getDate() + 1);
+        break;
+      case "week":
+        current.setDate(current.getDate() + 7);
+        break;
+      case "month":
+        current.setMonth(current.getMonth() + 1);
+        break;
+    }
+  }
+
+  // For each time point, calculate cumulative users and messages up to that point
+  for (const timePoint of timePoints) {
+    const usersUpToPoint = allUsers.filter(
+      u => new Date(u.created_at) <= timePoint
+    ).length;
+    const messagesUpToPoint = allMessages.filter(
+      m => new Date(m.created_at) <= timePoint
+    ).length;
+
+    const avg = usersUpToPoint > 0
+      ? Math.round((messagesUpToPoint / usersUpToPoint) * 10) / 10
+      : 0;
+
+    result.push({
+      label: getGroupKey(timePoint, groupBy),
+      avg
+    });
+  }
+
+  return result;
 }

@@ -38,12 +38,19 @@ interface Stats {
   signupsToday: number;
   signupsThisWeek: number;
   signupsThisMonth: number;
+  avgMessagesPerUser: number;
+  totalMessages: number;
 }
 
 interface TrendData {
   label: string;
   count: number;
   cumulative: number;
+}
+
+interface AvgTrendData {
+  label: string;
+  avg: number;
 }
 
 type Period = "day" | "week" | "month" | "year";
@@ -63,6 +70,7 @@ export default function AdminPage() {
   // Chart data
   const [userTrend, setUserTrend] = useState<TrendData[]>([]);
   const [messageTrend, setMessageTrend] = useState<TrendData[]>([]);
+  const [avgTrend, setAvgTrend] = useState<AvgTrendData[]>([]);
   const [chartPeriod, setChartPeriod] = useState<Period>("month");
   const [chartLoading, setChartLoading] = useState(false);
 
@@ -132,6 +140,7 @@ export default function AdminPage() {
         const data = await res.json();
         setUserTrend(data.userTrend || []);
         setMessageTrend(data.messageTrend || []);
+        setAvgTrend(data.avgTrend || []);
       }
     } catch (err) {
       console.error("Failed to fetch chart data:", err);
@@ -234,6 +243,14 @@ export default function AdminPage() {
           <div style={styles.statCard}>
             <div style={styles.statValue}>{stats.signupsThisMonth}</div>
             <div style={styles.statLabel}>This Month</div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={styles.statValue}>{stats.avgMessagesPerUser}</div>
+            <div style={styles.statLabel}>Avg Msgs/User</div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={styles.statValue}>{stats.totalMessages}</div>
+            <div style={styles.statLabel}>Total Messages</div>
           </div>
         </div>
       )}
@@ -355,6 +372,44 @@ export default function AdminPage() {
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Avg Messages per User Chart */}
+          <div style={styles.chartCard}>
+            <h3 style={styles.chartTitle}>Avg Messages per User</h3>
+            {chartLoading ? (
+              <div style={styles.chartLoading}>Loading...</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={avgTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                  />
+                  <YAxis tick={{ fontSize: 11 }} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#fff",
+                      border: "1px solid #e0e0e0",
+                      borderRadius: "8px",
+                    }}
+                    formatter={(value: number) => [value.toFixed(1), "Avg"]}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="avg"
+                    name="Avg Msgs/User"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
                   />
                 </LineChart>
               </ResponsiveContainer>

@@ -42,6 +42,15 @@ export async function GET() {
   const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
   const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
+  // Get total messages count
+  const { count: totalMessages } = await supabase
+    .from("messages")
+    .select("*", { count: "exact", head: true });
+
+  const avgMessagesPerUser = users.length > 0
+    ? Math.round(((totalMessages || 0) / users.length) * 10) / 10
+    : 0;
+
   const stats = {
     totalUsers: users.length,
     planCounts: {
@@ -54,6 +63,8 @@ export async function GET() {
     signupsToday: users.filter(u => new Date(u.created_at) >= today).length,
     signupsThisWeek: users.filter(u => new Date(u.created_at) >= thisWeek).length,
     signupsThisMonth: users.filter(u => new Date(u.created_at) >= thisMonth).length,
+    avgMessagesPerUser,
+    totalMessages: totalMessages || 0,
   };
 
   return NextResponse.json({ stats });
