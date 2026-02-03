@@ -3,6 +3,16 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
 interface User {
   id: string;
@@ -30,6 +40,16 @@ interface Stats {
   signupsThisMonth: number;
 }
 
+interface TrendData {
+  label: string;
+  count: number;
+  cumulative: number;
+}
+
+type Period = "day" | "week" | "month" | "year";
+
+const USERS_PER_PAGE = 15;
+
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -40,6 +60,15 @@ export default function AdminPage() {
   const [updatingUser, setUpdatingUser] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Chart data
+  const [userTrend, setUserTrend] = useState<TrendData[]>([]);
+  const [messageTrend, setMessageTrend] = useState<TrendData[]>([]);
+  const [chartPeriod, setChartPeriod] = useState<Period>("month");
+  const [chartLoading, setChartLoading] = useState(false);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/");
@@ -49,8 +78,20 @@ export default function AdminPage() {
   useEffect(() => {
     if (status === "authenticated") {
       fetchData();
+      fetchChartData(chartPeriod);
     }
   }, [status]);
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetchChartData(chartPeriod);
+    }
+  }, [chartPeriod]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -83,6 +124,22 @@ export default function AdminPage() {
     }
   };
 
+  const fetchChartData = async (period: Period) => {
+    setChartLoading(true);
+    try {
+      const res = await fetch(`/api/admin/history?period=${period}`);
+      if (res.ok) {
+        const data = await res.json();
+        setUserTrend(data.userTrend || []);
+        setMessageTrend(data.messageTrend || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch chart data:", err);
+    } finally {
+      setChartLoading(false);
+    }
+  };
+
   const updatePlan = async (userId: string, newPlan: string) => {
     setUpdatingUser(userId);
     try {
@@ -110,6 +167,18 @@ export default function AdminPage() {
     u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE);
+  const startIndex = (currentPage - 1) * USERS_PER_PAGE;
+  const endIndex = startIndex + USERS_PER_PAGE;
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
 
   if (status === "loading" || loading) {
     return (
@@ -178,6 +247,122 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* Chart Period Filter */}
+      <div style={styles.chartSection}>
+        <div style={styles.chartHeader}>
+          <h2 style={styles.sectionTitle}>Trends</h2>
+          <div style={styles.periodFilter}>
+            {(["day", "week", "month", "year"] as Period[]).map((period) => (
+              <button
+                key={period}
+                onClick={() => setChartPeriod(period)}
+                style={{
+                  ...styles.periodBtn,
+                  ...(chartPeriod === period ? styles.periodBtnActive : {}),
+                }}
+              >
+                {period.charAt(0).toUpperCase() + period.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Charts Side by Side */}
+        <div style={styles.chartsContainer}>
+          {/* User Signups Chart */}
+          <div style={styles.chartCard}>
+            <h3 style={styles.chartTitle}>User Signups</h3>
+            {chartLoading ? (
+              <div style={styles.chartLoading}>Loading...</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={userTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                  />
+                  <YAxis tick={{ fontSize: 11 }} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#fff",
+                      border: "1px solid #e0e0e0",
+                      borderRadius: "8px",
+                    }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    name="New Users"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="cumulative"
+                    name="Total"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Messages Chart */}
+          <div style={styles.chartCard}>
+            <h3 style={styles.chartTitle}>Messages Sent</h3>
+            {chartLoading ? (
+              <div style={styles.chartLoading}>Loading...</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={messageTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                  />
+                  <YAxis tick={{ fontSize: 11 }} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#fff",
+                      border: "1px solid #e0e0e0",
+                      borderRadius: "8px",
+                    }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    name="Messages"
+                    stroke="#8b5cf6"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="cumulative"
+                    name="Total"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Search */}
       <div style={styles.searchContainer}>
         <input
@@ -187,6 +372,9 @@ export default function AdminPage() {
           onChange={(e) => setSearchTerm(e.target.value)}
           style={styles.searchInput}
         />
+        <span style={styles.resultCount}>
+          {filteredUsers.length} user{filteredUsers.length !== 1 ? "s" : ""} found
+        </span>
       </div>
 
       {/* Users Table */}
@@ -203,7 +391,7 @@ export default function AdminPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.map((user) => (
+            {paginatedUsers.map((user) => (
               <tr key={user.id} style={styles.tr}>
                 <td style={styles.td}>
                   <div style={styles.userName}>{user.name}</div>
@@ -256,6 +444,60 @@ export default function AdminPage() {
       {filteredUsers.length === 0 && (
         <div style={styles.noResults}>No users found</div>
       )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={styles.pagination}>
+          <button
+            onClick={() => goToPage(1)}
+            disabled={currentPage === 1}
+            style={{
+              ...styles.pageBtn,
+              ...(currentPage === 1 ? styles.pageBtnDisabled : {}),
+            }}
+          >
+            First
+          </button>
+          <button
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage === 1}
+            style={{
+              ...styles.pageBtn,
+              ...(currentPage === 1 ? styles.pageBtnDisabled : {}),
+            }}
+          >
+            ← Prev
+          </button>
+
+          <div style={styles.pageInfo}>
+            Page {currentPage} of {totalPages}
+            <span style={styles.pageRange}>
+              ({startIndex + 1}-{Math.min(endIndex, filteredUsers.length)} of {filteredUsers.length})
+            </span>
+          </div>
+
+          <button
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            style={{
+              ...styles.pageBtn,
+              ...(currentPage === totalPages ? styles.pageBtnDisabled : {}),
+            }}
+          >
+            Next →
+          </button>
+          <button
+            onClick={() => goToPage(totalPages)}
+            disabled={currentPage === totalPages}
+            style={{
+              ...styles.pageBtn,
+              ...(currentPage === totalPages ? styles.pageBtnDisabled : {}),
+            }}
+          >
+            Last
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -266,6 +508,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     background: "#f8f5ef",
     padding: "24px",
     fontFamily: "Inter, -apple-system, sans-serif",
+    overflowY: "auto",
   },
   header: {
     display: "flex",
@@ -351,8 +594,73 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: "14px",
     fontWeight: 500,
   },
+  chartSection: {
+    marginBottom: "24px",
+  },
+  chartHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "16px",
+    flexWrap: "wrap" as const,
+    gap: "12px",
+  },
+  sectionTitle: {
+    fontSize: "20px",
+    fontWeight: 600,
+    color: "#1a1a1a",
+    margin: 0,
+  },
+  periodFilter: {
+    display: "flex",
+    gap: "8px",
+  },
+  periodBtn: {
+    padding: "8px 16px",
+    background: "#fff",
+    border: "1px solid #e0e0e0",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontSize: "13px",
+    fontWeight: 500,
+    transition: "all 0.2s",
+  },
+  periodBtnActive: {
+    background: "#1a1a1a",
+    color: "#fff",
+    borderColor: "#1a1a1a",
+  },
+  chartsContainer: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))",
+    gap: "20px",
+  },
+  chartCard: {
+    background: "#fff",
+    padding: "20px",
+    borderRadius: "12px",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+  },
+  chartTitle: {
+    fontSize: "16px",
+    fontWeight: 600,
+    color: "#1a1a1a",
+    marginBottom: "16px",
+    margin: "0 0 16px 0",
+  },
+  chartLoading: {
+    height: "250px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#666",
+  },
   searchContainer: {
     marginBottom: "20px",
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+    flexWrap: "wrap" as const,
   },
   searchInput: {
     width: "100%",
@@ -362,6 +670,10 @@ const styles: { [key: string]: React.CSSProperties } = {
     border: "1px solid #e0e0e0",
     borderRadius: "8px",
     outline: "none",
+  },
+  resultCount: {
+    fontSize: "14px",
+    color: "#666",
   },
   tableContainer: {
     background: "#fff",
@@ -427,5 +739,37 @@ const styles: { [key: string]: React.CSSProperties } = {
     textAlign: "center" as const,
     padding: "40px",
     color: "#666",
+  },
+  pagination: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "12px",
+    marginTop: "24px",
+    flexWrap: "wrap" as const,
+  },
+  pageBtn: {
+    padding: "8px 16px",
+    background: "#fff",
+    border: "1px solid #e0e0e0",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontSize: "13px",
+    fontWeight: 500,
+    transition: "all 0.2s",
+  },
+  pageBtnDisabled: {
+    opacity: 0.5,
+    cursor: "not-allowed",
+  },
+  pageInfo: {
+    fontSize: "14px",
+    color: "#1a1a1a",
+    fontWeight: 500,
+  },
+  pageRange: {
+    marginLeft: "8px",
+    color: "#666",
+    fontWeight: 400,
   },
 };
