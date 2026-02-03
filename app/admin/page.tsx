@@ -439,6 +439,55 @@ export default function AdminPage() {
               </ResponsiveContainer>
             )}
           </div>
+
+          {/* Cumulative User Growth Chart */}
+          <div style={styles.chartCard}>
+            <div style={styles.chartHeader2}>
+              <h3 style={styles.chartTitle}>Cumulative Users</h3>
+              <span style={{ ...styles.chartBadge, background: "#fef3c7", color: "#d97706" }}>
+                {userTrend.length > 0 ? userTrend[userTrend.length - 1]?.cumulative || 0 : 0} users
+              </span>
+            </div>
+            {chartLoading ? (
+              <div style={styles.chartLoading}>Loading...</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={userTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                  <XAxis
+                    dataKey="label"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: "#999" }}
+                    dy={10}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: "#999" }}
+                    width={30}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "rgba(255,255,255,0.95)",
+                      border: "none",
+                      borderRadius: "8px",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      fontSize: "12px",
+                    }}
+                    labelStyle={{ color: "#666", marginBottom: "4px" }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="cumulative"
+                    stroke="#f59e0b"
+                    strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 4, fill: "#f59e0b", stroke: "#fff", strokeWidth: 2 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
       </div>
 
@@ -720,7 +769,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   chartsContainer: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+    gridTemplateColumns: "repeat(2, 1fr)",
     gap: "16px",
   },
   chartCard: {
