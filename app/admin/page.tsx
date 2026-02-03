@@ -507,8 +507,8 @@ const styles: { [key: string]: React.CSSProperties } = {
     minHeight: "100vh",
     background: "#f8f5ef",
     padding: "24px",
+    paddingBottom: "48px",
     fontFamily: "Inter, -apple-system, sans-serif",
-    overflowY: "auto",
   },
   header: {
     display: "flex",
@@ -634,7 +634,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   chartsContainer: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
     gap: "20px",
   },
   chartCard: {
