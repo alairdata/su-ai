@@ -618,7 +618,9 @@ const styles: { [key: string]: React.CSSProperties } = {
   periodBtn: {
     padding: "8px 16px",
     background: "#fff",
-    border: "1px solid #e0e0e0",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: "#e0e0e0",
     borderRadius: "8px",
     cursor: "pointer",
     fontSize: "13px",
