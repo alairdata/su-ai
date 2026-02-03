@@ -288,44 +288,53 @@ export default function AdminPage() {
         <div style={styles.chartsContainer}>
           {/* User Signups Chart */}
           <div style={styles.chartCard}>
-            <h3 style={styles.chartTitle}>User Signups</h3>
+            <div style={styles.chartHeader2}>
+              <h3 style={styles.chartTitle}>User Signups</h3>
+              <span style={styles.chartBadge}>
+                {userTrend.length > 0 ? userTrend[userTrend.length - 1]?.cumulative || 0 : 0} total
+              </span>
+            </div>
             {chartLoading ? (
               <div style={styles.chartLoading}>Loading...</div>
             ) : (
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={userTrend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={userTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                  <defs>
+                    <linearGradient id="userGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 11 }}
+                    axisLine={false}
                     tickLine={false}
+                    tick={{ fontSize: 10, fill: "#999" }}
+                    dy={10}
                   />
-                  <YAxis tick={{ fontSize: 11 }} tickLine={false} />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: "#999" }}
+                    width={30}
+                  />
                   <Tooltip
                     contentStyle={{
-                      background: "#fff",
-                      border: "1px solid #e0e0e0",
+                      background: "rgba(255,255,255,0.95)",
+                      border: "none",
                       borderRadius: "8px",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      fontSize: "12px",
                     }}
+                    labelStyle={{ color: "#666", marginBottom: "4px" }}
                   />
-                  <Legend />
                   <Line
                     type="monotone"
                     dataKey="count"
-                    name="New Users"
                     stroke="#3b82f6"
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="cumulative"
-                    name="Total"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
+                    strokeWidth={2.5}
                     dot={false}
+                    activeDot={{ r: 4, fill: "#3b82f6", stroke: "#fff", strokeWidth: 2 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -334,44 +343,47 @@ export default function AdminPage() {
 
           {/* Messages Chart */}
           <div style={styles.chartCard}>
-            <h3 style={styles.chartTitle}>Messages Sent</h3>
+            <div style={styles.chartHeader2}>
+              <h3 style={styles.chartTitle}>Messages Sent</h3>
+              <span style={{ ...styles.chartBadge, background: "#f3e8ff", color: "#7c3aed" }}>
+                {messageTrend.length > 0 ? messageTrend[messageTrend.length - 1]?.cumulative || 0 : 0} total
+              </span>
+            </div>
             {chartLoading ? (
               <div style={styles.chartLoading}>Loading...</div>
             ) : (
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={messageTrend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={messageTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 11 }}
+                    axisLine={false}
                     tickLine={false}
+                    tick={{ fontSize: 10, fill: "#999" }}
+                    dy={10}
                   />
-                  <YAxis tick={{ fontSize: 11 }} tickLine={false} />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: "#999" }}
+                    width={30}
+                  />
                   <Tooltip
                     contentStyle={{
-                      background: "#fff",
-                      border: "1px solid #e0e0e0",
+                      background: "rgba(255,255,255,0.95)",
+                      border: "none",
                       borderRadius: "8px",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      fontSize: "12px",
                     }}
+                    labelStyle={{ color: "#666", marginBottom: "4px" }}
                   />
-                  <Legend />
                   <Line
                     type="monotone"
                     dataKey="count"
-                    name="Messages"
                     stroke="#8b5cf6"
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="cumulative"
-                    name="Total"
-                    stroke="#f59e0b"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
+                    strokeWidth={2.5}
                     dot={false}
+                    activeDot={{ r: 4, fill: "#8b5cf6", stroke: "#fff", strokeWidth: 2 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -380,36 +392,48 @@ export default function AdminPage() {
 
           {/* Avg Messages per User Chart */}
           <div style={styles.chartCard}>
-            <h3 style={styles.chartTitle}>Avg Messages per User</h3>
+            <div style={styles.chartHeader2}>
+              <h3 style={styles.chartTitle}>Avg Messages / User</h3>
+              <span style={{ ...styles.chartBadge, background: "#d1fae5", color: "#059669" }}>
+                {avgTrend.length > 0 ? avgTrend[avgTrend.length - 1]?.avg?.toFixed(1) || 0 : 0} avg
+              </span>
+            </div>
             {chartLoading ? (
               <div style={styles.chartLoading}>Loading...</div>
             ) : (
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={avgTrend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={avgTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 11 }}
+                    axisLine={false}
                     tickLine={false}
+                    tick={{ fontSize: 10, fill: "#999" }}
+                    dy={10}
                   />
-                  <YAxis tick={{ fontSize: 11 }} tickLine={false} />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: "#999" }}
+                    width={30}
+                  />
                   <Tooltip
                     contentStyle={{
-                      background: "#fff",
-                      border: "1px solid #e0e0e0",
+                      background: "rgba(255,255,255,0.95)",
+                      border: "none",
                       borderRadius: "8px",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      fontSize: "12px",
                     }}
+                    labelStyle={{ color: "#666", marginBottom: "4px" }}
                     formatter={(value: number) => [value.toFixed(1), "Avg"]}
                   />
-                  <Legend />
                   <Line
                     type="monotone"
                     dataKey="avg"
-                    name="Avg Msgs/User"
                     stroke="#10b981"
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    activeDot={{ r: 5 }}
+                    strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 4, fill: "#10b981", stroke: "#fff", strokeWidth: 2 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -605,20 +629,23 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   statCard: {
     background: "#fff",
-    padding: "20px",
+    padding: "16px 20px",
     borderRadius: "12px",
     textAlign: "center" as const,
-    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+    border: "1px solid #f0f0f0",
   },
   statValue: {
-    fontSize: "32px",
-    fontWeight: 700,
+    fontSize: "28px",
+    fontWeight: 600,
     color: "#1a1a1a",
+    letterSpacing: "-0.02em",
   },
   statLabel: {
-    fontSize: "13px",
-    color: "#666",
-    marginTop: "4px",
+    fontSize: "12px",
+    color: "#888",
+    marginTop: "2px",
+    fontWeight: 500,
   },
   planDistribution: {
     display: "flex",
@@ -662,56 +689,74 @@ const styles: { [key: string]: React.CSSProperties } = {
     gap: "12px",
   },
   sectionTitle: {
-    fontSize: "20px",
+    fontSize: "15px",
     fontWeight: 600,
     color: "#1a1a1a",
     margin: 0,
+    letterSpacing: "-0.01em",
   },
   periodFilter: {
     display: "flex",
-    gap: "8px",
+    gap: "4px",
+    background: "#f5f5f5",
+    padding: "4px",
+    borderRadius: "10px",
   },
   periodBtn: {
-    padding: "8px 16px",
-    background: "#fff",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: "#e0e0e0",
+    padding: "6px 14px",
+    background: "transparent",
+    border: "none",
     borderRadius: "8px",
     cursor: "pointer",
-    fontSize: "13px",
+    fontSize: "12px",
     fontWeight: 500,
-    transition: "all 0.2s",
+    color: "#666",
+    transition: "all 0.15s ease",
   },
   periodBtnActive: {
-    background: "#1a1a1a",
-    color: "#fff",
-    borderColor: "#1a1a1a",
+    background: "#fff",
+    color: "#1a1a1a",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
   },
   chartsContainer: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-    gap: "20px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+    gap: "16px",
   },
   chartCard: {
     background: "#fff",
     padding: "20px",
-    borderRadius: "12px",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+    borderRadius: "16px",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+    border: "1px solid #f0f0f0",
+  },
+  chartHeader2: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "16px",
   },
   chartTitle: {
-    fontSize: "16px",
+    fontSize: "14px",
     fontWeight: 600,
     color: "#1a1a1a",
-    marginBottom: "16px",
-    margin: "0 0 16px 0",
+    margin: 0,
+  },
+  chartBadge: {
+    fontSize: "11px",
+    fontWeight: 500,
+    padding: "4px 10px",
+    borderRadius: "20px",
+    background: "#eff6ff",
+    color: "#2563eb",
   },
   chartLoading: {
-    height: "250px",
+    height: "200px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    color: "#666",
+    color: "#999",
+    fontSize: "13px",
   },
   searchContainer: {
     marginBottom: "20px",
