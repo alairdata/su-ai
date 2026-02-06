@@ -49,6 +49,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const userMessage: string = body.message || "";
     const chatId: string = body.chatId;
+    const isRegenerate: boolean = body.regenerate || false;
+    const regenerateFromIndex: number | undefined = body.regenerateFromIndex;
+    const editFromMessageIndex: number | undefined = body.editFromMessageIndex;
 
     if (!userMessage.trim()) {
       return NextResponse.json(
@@ -70,9 +73,10 @@ export async function POST(req: NextRequest) {
       .select(`
         id,
         user_id,
-        messages (role, content, created_at)
+        messages (id, role, content, created_at)
       `)
       .eq("id", chatId)
+      .order("created_at", { referencedTable: "messages", ascending: true })
       .single();
 
     if (!chat || chat.user_id !== session.user.id) {
@@ -82,21 +86,50 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const allMessages = (chat.messages as Array<{ role: "user" | "assistant"; content: string; created_at: string }>) || [];
+    let allMessages = (chat.messages as Array<{ id: string; role: "user" | "assistant"; content: string; created_at: string }>) || [];
+
+    // Handle regenerate: delete messages from the specified index onwards
+    if (isRegenerate && regenerateFromIndex !== undefined) {
+      const messagesToDelete = allMessages.slice(regenerateFromIndex + 1);
+      if (messagesToDelete.length > 0) {
+        const idsToDelete = messagesToDelete.map(m => m.id);
+        await supabase.from("messages").delete().in("id", idsToDelete);
+      }
+      // Keep only messages up to and including the user message
+      allMessages = allMessages.slice(0, regenerateFromIndex + 1);
+    }
+
+    // Handle edit: delete messages from the specified index onwards, then add the new message
+    if (editFromMessageIndex !== undefined) {
+      const messagesToDelete = allMessages.slice(editFromMessageIndex);
+      if (messagesToDelete.length > 0) {
+        const idsToDelete = messagesToDelete.map(m => m.id);
+        await supabase.from("messages").delete().in("id", idsToDelete);
+      }
+      // Keep only messages before the edited message
+      allMessages = allMessages.slice(0, editFromMessageIndex);
+    }
+
     const isFirstMessage = allMessages.length === 0;
 
-    // Save user message immediately (don't wait)
-    supabase.from("messages").insert({
-      chat_id: chatId,
-      role: "user",
-      content: userMessage,
-    }).then(() => {});
+    // Save user message immediately (don't wait) - only if not regenerating
+    if (!isRegenerate) {
+      supabase.from("messages").insert({
+        chat_id: chatId,
+        role: "user",
+        content: userMessage,
+      }).then(() => {});
+    }
 
     // Build messages for API
-    const apiMessages: Anthropic.MessageParam[] = [
-      ...allMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-      { role: "user" as const, content: userMessage }
-    ];
+    // For regenerate: the user message is already in allMessages, don't duplicate
+    // For new/edit: add the new user message
+    const apiMessages: Anthropic.MessageParam[] = isRegenerate
+      ? allMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content }))
+      : [
+          ...allMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+          { role: "user" as const, content: userMessage }
+        ];
 
     // Track full response for saving to database
     let fullResponse = "";
@@ -105,11 +138,15 @@ export async function POST(req: NextRequest) {
 
     const encoder = new TextEncoder();
 
+    // Track all message segments (for when search splits the response)
+    const messageSegments: string[] = [];
+
     const readableStream = new ReadableStream({
       async start(controller) {
         try {
           let currentMessages = [...apiMessages];
           let continueLoop = true;
+          let currentSegment = "";
 
           while (continueLoop) {
             const stream = await anthropic.messages.create({
@@ -134,6 +171,7 @@ export async function POST(req: NextRequest) {
                 const delta = event.delta as { type: string; text?: string; partial_json?: string };
                 if (delta.type === "text_delta" && delta.text) {
                   fullResponse += delta.text;
+                  currentSegment += delta.text;
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: delta.text })}\n\n`));
                 } else if (delta.type === "input_json_delta" && delta.partial_json) {
                   currentToolInput += delta.partial_json;
@@ -149,6 +187,13 @@ export async function POST(req: NextRequest) {
               } else if (event.type === "message_stop") {
                 // Check if we need to handle tool use
                 if (toolUseBlock) {
+                  // Save the pre-search content as a separate segment
+                  if (currentSegment.trim()) {
+                    messageSegments.push(currentSegment);
+                    // Signal frontend to finalize this message (no action buttons)
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ finalizeMessage: true })}\n\n`));
+                  }
+
                   // Send searching indicator
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ searching: true, query: toolUseBlock.input.query })}\n\n`));
 
@@ -183,13 +228,17 @@ export async function POST(req: NextRequest) {
                     }
                   ];
 
-                  // Reset for next iteration
+                  // Reset for next iteration - start new message segment
                   toolUseBlock = null;
                   currentToolInput = "";
+                  currentSegment = "";
 
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ searching: false })}\n\n`));
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ searching: false, newMessage: true })}\n\n`));
                 } else {
-                  // No tool use, we're done
+                  // No tool use, we're done - save final segment
+                  if (currentSegment.trim()) {
+                    messageSegments.push(currentSegment);
+                  }
                   continueLoop = false;
                 }
               }
@@ -197,18 +246,28 @@ export async function POST(req: NextRequest) {
           }
 
           // Stream complete - save to database in background
-          const savePromises = [
-            supabase.from("messages").insert({
-              chat_id: chatId,
-              role: "assistant",
-              content: fullResponse,
-            }),
+          // Save each message segment separately
+          const savePromises: Promise<unknown>[] = [];
+
+          for (const segment of messageSegments) {
+            if (segment.trim()) {
+              savePromises.push(
+                supabase.from("messages").insert({
+                  chat_id: chatId,
+                  role: "assistant",
+                  content: segment,
+                })
+              );
+            }
+          }
+
+          savePromises.push(
             supabase.from("users").update({
               messages_used_today: messagesUsedToday + 1
             }).eq("id", userId),
             // Increment total_messages atomically using RPC
             supabase.rpc('increment_total_messages', { user_id_param: userId }),
-          ];
+          );
 
           // Generate title for first message (using Haiku for speed)
           if (isFirstMessage) {

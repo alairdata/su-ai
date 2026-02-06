@@ -65,6 +65,17 @@ function HomePage() {
   const [editNameValue, setEditNameValue] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
 
+  // Message editing state
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingMessageContent, setEditingMessageContent] = useState("");
+
+  // Message feedback state (like/dislike)
+  const [messageFeedback, setMessageFeedback] = useState<Record<string, 'like' | 'dislike'>>({});
+
+  // Plus menu state
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const plusMenuRef = useRef<HTMLDivElement>(null);
+
   const {
     chats,
     currentChat,
@@ -80,6 +91,9 @@ function HomePage() {
     selectChat,
     renameChat,
     deleteChat,
+    editMessage,
+    regenerateResponse,
+    stopGeneration,
     canSendMessage,
     getRemainingMessages,
   } = useChats();
@@ -180,6 +194,19 @@ function HomePage() {
   useEffect(() => {
     document.body.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // Close plus menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (plusMenuRef.current && !plusMenuRef.current.contains(event.target as Node)) {
+        setShowPlusMenu(false);
+      }
+    };
+    if (showPlusMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showPlusMenu]);
 
   // Show chat view when authenticated, auth view only when confirmed unauthenticated
   React.useEffect(() => {
@@ -464,6 +491,76 @@ function HomePage() {
     } catch (error) {
       console.error('Failed to copy:', error);
     }
+  };
+
+  // Edit message handlers
+  const handleEditStart = (messageId: string, content: string) => {
+    setEditingMessageId(messageId);
+    setEditingMessageContent(content);
+  };
+
+  const handleEditCancel = () => {
+    setEditingMessageId(null);
+    setEditingMessageContent("");
+  };
+
+  const handleEditSave = async () => {
+    if (!editingMessageId || !editingMessageContent.trim()) return;
+    await editMessage(editingMessageId, editingMessageContent);
+    setEditingMessageId(null);
+    setEditingMessageContent("");
+  };
+
+  // Regenerate handler
+  const handleRegenerate = async (userMessageId: string) => {
+    await regenerateResponse(userMessageId);
+  };
+
+  // Like/Dislike feedback handler
+  const handleFeedback = async (messageId: string, type: 'like' | 'dislike') => {
+    // Toggle off if already selected
+    if (messageFeedback[messageId] === type) {
+      setMessageFeedback(prev => {
+        const updated = { ...prev };
+        delete updated[messageId];
+        return updated;
+      });
+      // TODO: Send removal to backend
+      return;
+    }
+
+    // Set new feedback
+    setMessageFeedback(prev => ({ ...prev, [messageId]: type }));
+
+    // Send to backend
+    try {
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageId,
+          chatId: currentChatId,
+          feedback: type,
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to send feedback:', error);
+    }
+  };
+
+  // Find the user message that preceded an AI message (for regenerate on AI side)
+  const findPrecedingUserMessageId = (aiMessageId: string): string | null => {
+    if (!currentChat) return null;
+    const messages = currentChat.messages;
+    const aiIndex = messages.findIndex(m => m.id === aiMessageId);
+    if (aiIndex <= 0) return null;
+    // Find the user message before this AI message
+    for (let i = aiIndex - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        return messages[i].id;
+      }
+    }
+    return null;
   };
 
   const _formatTimestamp = (date: Date) => {
@@ -1517,55 +1614,318 @@ function HomePage() {
                       {remainingMessages} messages remaining today
                     </div>
                   )}
+
+                  {/* Input area centered with greeting */}
+                  <div style={{
+                    ...currentStyles.inputWrapper,
+                    ...(isMobile ? currentStyles.inputWrapperMobile : {}),
+                    padding: '16px 24px',
+                    marginTop: '8px',
+                  }}>
+                    {!canSendMessage() && (
+                      <div style={currentStyles.limitWarning}>
+                        <strong>Daily limit reached!</strong> You&apos;ve used all your messages for today.
+                        {" "}
+                        <span
+                          style={currentStyles.upgradeLink}
+                          onClick={() => setShowAccountModal(true)}
+                        >
+                          Upgrade your plan
+                        </span> for more messages.
+                      </div>
+                    )}
+
+                    <div style={currentStyles.inputCard}>
+                      <div style={currentStyles.inputRow}>
+                        {/* Plus button with dropdown menu */}
+                        <div ref={showGreeting ? plusMenuRef : undefined} style={{ position: 'relative' }}>
+                          <button
+                            onClick={() => setShowPlusMenu(!showPlusMenu)}
+                            style={currentStyles.plusBtn}
+                            title="More options"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="12" y1="5" x2="12" y2="19" />
+                              <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                          </button>
+                          {showPlusMenu && (
+                            <div style={currentStyles.plusMenu}>
+                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                                <div style={currentStyles.plusMenuItemContent}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                    <circle cx="8.5" cy="8.5" r="1.5" />
+                                    <polyline points="21 15 16 10 5 21" />
+                                  </svg>
+                                  <span>Add Photos</span>
+                                </div>
+                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                              </button>
+                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                                <div style={currentStyles.plusMenuItemContent}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                    <polyline points="14 2 14 8 20 8" />
+                                  </svg>
+                                  <span>Add Files</span>
+                                </div>
+                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                              </button>
+                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                                <div style={currentStyles.plusMenuItemContent}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
+                                    <circle cx="12" cy="12" r="4" />
+                                  </svg>
+                                  <span>Generate Image</span>
+                                </div>
+                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                              </button>
+                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                                <div style={currentStyles.plusMenuItemContent}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                    <circle cx="12" cy="7" r="4" />
+                                  </svg>
+                                  <span>Add Chat Character</span>
+                                </div>
+                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <textarea
+                          ref={textareaRef}
+                          rows={1}
+                          placeholder={canSendMessage() ? "What's up? Time to spill it..." : "Daily limit reached. Upgrade to continue."}
+                          value={input}
+                          onChange={(e) => setInput(e.target.value)}
+                          onKeyDown={handleKeyDown}
+                          onInput={(e) => {
+                            const el = e.currentTarget;
+                            el.style.height = 'auto';
+                            el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
+                          }}
+                          disabled={chatLoading || !canSendMessage()}
+                          style={currentStyles.textarea}
+                        />
+                        {chatLoading ? (
+                          <button
+                            style={{
+                              ...currentStyles.sendBtn,
+                              background: '#ef4444',
+                            }}
+                            onClick={stopGeneration}
+                            title="Stop generating"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                              <rect x="6" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <button
+                            style={{
+                              ...currentStyles.sendBtn,
+                              ...(!input.trim() || !canSendMessage() ? currentStyles.sendBtnDisabled : {})
+                            }}
+                            onClick={handleSend}
+                            disabled={!input.trim() || !canSendMessage()}
+                          >
+                            ↑
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div style={currentStyles.modelSelect}>
+                      <span>So UnFiltered AI can make mistakes.</span>
+                      {remainingMessages !== Infinity && canSendMessage() && (
+                        <span style={currentStyles.remainingMessages}>
+                          {" "}· {remainingMessages} messages left today
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {!showGreeting && isChatsLoaded && !isWaitingForStoredChat && (
+              {!showGreeting && isChatsLoaded && !isWaitingForStoredChat && (() => {
+                // Find the index of the last assistant message (for showing buttons only on last one)
+                const lastAssistantIndex = messages.reduce((lastIdx, m, idx) =>
+                  m.role === 'assistant' ? idx : lastIdx, -1);
+
+                return (
                 <div style={{
                   ...currentStyles.chatMessages,
                   ...(isMobile ? currentStyles.chatMessagesMobile : {})
                 }}>
-                  {messages.map((m) => (
+                  {messages.map((m, index) => {
+                    const isLastAssistant = m.role === 'assistant' && index === lastAssistantIndex;
+
+                    // Hide empty assistant messages UNLESS it's the last one (which shows typing dots)
+                    // Also hide if searching (search indicator will show instead)
+                    if (m.role === "assistant" && !m.content && (!isLastAssistant || isSearching)) {
+                      return null;
+                    }
+                    return (
                     <div
                       key={m.id}
                       style={m.role === "user" ? currentStyles.messageRowUser : currentStyles.messageRowAssistant}
                     >
                       {m.role === "user" ? (
-                        /* User messages: copy button on left, bubble on right */
+                        /* User messages: bubble with actions below, or edit mode */
                         <div style={currentStyles.messageWrapperUser}>
-                          <div style={currentStyles.messageActionsUser}>
-                            <button
-                              onClick={() => handleCopyMessage(m.content, m.id)}
-                              style={{
-                                ...currentStyles.actionButton,
-                                ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {})
-                              }}
-                              title="Copy message"
-                            >
-                              {copiedMessageId === m.id ? (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <polyline points="20 6 9 17 4 12"/>
+                          {editingMessageId === m.id ? (
+                            /* Edit mode */
+                            <div style={currentStyles.editModeContainer}>
+                              <textarea
+                                value={editingMessageContent}
+                                onChange={(e) => setEditingMessageContent(e.target.value)}
+                                style={currentStyles.editTextarea}
+                                autoFocus
+                              />
+                              <div style={currentStyles.editWarning}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+                                  <circle cx="12" cy="12" r="10"/>
+                                  <line x1="12" y1="8" x2="12" y2="12"/>
+                                  <line x1="12" y1="16" x2="12.01" y2="16"/>
                                 </svg>
-                              ) : (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                                </svg>
-                              )}
-                            </button>
-                          </div>
-                          <div style={currentStyles.messageBubbleUser}>
-                            <span>{m.content}</span>
-                          </div>
+                                <span>Heads up: editing this will wipe the AI&apos;s response and get you a fresh one. No going back.</span>
+                              </div>
+                              <div style={currentStyles.editActions}>
+                                <button
+                                  onClick={handleEditCancel}
+                                  style={currentStyles.editCancelBtn}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={handleEditSave}
+                                  disabled={!editingMessageContent.trim() || chatLoading}
+                                  style={{
+                                    ...currentStyles.editSaveBtn,
+                                    opacity: editingMessageContent.trim() && !chatLoading ? 1 : 0.5,
+                                  }}
+                                >
+                                  Save
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Normal display mode */
+                            <>
+                              <div style={currentStyles.messageBubbleUser}>
+                                <span>{m.content}</span>
+                              </div>
+                              <div style={currentStyles.messageActionsUser}>
+                                {/* Refresh/retry button */}
+                                <button
+                                  onClick={() => handleRegenerate(m.id)}
+                                  disabled={chatLoading}
+                                  style={{
+                                    ...currentStyles.actionButton,
+                                    ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {}),
+                                    opacity: chatLoading ? 0.3 : 1,
+                                  }}
+                                  title="Retry message"
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                                    <path d="M21 3v5h-5"/>
+                                  </svg>
+                                </button>
+                                {/* Edit button */}
+                                <button
+                                  onClick={() => handleEditStart(m.id, m.content)}
+                                  disabled={chatLoading}
+                                  style={{
+                                    ...currentStyles.actionButton,
+                                    ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {}),
+                                    opacity: chatLoading ? 0.3 : 1,
+                                  }}
+                                  title="Edit message"
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                  </svg>
+                                </button>
+                                {/* Copy button */}
+                                <button
+                                  onClick={() => handleCopyMessage(m.content, m.id)}
+                                  style={{
+                                    ...currentStyles.actionButton,
+                                    ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {})
+                                  }}
+                                  title="Copy message"
+                                >
+                                  {copiedMessageId === m.id ? (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                  ) : (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                    </svg>
+                                  )}
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       ) : (
                         /* AI messages: bubble on left, copy button on right */
                         <div style={currentStyles.messageWrapper}>
-                          <div
-                            className="message-bubble"
-                            style={currentStyles.messageBubbleAssistant}
-                          >
-                            {m.content ? (
+                          {m.isError ? (
+                            /* Error state - show error message with retry button */
+                            <div
+                              className="message-bubble"
+                              style={{
+                                ...currentStyles.messageBubbleAssistant,
+                                background: isDark ? '#3a2a2a' : '#fef2f2',
+                                border: `1px solid ${isDark ? '#5c3c3c' : '#fecaca'}`,
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isDark ? '#fca5a5' : '#dc2626' }}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <circle cx="12" cy="12" r="10"/>
+                                  <line x1="12" y1="8" x2="12" y2="12"/>
+                                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                                </svg>
+                                <span style={{ fontSize: '14px' }}>{m.content}</span>
+                                <button
+                                  onClick={() => {
+                                    const userMsgId = findPrecedingUserMessageId(m.id);
+                                    if (userMsgId) handleRegenerate(userMsgId);
+                                  }}
+                                  disabled={chatLoading}
+                                  style={{
+                                    marginLeft: 'auto',
+                                    padding: '6px 12px',
+                                    fontSize: '13px',
+                                    background: isDark ? '#4a3a3a' : '#fee2e2',
+                                    border: `1px solid ${isDark ? '#6c4c4c' : '#fca5a5'}`,
+                                    borderRadius: '8px',
+                                    color: isDark ? '#fca5a5' : '#dc2626',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                  }}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                                    <path d="M21 3v5h-5"/>
+                                  </svg>
+                                  Retry
+                                </button>
+                              </div>
+                            </div>
+                          ) : m.content ? (
+                            <div
+                              className="message-bubble"
+                              style={currentStyles.messageBubbleAssistant}
+                            >
                               <div style={currentStyles.messageText}>
                                 <ReactMarkdown
                                   components={{
@@ -1575,17 +1935,25 @@ function HomePage() {
                                   {m.content}
                                 </ReactMarkdown>
                               </div>
-                            ) : (
-                              /* Typing indicator for empty assistant messages */
-                              <div style={currentStyles.typingIndicator}>
+                            </div>
+                          ) : (!isSearching && isLastAssistant) ? (
+                            /* Typing indicator bubble - only for the LAST assistant message and only when not searching */
+                            <div className="typing-bubble-wrapper">
+                              <div className="typing-bubble">
                                 <span className="typing-dot" />
                                 <span className="typing-dot" />
                                 <span className="typing-dot" />
                               </div>
-                            )}
-                          </div>
-                          {m.content && (
+                              <div className="typing-bubble-tail">
+                                <div className="tail-circle tail-circle-1" />
+                                <div className="tail-circle tail-circle-2" />
+                              </div>
+                            </div>
+                          ) : null}
+                          {/* Show action buttons for all assistant messages (except pre-search finalized ones) */}
+                          {m.content && !m.isFinalized && (
                             <div style={currentStyles.messageActions}>
+                              {/* Copy button */}
                               <button
                                 onClick={() => handleCopyMessage(m.content, m.id)}
                                 style={{
@@ -1595,22 +1963,70 @@ function HomePage() {
                                 title="Copy message"
                               >
                                 {copiedMessageId === m.id ? (
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="20 6 9 17 4 12"/>
                                   </svg>
                                 ) : (
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                                   </svg>
                                 )}
+                              </button>
+                              {/* Thumbs up button */}
+                              <button
+                                onClick={() => handleFeedback(m.id, 'like')}
+                                style={{
+                                  ...currentStyles.actionButton,
+                                  ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {}),
+                                  ...(messageFeedback[m.id] === 'like' ? { color: '#10b981', opacity: 1 } : {}),
+                                }}
+                                title="Good response"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill={messageFeedback[m.id] === 'like' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+                                </svg>
+                              </button>
+                              {/* Thumbs down button */}
+                              <button
+                                onClick={() => handleFeedback(m.id, 'dislike')}
+                                style={{
+                                  ...currentStyles.actionButton,
+                                  ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {}),
+                                  ...(messageFeedback[m.id] === 'dislike' ? { color: '#ef4444', opacity: 1 } : {}),
+                                }}
+                                title="Bad response"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill={messageFeedback[m.id] === 'dislike' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
+                                </svg>
+                              </button>
+                              {/* Refresh/regenerate button */}
+                              <button
+                                onClick={() => {
+                                  const userMsgId = findPrecedingUserMessageId(m.id);
+                                  if (userMsgId) handleRegenerate(userMsgId);
+                                }}
+                                disabled={chatLoading}
+                                style={{
+                                  ...currentStyles.actionButton,
+                                  ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {}),
+                                  opacity: chatLoading ? 0.3 : 1,
+                                }}
+                                title="Regenerate response"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                                  <path d="M21 3v5h-5"/>
+                                </svg>
                               </button>
                             </div>
                           )}
                         </div>
                       )}
                     </div>
-                  ))}
+                  );
+                  })}
 
                   {/* Show searching indicator when AI is searching the web */}
                   {isSearching && (
@@ -1644,7 +2060,8 @@ function HomePage() {
 
                   <div ref={messagesEndRef} />
                 </div>
-              )}
+                );
+              })()}
             </div>
 
             {/* Scroll to bottom floating button */}
@@ -1660,63 +2077,139 @@ function HomePage() {
               </button>
             )}
 
-            <div style={currentStyles.inputArea}>
-              <div style={{
-                ...currentStyles.inputWrapper,
-                ...(isMobile ? currentStyles.inputWrapperMobile : {})
-              }}>
-                {!canSendMessage() && (
-                  <div style={currentStyles.limitWarning}>
-                    <strong>Daily limit reached!</strong> You&apos;ve used all your messages for today.
-                    {" "}
-                    <span 
-                      style={currentStyles.upgradeLink} 
-                      onClick={() => setShowAccountModal(true)}
-                    >
-                      Upgrade your plan
-                    </span> for more messages.
-                  </div>
-                )}
-
-                <div style={currentStyles.inputCard}>
-                  <div style={currentStyles.inputRow}>
-                    <textarea
-                      ref={textareaRef}
-                      rows={1}
-                      placeholder={canSendMessage() ? "What's up? Time to spill it..." : "Daily limit reached. Upgrade to continue."}
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      onInput={(e) => {
-                        const el = e.currentTarget;
-                        el.style.height = 'auto';
-                        el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
-                      }}
-                      disabled={chatLoading || !canSendMessage()}
-                      style={currentStyles.textarea}
-                    />
-                    <button
-                      style={{
-                        ...currentStyles.sendBtn,
-                        ...(chatLoading || !input.trim() || !canSendMessage() ? currentStyles.sendBtnDisabled : {})
-                      }}
-                      onClick={handleSend}
-                      disabled={chatLoading || !input.trim() || !canSendMessage()}
-                    >
-                      ↑
-                    </button>
-                  </div>
-                </div>
-                <div style={currentStyles.modelSelect}>
-                  <span>So UnFiltered AI can make mistakes.</span>
-                  {remainingMessages !== Infinity && canSendMessage() && (
-                    <span style={currentStyles.remainingMessages}>
-                      {" "}· {remainingMessages} messages left today
-                    </span>
+            {/* Bottom input area - only shown when there are messages */}
+            {!showGreeting && (
+              <div style={currentStyles.inputArea}>
+                <div style={{
+                  ...currentStyles.inputWrapper,
+                  ...(isMobile ? currentStyles.inputWrapperMobile : {})
+                }}>
+                  {!canSendMessage() && (
+                    <div style={currentStyles.limitWarning}>
+                      <strong>Daily limit reached!</strong> You&apos;ve used all your messages for today.
+                      {" "}
+                      <span
+                        style={currentStyles.upgradeLink}
+                        onClick={() => setShowAccountModal(true)}
+                      >
+                        Upgrade your plan
+                      </span> for more messages.
+                    </div>
                   )}
+
+                  <div style={currentStyles.inputCard}>
+                    <div style={currentStyles.inputRow}>
+                      {/* Plus button with dropdown menu */}
+                      <div ref={!showGreeting ? plusMenuRef : undefined} style={{ position: 'relative' }}>
+                        <button
+                          onClick={() => setShowPlusMenu(!showPlusMenu)}
+                          style={currentStyles.plusBtn}
+                          title="More options"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                          </svg>
+                        </button>
+                        {showPlusMenu && (
+                          <div style={currentStyles.plusMenu}>
+                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                              <div style={currentStyles.plusMenuItemContent}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                  <circle cx="8.5" cy="8.5" r="1.5" />
+                                  <polyline points="21 15 16 10 5 21" />
+                                </svg>
+                                <span>Add Photos</span>
+                              </div>
+                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                            </button>
+                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                              <div style={currentStyles.plusMenuItemContent}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                  <polyline points="14 2 14 8 20 8" />
+                                </svg>
+                                <span>Add Files</span>
+                              </div>
+                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                            </button>
+                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                              <div style={currentStyles.plusMenuItemContent}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
+                                  <circle cx="12" cy="12" r="4" />
+                                </svg>
+                                <span>Generate Image</span>
+                              </div>
+                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                            </button>
+                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                              <div style={currentStyles.plusMenuItemContent}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                  <circle cx="12" cy="7" r="4" />
+                                </svg>
+                                <span>Add Chat Character</span>
+                              </div>
+                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <textarea
+                        ref={textareaRef}
+                        rows={1}
+                        placeholder={canSendMessage() ? "What's up? Time to spill it..." : "Daily limit reached. Upgrade to continue."}
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        onInput={(e) => {
+                          const el = e.currentTarget;
+                          el.style.height = 'auto';
+                          el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
+                        }}
+                        disabled={chatLoading || !canSendMessage()}
+                        style={currentStyles.textarea}
+                      />
+                      {chatLoading ? (
+                        <button
+                          style={{
+                            ...currentStyles.sendBtn,
+                            background: '#ef4444',
+                          }}
+                          onClick={stopGeneration}
+                          title="Stop generating"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="6" width="12" height="12" rx="2" />
+                          </svg>
+                        </button>
+                      ) : (
+                        <button
+                          style={{
+                            ...currentStyles.sendBtn,
+                            ...(!input.trim() || !canSendMessage() ? currentStyles.sendBtnDisabled : {})
+                          }}
+                          onClick={handleSend}
+                          disabled={!input.trim() || !canSendMessage()}
+                        >
+                          ↑
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div style={currentStyles.modelSelect}>
+                    <span>So UnFiltered AI can make mistakes.</span>
+                    {remainingMessages !== Infinity && canSendMessage() && (
+                      <span style={currentStyles.remainingMessages}>
+                        {" "}· {remainingMessages} messages left today
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </main>
       </div>
@@ -2673,11 +3166,11 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   sidebar: {
     width: '260px',
-    background: '#f9f9f9',
-    borderRight: '1px solid #e0e0e0',
+    background: '#f2f2f7',
+    borderRight: '1px solid rgba(0, 0, 0, 0.06)',
     display: 'flex',
     flexDirection: 'column' as const,
-    transition: 'all 0.3s ease',
+    transition: 'all 0.25s ease',
   },
   sidebarCollapsed: {
     width: '70px',
@@ -2689,11 +3182,11 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     overflow: 'hidden',
   },
   sidebarHeader: {
-    padding: '16px',
+    padding: '14px 16px',
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    borderBottom: '1px solid #e0e0e0',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
   },
   sidebarToggle: {
     background: 'none',
@@ -2721,16 +3214,17 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   section: {
     padding: '12px',
-    borderBottom: '1px solid #e0e0e0',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
   },
   navItem: {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
     padding: '10px 12px',
-    borderRadius: '8px',
+    borderRadius: '12px',
     cursor: 'pointer',
     marginBottom: '4px',
+    transition: 'background 0.15s ease',
   },
   navIcon: {
     fontSize: '18px',
@@ -2740,43 +3234,45 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     justifyContent: 'center',
   },
   navText: {
-    fontSize: '14px',
-    color: '#000',
+    fontSize: '15px',
+    color: '#1c1c1e',
   },
   sectionLabel: {
     padding: '12px 16px 8px',
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: 600,
-    color: '#666',
+    color: '#8e8e93',
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
+    letterSpacing: '0.3px',
   },
   recentsList: {
     flex: 1,
     overflowY: 'auto' as const,
-    padding: '0 12px',
+    padding: '0 10px',
   },
   chatItemWrapper: {
     position: 'relative' as const,
     display: 'flex',
     alignItems: 'center',
-    marginBottom: '4px',
+    marginBottom: '2px',
   },
   recentItem: {
     flex: 1,
     padding: '10px 12px',
-    borderRadius: '8px',
+    borderRadius: '12px',
     cursor: 'pointer',
-    fontSize: '14px',
-    color: '#000',
+    fontSize: '15px',
+    color: '#1c1c1e',
     whiteSpace: 'nowrap' as const,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     position: 'relative' as const,
+    transition: 'background 0.15s ease',
   },
   recentItemActive: {
-    background: '#e8e8e8',
+    background: 'rgba(60, 60, 67, 0.12)',
     fontWeight: 500,
+    color: '#1c1c1e',
   },
   chatActions: {
     display: 'flex',
@@ -2917,7 +3413,8 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     fontSize: '20px',
     cursor: 'pointer',
     padding: '8px',
-    borderRadius: '8px',
+    borderRadius: '10px',
+    transition: 'background 0.15s ease',
   },
   chatWrapper: {
     flex: 1,
@@ -2940,12 +3437,13 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     bottom: '140px',
     left: '50%',
     transform: 'translateX(-50%)',
-    width: '40px',
-    height: '40px',
+    width: '36px',
+    height: '36px',
     borderRadius: '50%',
-    background: '#f0f0f0',
-    border: '1px solid #d0d0d0',
+    background: 'rgba(255, 255, 255, 0.95)',
+    border: 'none',
     cursor: 'pointer',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -3016,31 +3514,31 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     paddingBottom: '1px',
   },
   messageBubbleUser: {
-    padding: '14px 18px',
-    borderRadius: '18px 18px 4px 18px',
-    fontSize: '14px',
-    lineHeight: 1.6,
+    padding: '12px 16px',
+    borderRadius: '20px 20px 6px 20px',
+    fontSize: '15px',
+    lineHeight: 1.5,
     whiteSpace: 'pre-wrap' as const,
     overflowWrap: 'break-word' as const,
-    background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+    background: '#3a3a3c',
     color: '#fff',
     boxSizing: 'border-box' as const,
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.15)',
   },
   messageBubbleAssistant: {
     maxWidth: '90%',
-    padding: '14px 18px',
-    borderRadius: '18px 18px 18px 4px',
-    fontSize: '14px',
-    lineHeight: 1.6,
+    padding: '12px 16px',
+    borderRadius: '20px 20px 20px 6px',
+    fontSize: '15px',
+    lineHeight: 1.5,
     wordWrap: 'break-word' as const,
     wordBreak: 'break-word' as const,
     overflowWrap: 'break-word' as const,
-    background: '#f0f0f0',
-    border: '1px solid #e0e0e0',
-    color: '#1a1a1a',
+    background: '#E9E9EB',
+    border: 'none',
+    color: '#1c1c1e',
     boxSizing: 'border-box' as const,
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+    boxShadow: 'none',
   },
   messageText: {
     wordBreak: 'normal' as const,
@@ -3048,15 +3546,15 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   messageWrapper: {
     display: 'flex',
-    flexDirection: 'row' as const,
-    alignItems: 'flex-end',
+    flexDirection: 'column' as const,
+    alignItems: 'flex-start',
     gap: '4px',
     width: 'fit-content' as const,
     maxWidth: '90%',
   },
   messageWrapperUser: {
     display: 'flex',
-    flexDirection: 'row' as const,
+    flexDirection: 'column' as const,
     alignItems: 'flex-end',
     gap: '4px',
     width: 'fit-content' as const,
@@ -3066,14 +3564,74 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   messageActions: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
-    opacity: 0.6,
+    gap: '8px',
+    opacity: 0.5,
+    marginTop: '4px',
+    marginLeft: '4px',
   },
   messageActionsUser: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
-    opacity: 0.6,
+    gap: '8px',
+    opacity: 0.5,
+    marginTop: '4px',
+    marginRight: '4px',
+  },
+  editModeContainer: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '10px',
+    width: '100%',
+    maxWidth: '600px',
+  },
+  editTextarea: {
+    width: '100%',
+    minHeight: '100px',
+    padding: '14px 16px',
+    fontSize: '16px',
+    fontFamily: 'inherit',
+    border: 'none',
+    borderRadius: '16px',
+    resize: 'vertical' as const,
+    outline: 'none',
+    background: '#f2f2f7',
+    color: '#1c1c1e',
+    lineHeight: 1.5,
+  },
+  editWarning: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '8px',
+    fontSize: '13px',
+    color: '#8e8e93',
+    lineHeight: 1.4,
+  },
+  editActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '10px',
+  },
+  editCancelBtn: {
+    padding: '10px 20px',
+    fontSize: '15px',
+    fontWeight: 500,
+    border: 'none',
+    borderRadius: '12px',
+    background: '#e5e5ea',
+    color: '#1c1c1e',
+    cursor: 'pointer',
+    transition: 'background 0.15s ease',
+  },
+  editSaveBtn: {
+    padding: '10px 20px',
+    fontSize: '15px',
+    fontWeight: 600,
+    border: 'none',
+    borderRadius: '12px',
+    background: '#3a3a3c',
+    color: '#fff',
+    cursor: 'pointer',
+    transition: 'background 0.15s ease',
   },
   messageTimestamp: {
     fontSize: '11px',
@@ -3083,28 +3641,30 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
-    padding: '4px',
-    borderRadius: '4px',
-    color: '#888',
+    padding: '6px',
+    borderRadius: '8px',
+    color: '#8e8e93',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'all 0.2s ease',
+    transition: 'color 0.15s ease, transform 0.15s ease',
   },
   typingIndicator: {
     display: 'flex',
-    gap: '6px',
-    padding: '4px 0',
+    alignItems: 'center',
+    gap: '5px',
+    padding: '8px 4px',
+    minHeight: '28px',
   },
   typingDot: {
-    width: '8px',
-    height: '8px',
+    width: '10px',
+    height: '10px',
     borderRadius: '50%',
     background: '#666',
   },
   inputArea: {
-    borderTop: '1px solid #e0e0e0',
-    background: 'white',
+    borderTop: '1px solid rgba(0, 0, 0, 0.08)',
+    background: '#f2f2f7',
     padding: '0',
     maxWidth: '100%',
   },
@@ -3112,21 +3672,21 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     maxWidth: '768px',
     width: '100%',
     margin: '0 auto',
-    padding: '16px 24px',
+    padding: '12px 16px',
     boxSizing: 'border-box' as const,
   },
   inputWrapperMobile: {
-    padding: '12px 16px',
+    padding: '10px 12px',
     maxWidth: '100%',
     boxSizing: 'border-box' as const,
   },
   inputCard: {
     width: '100%',
-    background: 'white',
-    border: '1px solid #e0e0e0',
-    borderRadius: '24px',
-    padding: '6px 8px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+    background: '#ffffff',
+    border: 'none',
+    borderRadius: '22px',
+    padding: '4px 6px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
     boxSizing: 'border-box' as const,
   },
   inputRow: {
@@ -3144,38 +3704,100 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     resize: 'none' as const,
     outline: 'none',
     color: '#000',
-    padding: '6px 8px',
+    padding: '8px 8px',
     maxHeight: '150px',
-    minHeight: '24px',
-    lineHeight: '1.5',
+    minHeight: '36px',
+    height: '36px',
+    lineHeight: '20px',
     width: '100%',
-    overflow: 'auto' as const,
+    overflow: 'hidden' as const,
+    verticalAlign: 'middle' as const,
   },
   sendBtn: {
-    width: '32px',
-    height: '32px',
-    minWidth: '32px',
-    minHeight: '32px',
+    width: '30px',
+    height: '30px',
+    minWidth: '30px',
+    minHeight: '30px',
     border: 'none',
     borderRadius: '50%',
-    background: '#000',
+    background: '#3a3a3c',
     color: 'white',
-    fontSize: '16px',
+    fontSize: '15px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    transition: 'transform 0.15s ease, opacity 0.15s ease',
   },
   sendBtnDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
     cursor: 'not-allowed',
+    background: '#c7c7cc',
+  },
+  plusBtn: {
+    width: '30px',
+    height: '30px',
+    minWidth: '30px',
+    minHeight: '30px',
+    border: 'none',
+    borderRadius: '50%',
+    background: 'transparent',
+    color: '#8e8e93',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    transition: 'background 0.15s ease, color 0.15s ease',
+  },
+  plusMenu: {
+    position: 'absolute' as const,
+    bottom: '100%',
+    left: 0,
+    marginBottom: '8px',
+    background: '#ffffff',
+    borderRadius: '12px',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+    padding: '8px 0',
+    minWidth: '260px',
+    zIndex: 1000,
+  },
+  plusMenuItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    width: '100%',
+    padding: '12px 16px',
+    border: 'none',
+    background: 'transparent',
+    color: '#1c1c1e',
+    fontSize: '14px',
+    cursor: 'pointer',
+    textAlign: 'left' as const,
+    transition: 'background 0.15s ease',
+    position: 'relative' as const,
+  },
+  plusMenuItemContent: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flex: 1,
+  },
+  upgradeBadge: {
+    fontSize: '11px',
+    fontWeight: 500,
+    color: '#636366',
+    background: '#f2f2f7',
+    padding: '3px 10px',
+    borderRadius: '10px',
+    marginLeft: 'auto',
   },
   modelSelect: {
-    padding: '8px 0 0',
+    padding: '6px 0 0',
     textAlign: 'center' as const,
     fontSize: '11px',
-    color: '#666',
+    color: '#8e8e93',
     maxWidth: '100%',
     overflow: 'hidden',
   },
@@ -3185,8 +3807,10 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(0, 0, 0, 0.5)',
+    background: 'rgba(0, 0, 0, 0.4)',
     zIndex: 1100,
+    backdropFilter: 'blur(4px)',
+    WebkitBackdropFilter: 'blur(4px)',
   },
   modalContainer: {
     position: 'fixed' as const,
@@ -3200,32 +3824,32 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     overflowY: 'auto' as const,
   },
   modalContent: {
-    background: 'rgba(255, 255, 255, 0.85)',
-    borderRadius: '24px',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255, 255, 255, 0.4)',
+    background: 'rgba(255, 255, 255, 0.92)',
+    borderRadius: '20px',
+    boxShadow: '0 12px 40px rgba(0, 0, 0, 0.15)',
+    backdropFilter: 'blur(30px)',
+    WebkitBackdropFilter: 'blur(30px)',
+    border: 'none',
   },
   modalHeader: {
-    padding: '24px 28px 20px',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+    padding: '20px 24px 16px',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   modalTitle: {
-    fontSize: '18px',
+    fontSize: '17px',
     fontWeight: 600,
-    color: '#1a1a1a',
+    color: '#1c1c1e',
     margin: 0,
   },
   modalCloseBtn: {
-    background: 'linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%)',
-    border: '1px solid #d0d0d0',
-    borderRadius: '10px',
-    width: '36px',
-    height: '36px',
+    background: 'rgba(142, 142, 147, 0.12)',
+    border: 'none',
+    borderRadius: '50%',
+    width: '30px',
+    height: '30px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -3584,7 +4208,7 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   forgotLink: {
     ...lightStyles.forgotLink,
-    color: '#a78bfa',
+    color: '#8e8e93',
   },
   input: {
     ...lightStyles.input,
@@ -3612,7 +4236,7 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   authLink: {
     ...lightStyles.authLink,
-    color: '#a78bfa',
+    color: '#e5e5e7',
   },
   authSuccess: {
     ...lightStyles.authSuccess,
@@ -3654,12 +4278,12 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   sidebar: {
     ...lightStyles.sidebar,
-    background: '#1a1a1a',
-    borderRight: '1px solid #3a3a3a',
+    background: '#1c1c1e',
+    borderRight: '1px solid rgba(255, 255, 255, 0.08)',
   },
   sidebarHeader: {
     ...lightStyles.sidebarHeader,
-    borderBottom: '1px solid #3a3a3a',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
   },
   sidebarToggle: {
     ...lightStyles.sidebarToggle,
@@ -3675,15 +4299,15 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   section: {
     ...lightStyles.section,
-    borderBottom: '1px solid #3a3a3a',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
   },
   navText: {
     ...lightStyles.navText,
-    color: '#fff',
+    color: '#e5e5e7',
   },
   sectionLabel: {
     ...lightStyles.sectionLabel,
-    color: '#999',
+    color: '#8e8e93',
   },
   greetingLogoImg: {
     ...lightStyles.greetingLogoImg,
@@ -3695,29 +4319,30 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   recentItem: {
     ...lightStyles.recentItem,
-    color: '#fff',
+    color: '#e5e5e7',
   },
   recentItemActive: {
     ...lightStyles.recentItemActive,
-    background: '#3a3a3a',
+    background: 'rgba(142, 142, 147, 0.2)',
+    color: '#e5e5e7',
   },
   renameInput: {
     ...lightStyles.renameInput,
-    background: '#2a2a2a',
+    background: '#2c2c2e',
     color: '#fff',
-    border: '1px solid #555',
+    border: 'none',
   },
   sidebarFooter: {
     ...lightStyles.sidebarFooter,
-    borderTop: '1px solid #3a3a3a',
+    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
   },
   main: {
     ...lightStyles.main,
-    background: '#2a2a2a',
+    background: '#1c1c1e',
   },
   topBar: {
     ...lightStyles.topBar,
-    borderBottom: '1px solid #3a3a3a',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
   },
   modelBadge: {
     ...lightStyles.modelBadge,
@@ -3725,31 +4350,74 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   scrollToBottomBtn: {
     ...lightStyles.scrollToBottomBtn,
-    background: '#2a2a2a',
-    border: '1px solid #444',
-    color: '#ccc',
+    background: 'rgba(44, 44, 46, 0.95)',
+    border: 'none',
+    color: '#fff',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
   },
   messageBubbleAssistant: {
     ...lightStyles.messageBubbleAssistant,
+    background: '#2c2c2e',
+    border: 'none',
+    color: '#e5e5e7',
+    boxShadow: 'none',
+  },
+  editTextarea: {
+    ...lightStyles.editTextarea,
+    background: '#2c2c2e',
+    color: '#e5e5e7',
+    border: 'none',
+  },
+  editWarning: {
+    ...lightStyles.editWarning,
+    color: '#8e8e93',
+  },
+  editCancelBtn: {
+    ...lightStyles.editCancelBtn,
     background: '#3a3a3a',
-    border: '1px solid #4a4a4a',
+    border: '1px solid #555',
     color: '#e0e0e0',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
+  },
+  editSaveBtn: {
+    ...lightStyles.editSaveBtn,
+    background: '#e0e0e0',
+    color: '#1a1a1a',
   },
   inputArea: {
     ...lightStyles.inputArea,
-    borderTop: '1px solid #3a3a3a',
-    background: '#1a1a1a',
+    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+    background: '#1c1c1e',
   },
   inputCard: {
     ...lightStyles.inputCard,
-    background: '#2a2a2a',
-    border: '1px solid #3a3a3a',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+    background: '#2c2c2e',
+    border: 'none',
+    boxShadow: 'none',
   },
   textarea: {
     ...lightStyles.textarea,
     color: '#fff',
+  },
+  plusBtn: {
+    ...lightStyles.plusBtn,
+    color: '#8e8e93',
+  },
+  plusMenu: {
+    ...lightStyles.plusMenu,
+    background: '#2c2c2e',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+  },
+  plusMenuItem: {
+    ...lightStyles.plusMenuItem,
+    color: '#e5e5e7',
+  },
+  plusMenuItemContent: {
+    ...lightStyles.plusMenuItemContent,
+  },
+  upgradeBadge: {
+    ...lightStyles.upgradeBadge,
+    color: '#8e8e93',
+    background: '#3a3a3c',
   },
   upgradeLink: {
     ...lightStyles.upgradeLink,

@@ -6,6 +6,8 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  isFinalized?: boolean; // True for messages that shouldn't show action buttons (e.g., pre-search messages)
+  isError?: boolean; // True if this message failed to load - shows error state with retry
 };
 
 type Chat = {
@@ -58,6 +60,8 @@ export function useChats() {
   const previousMessageCountRef = useRef(0);
   // Track pending chat ID during temp->real ID transition
   const pendingChatIdRef = useRef<string | null>(null);
+  // AbortController for canceling ongoing requests
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Wrapper to persist currentChatId to localStorage
   const setCurrentChatId = (chatId: string | null) => {
@@ -86,6 +90,8 @@ export function useChats() {
   // Load chats from API when user logs in
   useEffect(() => {
     if (!session?.user) return;
+    // Don't reload chats if already loaded (prevents overwriting during streaming)
+    if (isChatsLoaded) return;
 
     const loadChats = async () => {
       try {
@@ -108,7 +114,7 @@ export function useChats() {
     };
 
     loadChats();
-  }, [session]);
+  }, [session, isChatsLoaded]);
 
   // Smart auto-scroll: only when message count increases
   useEffect(() => {
@@ -220,7 +226,7 @@ export function useChats() {
     };
 
     // Create assistant message placeholder for streaming
-    const assistantMessageId = `msg-${Date.now()}`;
+    let assistantMessageId = `msg-${Date.now()}`;
     const assistantMessage: Message = {
       id: assistantMessageId,
       role: 'assistant',
@@ -262,6 +268,7 @@ export function useChats() {
     }
 
     let realChatId = activeChatId;
+    let streamedContent = ''; // Declare here so it's accessible in catch block
 
     try {
       // Create chat in background if needed, then send message
@@ -280,6 +287,9 @@ export function useChats() {
         pendingChatIdRef.current = null;
       }
 
+      // Create new AbortController for this request
+      abortControllerRef.current = new AbortController();
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -287,6 +297,7 @@ export function useChats() {
           chatId: realChatId,
           message: input
         }),
+        signal: abortControllerRef.current.signal,
       });
 
       if (!res.ok) {
@@ -302,7 +313,7 @@ export function useChats() {
         throw new Error('No response body');
       }
 
-      let streamedContent = '';
+      streamedContent = ''; // Reset for this request (declared before try block)
       let receivedDone = false;
 
       while (true) {
@@ -322,10 +333,8 @@ export function useChats() {
                 setSearchQuery(data.query || null);
               }
 
-              if (data.text) {
-                streamedContent += data.text;
-                // Update assistant message content in real-time
-                // Check both activeChatId and realChatId in case ID update hasn't propagated
+              // Handle finalizeMessage - mark current message as finalized (no action buttons)
+              if (data.finalizeMessage) {
                 setChats(prev =>
                   prev.map(c =>
                     (c.id === realChatId || c.id === activeChatId)
@@ -333,7 +342,49 @@ export function useChats() {
                           ...c,
                           messages: c.messages.map(m =>
                             m.id === assistantMessageId
-                              ? { ...m, content: streamedContent }
+                              ? { ...m, isFinalized: true }
+                              : m
+                          ),
+                        }
+                      : c
+                  )
+                );
+              }
+
+              // Handle newMessage - create a new assistant message for post-search content
+              if (data.newMessage) {
+                const newAssistantId = `msg-${Date.now()}-post`;
+                const newAssistantMessage: Message = {
+                  id: newAssistantId,
+                  role: 'assistant',
+                  content: '',
+                  created_at: new Date().toISOString(),
+                };
+                assistantMessageId = newAssistantId;
+                streamedContent = '';
+                setChats(prev =>
+                  prev.map(c =>
+                    (c.id === realChatId || c.id === activeChatId)
+                      ? { ...c, messages: [...c.messages, newAssistantMessage] }
+                      : c
+                  )
+                );
+              }
+
+              if (data.text) {
+                streamedContent += data.text;
+                // Update assistant message content in real-time
+                // Check both activeChatId and realChatId in case ID update hasn't propagated
+                const contentToSet = streamedContent; // Capture in closure to avoid race conditions
+                setChats(prev =>
+                  prev.map(c =>
+                    (c.id === realChatId || c.id === activeChatId)
+                      ? {
+                          ...c,
+                          messages: c.messages.map(m =>
+                            m.id === assistantMessageId
+                              // Safety: never replace existing content with empty/shorter content
+                              ? { ...m, content: contentToSet.length >= (m.content?.length || 0) ? contentToSet : m.content }
                               : m
                           ),
                         }
@@ -375,8 +426,9 @@ export function useChats() {
         }
       }
 
-      // If stream ended without receiving done signal, fetch the actual response from DB
-      if (!receivedDone && realChatId) {
+      // If stream ended without receiving done signal but we got content, trust local state
+      // Only fetch from DB if we got NO content at all (complete failure)
+      if (!receivedDone && realChatId && !streamedContent) {
         try {
           const chatRes = await fetch(`/api/chats/${realChatId}`);
           if (chatRes.ok) {
@@ -397,36 +449,48 @@ export function useChats() {
           // Recovery failed, but don't throw - the message might still be there on refresh
           console.warn('Stream interrupted - response may be available on refresh');
         }
+      } else if (!receivedDone && streamedContent) {
+        // We got content but no done signal - still count it as a message
+        setLocalMessagesUsed(prev => (prev ?? 0) + 1);
       }
 
     } catch (error) {
-      console.error('Error sending message:', error);
-      // Remove failed chat or messages on error
-      setChats(prev => {
-        // If it was a new chat that failed, remove the whole chat
-        if (needsNewChat) {
-          return prev.filter(c => c.id !== activeChatId && c.id !== realChatId);
+      // If user stopped the generation, don't show error - keep whatever was streamed
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Generation stopped by user');
+        // Remove empty assistant message if no content was streamed
+        if (!streamedContent) {
+          setChats(prev => prev.map(c =>
+            (c.id === activeChatId || c.id === realChatId)
+              ? { ...c, messages: c.messages.filter(m => m.id !== assistantMessageId) }
+              : c
+          ));
         }
-        // Otherwise just remove the failed messages
+        return;
+      }
+
+      console.error('Error sending message:', error);
+      // Instead of removing messages, show an error state that allows retry
+      setChats(prev => {
         return prev.map(c =>
           (c.id === activeChatId || c.id === realChatId)
             ? {
                 ...c,
-                messages: c.messages.filter(m =>
-                  m.id !== optimisticMessage.id && m.id !== assistantMessageId
+                messages: c.messages.map(m =>
+                  m.id === assistantMessageId
+                    ? { ...m, content: 'Something went wrong. Please try again.', isError: true }
+                    : m
                 )
               }
             : c
         );
       });
-      if (needsNewChat) {
-        setCurrentChatId(null);
-      }
     } finally {
       setIsLoading(false);
       setIsSearching(false);
       setSearchQuery(null);
       pendingChatIdRef.current = null;
+      abortControllerRef.current = null;
     }
   };
 
@@ -500,6 +564,431 @@ export function useChats() {
     }
   };
 
+  // Edit a user message and resend to get new AI response
+  const editMessage = async (messageId: string, newContent: string) => {
+    if (!currentChatId || isLoading || !canSendMessage()) return;
+
+    const chat = chats.find(c => c.id === currentChatId);
+    if (!chat) return;
+
+    // Find the message index
+    const messageIndex = chat.messages.findIndex(m => m.id === messageId);
+    if (messageIndex === -1) return;
+
+    setIsLoading(true);
+
+    // Remove all messages from this point onwards (the edited message and everything after)
+    const messagesBeforeEdit = chat.messages.slice(0, messageIndex);
+
+    // Create new user message
+    const newUserMessage: Message = {
+      id: `temp-${Date.now()}`,
+      role: 'user',
+      content: newContent,
+      created_at: new Date().toISOString(),
+    };
+
+    // Create assistant message placeholder for streaming
+    let assistantMessageId = `msg-${Date.now()}`;
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      created_at: new Date().toISOString(),
+    };
+
+    // Update chat with truncated messages + new user message + assistant placeholder
+    setChats(prev =>
+      prev.map(c =>
+        c.id === currentChatId
+          ? { ...c, messages: [...messagesBeforeEdit, newUserMessage, assistantMessage] }
+          : c
+      )
+    );
+
+    let streamedContent = ''; // Declare here so it's accessible in catch block
+
+    try {
+      // Create new AbortController for this request
+      abortControllerRef.current = new AbortController();
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatId: currentChatId,
+          message: newContent,
+          editFromMessageIndex: messageIndex, // Tell backend to truncate from this point
+        }),
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to send message');
+      }
+
+      // Handle streaming response (same as sendMessage)
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      streamedContent = ''; // Reset for this request (declared before try block)
+      let receivedDone = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.searching !== undefined) {
+                setIsSearching(data.searching);
+                setSearchQuery(data.query || null);
+              }
+
+              // Handle finalizeMessage - mark current message as finalized (no action buttons)
+              if (data.finalizeMessage) {
+                setChats(prev =>
+                  prev.map(c =>
+                    c.id === currentChatId
+                      ? {
+                          ...c,
+                          messages: c.messages.map(m =>
+                            m.id === assistantMessageId
+                              ? { ...m, isFinalized: true }
+                              : m
+                          ),
+                        }
+                      : c
+                  )
+                );
+              }
+
+              // Handle newMessage - create a new assistant message for post-search content
+              if (data.newMessage) {
+                const newAssistantId = `msg-${Date.now()}-post`;
+                const newAssistantMessage: Message = {
+                  id: newAssistantId,
+                  role: 'assistant',
+                  content: '',
+                  created_at: new Date().toISOString(),
+                };
+                assistantMessageId = newAssistantId;
+                streamedContent = '';
+                setChats(prev =>
+                  prev.map(c =>
+                    c.id === currentChatId
+                      ? { ...c, messages: [...c.messages, newAssistantMessage] }
+                      : c
+                  )
+                );
+              }
+
+              if (data.text) {
+                streamedContent += data.text;
+                const contentToSet = streamedContent; // Capture in closure to avoid race conditions
+                setChats(prev =>
+                  prev.map(c =>
+                    c.id === currentChatId
+                      ? {
+                          ...c,
+                          messages: c.messages.map(m =>
+                            m.id === assistantMessageId
+                              // Safety: never replace existing content with empty/shorter content
+                              ? { ...m, content: contentToSet.length >= (m.content?.length || 0) ? contentToSet : m.content }
+                              : m
+                          ),
+                        }
+                      : c
+                  )
+                );
+              }
+
+              if (data.done) {
+                receivedDone = true;
+                setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+              }
+
+              if (data.error) {
+                throw new Error(data.error);
+              }
+            } catch (parseError) {
+              if (parseError instanceof SyntaxError) continue;
+              throw parseError;
+            }
+          }
+        }
+      }
+
+      // Don't refetch from DB for edit - trust local state
+      if (!receivedDone) {
+        setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+      }
+    } catch (error) {
+      // If user stopped the generation, don't show error - keep whatever was streamed
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Generation stopped by user');
+        if (!streamedContent) {
+          setChats(prev => prev.map(c =>
+            c.id === currentChatId
+              ? { ...c, messages: c.messages.filter(m => m.id !== assistantMessageId) }
+              : c
+          ));
+        }
+        return;
+      }
+
+      console.error('Error editing message:', error);
+      // Instead of removing messages, show an error state that allows retry
+      setChats(prev =>
+        prev.map(c =>
+          c.id === currentChatId
+            ? {
+                ...c,
+                messages: c.messages.map(m =>
+                  m.id === assistantMessageId
+                    ? { ...m, content: 'Something went wrong. Please try again.', isError: true }
+                    : m
+                )
+              }
+            : c
+        )
+      );
+    } finally {
+      setIsLoading(false);
+      setIsSearching(false);
+      setSearchQuery(null);
+      abortControllerRef.current = null;
+    }
+  };
+
+  // Regenerate the AI response for a user message
+  const regenerateResponse = async (userMessageId: string) => {
+    if (!currentChatId || isLoading || !canSendMessage()) return;
+
+    const chat = chats.find(c => c.id === currentChatId);
+    if (!chat) return;
+
+    // Find the user message
+    const messageIndex = chat.messages.findIndex(m => m.id === userMessageId);
+    if (messageIndex === -1) return;
+
+    const userMessage = chat.messages[messageIndex];
+    if (userMessage.role !== 'user') return;
+
+    setIsLoading(true);
+
+    // Keep messages up to and including the user message, remove assistant response after it
+    const messagesUpToUser = chat.messages.slice(0, messageIndex + 1);
+
+    // Create assistant message placeholder for streaming
+    let assistantMessageId = `msg-${Date.now()}`;
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      created_at: new Date().toISOString(),
+    };
+
+    // Update chat with messages up to user + new assistant placeholder
+    setChats(prev =>
+      prev.map(c =>
+        c.id === currentChatId
+          ? { ...c, messages: [...messagesUpToUser, assistantMessage] }
+          : c
+      )
+    );
+
+    let streamedContent = ''; // Declare here so it's accessible in catch block
+
+    try {
+      // Create new AbortController for this request
+      abortControllerRef.current = new AbortController();
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatId: currentChatId,
+          message: userMessage.content,
+          regenerate: true,
+          regenerateFromIndex: messageIndex,
+        }),
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to regenerate');
+      }
+
+      // Handle streaming response
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      streamedContent = ''; // Reset for this request (declared before try block)
+      let receivedDone = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.searching !== undefined) {
+                setIsSearching(data.searching);
+                setSearchQuery(data.query || null);
+              }
+
+              // Handle finalizeMessage - mark current message as finalized (no action buttons)
+              if (data.finalizeMessage) {
+                setChats(prev =>
+                  prev.map(c =>
+                    c.id === currentChatId
+                      ? {
+                          ...c,
+                          messages: c.messages.map(m =>
+                            m.id === assistantMessageId
+                              ? { ...m, isFinalized: true }
+                              : m
+                          ),
+                        }
+                      : c
+                  )
+                );
+              }
+
+              // Handle newMessage - create a new assistant message for post-search content
+              if (data.newMessage) {
+                const newAssistantId = `msg-${Date.now()}-post`;
+                const newAssistantMessage: Message = {
+                  id: newAssistantId,
+                  role: 'assistant',
+                  content: '',
+                  created_at: new Date().toISOString(),
+                };
+                assistantMessageId = newAssistantId;
+                streamedContent = '';
+                setChats(prev =>
+                  prev.map(c =>
+                    c.id === currentChatId
+                      ? { ...c, messages: [...c.messages, newAssistantMessage] }
+                      : c
+                  )
+                );
+              }
+
+              if (data.text) {
+                streamedContent += data.text;
+                const contentToSet = streamedContent; // Capture in closure to avoid race conditions
+                setChats(prev =>
+                  prev.map(c =>
+                    c.id === currentChatId
+                      ? {
+                          ...c,
+                          messages: c.messages.map(m =>
+                            m.id === assistantMessageId
+                              // Safety: never replace existing content with empty/shorter content
+                              ? { ...m, content: contentToSet.length >= (m.content?.length || 0) ? contentToSet : m.content }
+                              : m
+                          ),
+                        }
+                      : c
+                  )
+                );
+              }
+
+              if (data.done) {
+                receivedDone = true;
+                setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+              }
+
+              if (data.error) {
+                throw new Error(data.error);
+              }
+            } catch (parseError) {
+              if (parseError instanceof SyntaxError) continue;
+              throw parseError;
+            }
+          }
+        }
+      }
+
+      // Don't refetch from DB for regenerate - trust local state
+      // The backend has already updated the DB, local state is correct
+      if (!receivedDone) {
+        // Just increment the message count if stream didn't send done signal
+        setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+      }
+    } catch (error) {
+      // If user stopped the generation, don't show error - keep whatever was streamed
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Generation stopped by user');
+        if (!streamedContent) {
+          setChats(prev => prev.map(c =>
+            c.id === currentChatId
+              ? { ...c, messages: c.messages.filter(m => m.id !== assistantMessageId) }
+              : c
+          ));
+        }
+        return;
+      }
+
+      console.error('Error regenerating response:', error);
+      // Instead of removing messages, show an error state that allows retry
+      setChats(prev =>
+        prev.map(c =>
+          c.id === currentChatId
+            ? {
+                ...c,
+                messages: c.messages.map(m =>
+                  m.id === assistantMessageId
+                    ? { ...m, content: 'Something went wrong. Please try again.', isError: true }
+                    : m
+                )
+              }
+            : c
+        )
+      );
+    } finally {
+      setIsLoading(false);
+      setIsSearching(false);
+      setSearchQuery(null);
+      abortControllerRef.current = null;
+    }
+  };
+
+  // Stop the current generation
+  const stopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+    setIsSearching(false);
+    setSearchQuery(null);
+  };
+
   return {
     chats,
     currentChat,
@@ -516,6 +1005,9 @@ export function useChats() {
     selectChat,
     renameChat,
     deleteChat,
+    editMessage,
+    regenerateResponse,
+    stopGeneration,
     canSendMessage,
     getRemainingMessages,
   };

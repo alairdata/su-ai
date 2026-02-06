@@ -424,39 +424,96 @@ select {
   font-style: italic;
 }
 
-/* typing dots */
+/* Typing indicator bubble - iMessage/WhatsApp style */
 
-.typing-indicator {
-  display: inline-flex;
+.typing-bubble-wrapper {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 8px;
+  padding-left: 12px;
+}
+
+.typing-bubble {
+  display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 6px;
+  background: #e5e5ea;
+  border-radius: 20px;
+  padding: 16px 20px;
+  min-width: 70px;
 }
 
 .typing-dot {
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: #888;
-  animation: typing-bounce 1.2s infinite ease-in-out;
+  background: #8e8e93;
+  animation: typing-bounce 1.4s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(1) {
+  animation-delay: 0s;
 }
 
 .typing-dot:nth-child(2) {
-  animation-delay: 0.2s;
+  animation-delay: 0.15s;
 }
 
 .typing-dot:nth-child(3) {
-  animation-delay: 0.4s;
+  animation-delay: 0.3s;
 }
 
 @keyframes typing-bounce {
-  0%, 80%, 100% {
-    opacity: 0.4;
+  0%, 60%, 100% {
     transform: translateY(0);
+    opacity: 0.5;
   }
-  40% {
+  30% {
+    transform: translateY(-6px);
     opacity: 1;
-    transform: translateY(-5px);
   }
+}
+
+/* Speech bubble tail - two circles */
+.typing-bubble-tail {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+}
+
+.tail-circle {
+  background: #e5e5ea;
+  border-radius: 50%;
+}
+
+.tail-circle-1 {
+  width: 14px;
+  height: 14px;
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+}
+
+.tail-circle-2 {
+  width: 8px;
+  height: 8px;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+}
+
+/* Dark mode */
+[data-theme="dark"] .typing-bubble {
+  background: #3a3a3c;
+}
+
+[data-theme="dark"] .typing-dot {
+  background: #8e8e93;
+}
+
+[data-theme="dark"] .tail-circle {
+  background: #3a3a3c;
 }
 
 @keyframes spin {
