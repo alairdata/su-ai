@@ -23,6 +23,7 @@ interface User {
   plan: "Free" | "Pro" | "Plus";
   messages_used_today: number;
   total_messages: number;
+  days_active: number;
   created_at: string;
   last_active: string | null;
   subscription_status: string | null;
@@ -542,6 +543,8 @@ export default function AdminPage() {
               <th style={styles.th}>User</th>
               <th style={styles.th}>Plan</th>
               <th style={styles.th}>Status</th>
+              <th style={styles.th}>Messages</th>
+              <th style={styles.th}>Days Active</th>
               <th style={styles.th}>Joined</th>
               <th style={styles.th}>Last Active</th>
               <th style={styles.th}>Actions</th>
@@ -577,6 +580,12 @@ export default function AdminPage() {
                     }}>
                       {isActive ? "Active" : "Inactive"}
                     </span>
+                  </td>
+                  <td style={styles.td}>
+                    {user.total_messages || 0}
+                  </td>
+                  <td style={styles.td}>
+                    {user.days_active || 0}
                   </td>
                   <td style={styles.td}>
                     {new Date(user.created_at).toLocaleDateString()}

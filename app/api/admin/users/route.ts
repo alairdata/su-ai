@@ -55,37 +55,39 @@ export async function GET() {
 
   const lastActiveMap = new Map<string, string>();
   const messageCountMap = new Map<string, number>();
+  const daysActiveMap = new Map<string, number>();
 
-  // Get the most recent message and count for each user's chats
+  // Get the most recent message, count, and days active for each user's chats
   for (const [userId, chatIds] of userChatIds.entries()) {
     if (chatIds.length === 0) continue;
 
-    // Get last message
-    const { data: lastMsg } = await supabase
+    // Get all messages for this user to calculate stats
+    const { data: userMessages } = await supabase
       .from("messages")
       .select("created_at")
       .in("chat_id", chatIds)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
+      .order("created_at", { ascending: false });
 
-    if (lastMsg) {
-      lastActiveMap.set(userId, lastMsg.created_at);
+    if (userMessages && userMessages.length > 0) {
+      // Last active = most recent message
+      lastActiveMap.set(userId, userMessages[0].created_at);
+
+      // Total messages
+      messageCountMap.set(userId, userMessages.length);
+
+      // Days active = unique days with messages
+      const uniqueDays = new Set(
+        userMessages.map(m => new Date(m.created_at).toISOString().split('T')[0])
+      );
+      daysActiveMap.set(userId, uniqueDays.size);
     }
-
-    // Get message count
-    const { count } = await supabase
-      .from("messages")
-      .select("*", { count: "exact", head: true })
-      .in("chat_id", chatIds);
-
-    messageCountMap.set(userId, count || 0);
   }
 
-  // Add last_active and total_messages to each user
+  // Add last_active, total_messages, and days_active to each user
   const usersWithActivity = (users || []).map(user => ({
     ...user,
     total_messages: messageCountMap.get(user.id) || 0,
+    days_active: daysActiveMap.get(user.id) || 0,
     last_active: lastActiveMap.get(user.id) || null
   }));
 
