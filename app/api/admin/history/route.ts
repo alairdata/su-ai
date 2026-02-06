@@ -17,6 +17,9 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || process.env.VIP_EMAILS || '')
 // Emails to exclude from aggregations/stats
 const EXCLUDED_EMAILS = ['datawithprincilla@gmail.com'];
 
+// Fixed start date for all data: Jan 28th 2026
+const DATA_START_DATE = new Date('2026-01-28T00:00:00.000Z');
+
 function isAdmin(email: string | null | undefined): boolean {
   if (!email) return false;
   return ADMIN_EMAILS.includes(email.toLowerCase());
@@ -33,31 +36,38 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const period = searchParams.get("period") || "month"; // day, week, month, year
 
-  // Calculate date range based on period
+  // Calculate date range based on period - always start from Jan 28th 2026
   const now = new Date();
-  let startDate: Date;
+  let startDate: Date = new Date(DATA_START_DATE);
   let groupBy: "hour" | "day" | "week" | "month";
 
   switch (period) {
     case "day":
-      startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      // Last 24 hours, but not before start date
+      const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      startDate = dayAgo > DATA_START_DATE ? dayAgo : DATA_START_DATE;
       groupBy = "hour";
       break;
     case "week":
-      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      // Last 7 days, but not before start date
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      startDate = weekAgo > DATA_START_DATE ? weekAgo : DATA_START_DATE;
       groupBy = "day";
       break;
     case "month":
-      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      groupBy = "week";
+      // Last 30 days, but not before start date
+      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      startDate = monthAgo > DATA_START_DATE ? monthAgo : DATA_START_DATE;
+      groupBy = "day";
       break;
     case "year":
-      startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+      // Always from start date
+      startDate = DATA_START_DATE;
       groupBy = "month";
       break;
     default:
-      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      groupBy = "week";
+      startDate = DATA_START_DATE;
+      groupBy = "day";
   }
 
   // Fetch users for signup trend (within period)
@@ -103,7 +113,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Fetch messages for message trend (within period) - excluding messages from excluded users
-  let messages: { created_at: string }[] = [];
+  let messages: { created_at: string; chat_id?: string }[] = [];
   if (excludedChatIds.length > 0) {
     const { data, error: messagesError } = await supabase
       .from("messages")
@@ -116,7 +126,7 @@ export async function GET(req: NextRequest) {
   } else {
     const { data, error: messagesError } = await supabase
       .from("messages")
-      .select("created_at")
+      .select("created_at, chat_id")
       .gte("created_at", startDate.toISOString())
       .order("created_at", { ascending: true });
     messages = data || [];
@@ -139,6 +149,114 @@ export async function GET(req: NextRequest) {
     allMessages = data || [];
   }
 
+  // Fetch chats with message counts for top users - within period
+  const { data: chatsWithCounts } = await supabase
+    .from("chats")
+    .select("id, user_id")
+    .gte("created_at", startDate.toISOString());
+
+  // Count messages per user in period
+  const userMessageCounts: Map<string, number> = new Map();
+  const filteredChats = (chatsWithCounts || []).filter(c => !excludedUserIds.includes(c.user_id));
+
+  // Get message counts per chat
+  for (const chat of filteredChats) {
+    const chatMessages = messages.filter(m => m.chat_id === chat.id);
+    const currentCount = userMessageCounts.get(chat.user_id) || 0;
+    userMessageCounts.set(chat.user_id, currentCount + chatMessages.length);
+  }
+
+  // Also count messages from chats created before the period but messages sent in period
+  if (excludedChatIds.length > 0) {
+    const { data: periodMessages } = await supabase
+      .from("messages")
+      .select("chat_id")
+      .gte("created_at", startDate.toISOString());
+
+    const { data: allChats } = await supabase
+      .from("chats")
+      .select("id, user_id");
+
+    const chatToUser = new Map((allChats || []).map(c => [c.id, c.user_id]));
+
+    for (const msg of (periodMessages || [])) {
+      const userId = chatToUser.get(msg.chat_id);
+      if (userId && !excludedUserIds.includes(userId)) {
+        const currentCount = userMessageCounts.get(userId) || 0;
+        userMessageCounts.set(userId, currentCount + 1);
+      }
+    }
+  } else {
+    const { data: periodMessages } = await supabase
+      .from("messages")
+      .select("chat_id")
+      .gte("created_at", startDate.toISOString());
+
+    const { data: allChats } = await supabase
+      .from("chats")
+      .select("id, user_id");
+
+    const chatToUser = new Map((allChats || []).map(c => [c.id, c.user_id]));
+
+    for (const msg of (periodMessages || [])) {
+      const userId = chatToUser.get(msg.chat_id);
+      if (userId && !excludedUserIds.includes(userId)) {
+        const currentCount = userMessageCounts.get(userId) || 0;
+        userMessageCounts.set(userId, currentCount + 1);
+      }
+    }
+  }
+
+  // Get top 10 users by message count
+  const sortedUsers = Array.from(userMessageCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+
+  // Get user details for top users
+  const topUserIds = sortedUsers.map(([id]) => id);
+  const { data: topUserDetails } = await supabase
+    .from("users")
+    .select("id, name, email")
+    .in("id", topUserIds);
+
+  const userDetailsMap = new Map((topUserDetails || []).map(u => [u.id, u]));
+
+  const topUsers = sortedUsers.map(([userId, messageCount]) => {
+    const user = userDetailsMap.get(userId);
+    return {
+      id: userId,
+      name: user?.name || 'Unknown',
+      email: user?.email || '',
+      messageCount
+    };
+  });
+
+  // Calculate message distribution (0-10+ buckets based on messages per day in period)
+  const daysDiff = Math.max(1, Math.ceil((now.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)));
+  const messageDistribution: { bucket: string; count: number }[] = [];
+
+  const buckets = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const bucketCounts = new Map<number, number>();
+  buckets.forEach(b => bucketCounts.set(b, 0));
+
+  for (const [, msgCount] of userMessageCounts.entries()) {
+    const avgPerDay = Math.round(msgCount / daysDiff);
+    const bucket = Math.min(avgPerDay, 10);
+    bucketCounts.set(bucket, (bucketCounts.get(bucket) || 0) + 1);
+  }
+
+  // Also count users with 0 messages
+  const usersWithMessages = new Set(userMessageCounts.keys());
+  const usersWithZero = allUsers.filter(u => !usersWithMessages.has(u.id)).length;
+  bucketCounts.set(0, (bucketCounts.get(0) || 0) + usersWithZero);
+
+  for (const bucket of buckets) {
+    messageDistribution.push({
+      bucket: bucket === 10 ? '10+' : String(bucket),
+      count: bucketCounts.get(bucket) || 0
+    });
+  }
+
   // Group data by time period
   const userTrend = groupDataByPeriod(users || [], groupBy, startDate, now);
   const messageTrend = groupDataByPeriod(messages || [], groupBy, startDate, now);
@@ -152,10 +270,22 @@ export async function GET(req: NextRequest) {
     now
   );
 
+  // Calculate period-specific stats
+  const periodStats = {
+    signups: users.length,
+    messages: messages.length,
+    avgMessagesPerUser: users.length > 0
+      ? Math.round((messages.length / users.length) * 10) / 10
+      : 0
+  };
+
   return NextResponse.json({
     userTrend,
     messageTrend,
     avgTrend,
+    topUsers,
+    messageDistribution,
+    periodStats,
     period,
     hasMessages: messages.length > 0
   });

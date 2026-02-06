@@ -29,7 +29,7 @@ export async function GET() {
 
   const { data: users, error } = await supabase
     .from("users")
-    .select("id, name, email, plan, messages_used_today, created_at, subscription_status, current_period_end, original_name")
+    .select("id, name, email, plan, messages_used_today, total_messages, created_at, subscription_status, current_period_end, original_name")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -37,5 +37,49 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
   }
 
-  return NextResponse.json({ users });
+  // Get last active timestamp for each user (last message sent)
+  const userIds = (users || []).map(u => u.id);
+
+  // Get all chats with their user_id
+  const { data: chats } = await supabase
+    .from("chats")
+    .select("id, user_id")
+    .in("user_id", userIds);
+
+  const userChatIds = new Map<string, string[]>();
+  for (const chat of (chats || [])) {
+    const existing = userChatIds.get(chat.user_id) || [];
+    existing.push(chat.id);
+    userChatIds.set(chat.user_id, existing);
+  }
+
+  // Get last message timestamp per chat
+  const allChatIds = Array.from(new Set((chats || []).map(c => c.id)));
+
+  const lastActiveMap = new Map<string, string>();
+
+  if (allChatIds.length > 0) {
+    // Get the most recent message for each user's chats
+    for (const [userId, chatIds] of userChatIds.entries()) {
+      const { data: lastMsg } = await supabase
+        .from("messages")
+        .select("created_at")
+        .in("chat_id", chatIds)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (lastMsg) {
+        lastActiveMap.set(userId, lastMsg.created_at);
+      }
+    }
+  }
+
+  // Add last_active to each user
+  const usersWithActivity = (users || []).map(user => ({
+    ...user,
+    last_active: lastActiveMap.get(user.id) || null
+  }));
+
+  return NextResponse.json({ users: usersWithActivity });
 }

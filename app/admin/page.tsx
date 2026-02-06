@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -20,7 +22,9 @@ interface User {
   email: string;
   plan: "Free" | "Pro" | "Plus";
   messages_used_today: number;
+  total_messages: number;
   created_at: string;
+  last_active: string | null;
   subscription_status: string | null;
   current_period_end: string | null;
   original_name: string | null;
@@ -53,6 +57,24 @@ interface AvgTrendData {
   avg: number;
 }
 
+interface TopUser {
+  id: string;
+  name: string;
+  email: string;
+  messageCount: number;
+}
+
+interface MessageDistribution {
+  bucket: string;
+  count: number;
+}
+
+interface PeriodStats {
+  signups: number;
+  messages: number;
+  avgMessagesPerUser: number;
+}
+
 type Period = "day" | "week" | "month" | "year";
 
 const USERS_PER_PAGE = 15;
@@ -71,6 +93,9 @@ export default function AdminPage() {
   const [userTrend, setUserTrend] = useState<TrendData[]>([]);
   const [messageTrend, setMessageTrend] = useState<TrendData[]>([]);
   const [avgTrend, setAvgTrend] = useState<AvgTrendData[]>([]);
+  const [topUsers, setTopUsers] = useState<TopUser[]>([]);
+  const [messageDistribution, setMessageDistribution] = useState<MessageDistribution[]>([]);
+  const [periodStats, setPeriodStats] = useState<PeriodStats | null>(null);
   const [chartPeriod, setChartPeriod] = useState<Period>("month");
   const [chartLoading, setChartLoading] = useState(false);
 
@@ -141,6 +166,9 @@ export default function AdminPage() {
         setUserTrend(data.userTrend || []);
         setMessageTrend(data.messageTrend || []);
         setAvgTrend(data.avgTrend || []);
+        setTopUsers(data.topUsers || []);
+        setMessageDistribution(data.messageDistribution || []);
+        setPeriodStats(data.periodStats || null);
       }
     } catch (err) {
       console.error("Failed to fetch chart data:", err);
@@ -217,7 +245,7 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Period-specific */}
       {stats && (
         <div style={styles.statsGrid}>
           <div style={styles.statCard}>
@@ -225,32 +253,24 @@ export default function AdminPage() {
             <div style={styles.statLabel}>Total Users</div>
           </div>
           <div style={styles.statCard}>
-            <div style={styles.statValue}>{stats.activeSubscriptions}</div>
-            <div style={styles.statLabel}>Active Subscriptions</div>
+            <div style={styles.statValue}>{stats.totalMessages}</div>
+            <div style={styles.statLabel}>Total Messages</div>
           </div>
           <div style={styles.statCard}>
-            <div style={styles.statValue}>{stats.totalMessagesToday}</div>
-            <div style={styles.statLabel}>Messages Today</div>
+            <div style={styles.statValue}>{periodStats?.signups || 0}</div>
+            <div style={styles.statLabel}>Signups ({chartPeriod})</div>
           </div>
           <div style={styles.statCard}>
-            <div style={styles.statValue}>{stats.signupsToday}</div>
-            <div style={styles.statLabel}>Signups Today</div>
-          </div>
-          <div style={styles.statCard}>
-            <div style={styles.statValue}>{stats.signupsThisWeek}</div>
-            <div style={styles.statLabel}>This Week</div>
-          </div>
-          <div style={styles.statCard}>
-            <div style={styles.statValue}>{stats.signupsThisMonth}</div>
-            <div style={styles.statLabel}>This Month</div>
+            <div style={styles.statValue}>{periodStats?.messages || 0}</div>
+            <div style={styles.statLabel}>Messages ({chartPeriod})</div>
           </div>
           <div style={styles.statCard}>
             <div style={styles.statValue}>{stats.avgMessagesPerUser}</div>
-            <div style={styles.statLabel}>Avg Msgs/User</div>
+            <div style={styles.statLabel}>Avg Msgs/User (All)</div>
           </div>
           <div style={styles.statCard}>
-            <div style={styles.statValue}>{stats.totalMessages}</div>
-            <div style={styles.statLabel}>Total Messages</div>
+            <div style={styles.statValue}>{stats.activeSubscriptions}</div>
+            <div style={styles.statLabel}>Active Subs</div>
           </div>
         </div>
       )}
@@ -284,27 +304,33 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Charts Side by Side */}
+        {/* Charts 2x2 Grid */}
         <div style={styles.chartsContainer}>
-          {/* User Signups Chart */}
+          {/* Chart 1: Cumulative Users vs Messages (Dual Axis) */}
           <div style={styles.chartCard}>
             <div style={styles.chartHeader2}>
-              <h3 style={styles.chartTitle}>User Signups</h3>
-              <span style={styles.chartBadge}>
-                {userTrend.length > 0 ? userTrend[userTrend.length - 1]?.cumulative || 0 : 0} total
-              </span>
+              <h3 style={styles.chartTitle}>Cumulative Growth</h3>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <span style={styles.chartBadge}>
+                  {userTrend.length > 0 ? userTrend[userTrend.length - 1]?.cumulative || 0 : 0} users
+                </span>
+                <span style={{ ...styles.chartBadge, background: "#f3e8ff", color: "#7c3aed" }}>
+                  {messageTrend.length > 0 ? messageTrend[messageTrend.length - 1]?.cumulative || 0 : 0} msgs
+                </span>
+              </div>
             </div>
             {chartLoading ? (
               <div style={styles.chartLoading}>Loading...</div>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={userTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                  <defs>
-                    <linearGradient id="userGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <LineChart
+                  data={userTrend.map((u, i) => ({
+                    label: u.label,
+                    users: u.cumulative,
+                    messages: messageTrend[i]?.cumulative || 0
+                  }))}
+                  margin={{ top: 5, right: 50, bottom: 5, left: 0 }}
+                >
                   <XAxis
                     dataKey="label"
                     axisLine={false}
@@ -313,10 +339,19 @@ export default function AdminPage() {
                     dy={10}
                   />
                   <YAxis
+                    yAxisId="left"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 10, fill: "#999" }}
-                    width={30}
+                    tick={{ fontSize: 10, fill: "#3b82f6" }}
+                    width={35}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: "#8b5cf6" }}
+                    width={40}
                   />
                   <Tooltip
                     contentStyle={{
@@ -326,71 +361,32 @@ export default function AdminPage() {
                       boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                       fontSize: "12px",
                     }}
-                    labelStyle={{ color: "#666", marginBottom: "4px" }}
                   />
+                  <Legend />
                   <Line
+                    yAxisId="left"
                     type="monotone"
-                    dataKey="count"
+                    dataKey="users"
                     stroke="#3b82f6"
                     strokeWidth={2.5}
                     dot={false}
-                    activeDot={{ r: 4, fill: "#3b82f6", stroke: "#fff", strokeWidth: 2 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-
-          {/* Messages Chart */}
-          <div style={styles.chartCard}>
-            <div style={styles.chartHeader2}>
-              <h3 style={styles.chartTitle}>Messages Sent</h3>
-              <span style={{ ...styles.chartBadge, background: "#f3e8ff", color: "#7c3aed" }}>
-                {messageTrend.length > 0 ? messageTrend[messageTrend.length - 1]?.cumulative || 0 : 0} total
-              </span>
-            </div>
-            {chartLoading ? (
-              <div style={styles.chartLoading}>Loading...</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={messageTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                  <XAxis
-                    dataKey="label"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 10, fill: "#999" }}
-                    dy={10}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 10, fill: "#999" }}
-                    width={30}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: "rgba(255,255,255,0.95)",
-                      border: "none",
-                      borderRadius: "8px",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                      fontSize: "12px",
-                    }}
-                    labelStyle={{ color: "#666", marginBottom: "4px" }}
+                    name="Users"
                   />
                   <Line
+                    yAxisId="right"
                     type="monotone"
-                    dataKey="count"
+                    dataKey="messages"
                     stroke="#8b5cf6"
                     strokeWidth={2.5}
                     dot={false}
-                    activeDot={{ r: 4, fill: "#8b5cf6", stroke: "#fff", strokeWidth: 2 }}
+                    name="Messages"
                   />
                 </LineChart>
               </ResponsiveContainer>
             )}
           </div>
 
-          {/* Avg Messages per User Chart */}
+          {/* Chart 2: Avg Messages per User */}
           <div style={styles.chartCard}>
             <div style={styles.chartHeader2}>
               <h3 style={styles.chartTitle}>Avg Messages / User</h3>
@@ -424,7 +420,6 @@ export default function AdminPage() {
                       boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                       fontSize: "12px",
                     }}
-                    labelStyle={{ color: "#666", marginBottom: "4px" }}
                     formatter={(value) => [typeof value === 'number' ? value.toFixed(1) : '0', "Avg"]}
                   />
                   <Line
@@ -440,25 +435,66 @@ export default function AdminPage() {
             )}
           </div>
 
-          {/* Cumulative User Growth Chart */}
+          {/* Chart 3: Top 10 Active Users */}
           <div style={styles.chartCard}>
             <div style={styles.chartHeader2}>
-              <h3 style={styles.chartTitle}>Cumulative Users</h3>
+              <h3 style={styles.chartTitle}>Top 10 Active Users</h3>
               <span style={{ ...styles.chartBadge, background: "#fef3c7", color: "#d97706" }}>
-                {userTrend.length > 0 ? userTrend[userTrend.length - 1]?.cumulative || 0 : 0} users
+                {chartPeriod}
               </span>
             </div>
             {chartLoading ? (
               <div style={styles.chartLoading}>Loading...</div>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={userTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                <BarChart
+                  data={topUsers}
+                  layout="vertical"
+                  margin={{ top: 5, right: 20, bottom: 5, left: 60 }}
+                >
+                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#999" }} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: "#666" }}
+                    width={55}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "rgba(255,255,255,0.95)",
+                      border: "none",
+                      borderRadius: "8px",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      fontSize: "12px",
+                    }}
+                    formatter={(value, name, props) => [value, `${props.payload.email}`]}
+                  />
+                  <Bar dataKey="messageCount" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Chart 4: Message Distribution (0-10 scale) */}
+          <div style={styles.chartCard}>
+            <div style={styles.chartHeader2}>
+              <h3 style={styles.chartTitle}>Daily Message Distribution</h3>
+              <span style={{ ...styles.chartBadge, background: "#fee2e2", color: "#dc2626" }}>
+                msgs/day
+              </span>
+            </div>
+            {chartLoading ? (
+              <div style={styles.chartLoading}>Loading...</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={messageDistribution} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <XAxis
-                    dataKey="label"
+                    dataKey="bucket"
                     axisLine={false}
                     tickLine={false}
                     tick={{ fontSize: 10, fill: "#999" }}
-                    dy={10}
                   />
                   <YAxis
                     axisLine={false}
@@ -474,17 +510,10 @@ export default function AdminPage() {
                       boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                       fontSize: "12px",
                     }}
-                    labelStyle={{ color: "#666", marginBottom: "4px" }}
+                    formatter={(value, name, props) => [`${value} users`, `${props.payload.bucket} msgs/day`]}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="cumulative"
-                    stroke="#f59e0b"
-                    strokeWidth={2.5}
-                    dot={false}
-                    activeDot={{ r: 4, fill: "#f59e0b", stroke: "#fff", strokeWidth: 2 }}
-                  />
-                </LineChart>
+                  <Bar dataKey="count" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             )}
           </div>
@@ -512,59 +541,67 @@ export default function AdminPage() {
             <tr>
               <th style={styles.th}>User</th>
               <th style={styles.th}>Plan</th>
-              <th style={styles.th}>Messages Today</th>
               <th style={styles.th}>Status</th>
               <th style={styles.th}>Joined</th>
+              <th style={styles.th}>Last Active</th>
               <th style={styles.th}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {paginatedUsers.map((user) => (
-              <tr key={user.id} style={styles.tr}>
-                <td style={styles.td}>
-                  <div style={styles.userName}>{user.name}</div>
-                  <div style={styles.userEmail}>{user.email}</div>
-                  {user.original_name && user.original_name !== user.name && (
-                    <div style={styles.originalName}>
-                      Originally: {user.original_name}
-                    </div>
-                  )}
-                </td>
-                <td style={styles.td}>
-                  <span style={{
-                    ...styles.planBadge,
-                    background: user.plan === "Plus" ? "#8b5cf6" :
-                               user.plan === "Pro" ? "#3b82f6" : "#6b7280"
-                  }}>
-                    {user.plan}
-                  </span>
-                </td>
-                <td style={styles.td}>{user.messages_used_today || 0}</td>
-                <td style={styles.td}>
-                  <span style={{
-                    ...styles.statusBadge,
-                    background: user.subscription_status === "active" ? "#10b981" : "#6b7280"
-                  }}>
-                    {user.subscription_status || "none"}
-                  </span>
-                </td>
-                <td style={styles.td}>
-                  {new Date(user.created_at).toLocaleDateString()}
-                </td>
-                <td style={styles.td}>
-                  <select
-                    value={user.plan}
-                    onChange={(e) => updatePlan(user.id, e.target.value)}
-                    disabled={updatingUser === user.id}
-                    style={styles.select}
-                  >
-                    <option value="Free">Free</option>
-                    <option value="Pro">Pro</option>
-                    <option value="Plus">Plus</option>
-                  </select>
-                </td>
-              </tr>
-            ))}
+            {paginatedUsers.map((user) => {
+              const isActive = (user.total_messages || 0) > 0;
+              return (
+                <tr key={user.id} style={styles.tr}>
+                  <td style={styles.td}>
+                    <div style={styles.userName}>{user.name}</div>
+                    <div style={styles.userEmail}>{user.email}</div>
+                    {user.original_name && user.original_name !== user.name && (
+                      <div style={styles.originalName}>
+                        Originally: {user.original_name}
+                      </div>
+                    )}
+                  </td>
+                  <td style={styles.td}>
+                    <span style={{
+                      ...styles.planBadge,
+                      background: user.plan === "Plus" ? "#8b5cf6" :
+                                 user.plan === "Pro" ? "#3b82f6" : "#6b7280"
+                    }}>
+                      {user.plan}
+                    </span>
+                  </td>
+                  <td style={styles.td}>
+                    <span style={{
+                      ...styles.statusBadge,
+                      background: isActive ? "#10b981" : "#9ca3af"
+                    }}>
+                      {isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td style={styles.td}>
+                    {new Date(user.created_at).toLocaleDateString()}
+                  </td>
+                  <td style={styles.td}>
+                    {user.last_active
+                      ? new Date(user.last_active).toLocaleDateString()
+                      : "Never"
+                    }
+                  </td>
+                  <td style={styles.td}>
+                    <select
+                      value={user.plan}
+                      onChange={(e) => updatePlan(user.id, e.target.value)}
+                      disabled={updatingUser === user.id}
+                      style={styles.select}
+                    >
+                      <option value="Free">Free</option>
+                      <option value="Pro">Pro</option>
+                      <option value="Plus">Plus</option>
+                    </select>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
