@@ -35,6 +35,13 @@ const tools: Anthropic.Tool[] = [
 // System prompt loaded from environment variable for security
 const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "You are a helpful AI assistant.";
 
+// Daily message limits per plan
+const PLAN_LIMITS: Record<string, number> = {
+  'Free': 10,
+  'Pro': 100,
+  'Plus': 300
+};
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -43,6 +50,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Please log in to use the chat." },
         { status: 401 }
+      );
+    }
+
+    // Check daily message limit
+    const userPlan = session.user.plan || 'Free';
+    const dailyLimit = PLAN_LIMITS[userPlan] || PLAN_LIMITS['Free'];
+    const messagesUsedToday = session.user.messagesUsedToday || 0;
+
+    if (messagesUsedToday >= dailyLimit) {
+      return NextResponse.json(
+        {
+          error: `Daily message limit reached (${dailyLimit} messages). Please upgrade your plan for more messages.`,
+          limitReached: true,
+          plan: userPlan,
+          limit: dailyLimit
+        },
+        { status: 429 }
       );
     }
 
@@ -134,7 +158,6 @@ export async function POST(req: NextRequest) {
     // Track full response for saving to database
     let fullResponse = "";
     const userId = session.user.id;
-    const messagesUsedToday = session.user.messagesUsedToday;
 
     const encoder = new TextEncoder();
 
