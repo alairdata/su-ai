@@ -80,26 +80,64 @@ export async function GET(req: NextRequest) {
   // Fetch ALL users for cumulative count (for avg calculation)
   const { data: allUsersRaw } = await supabase
     .from("users")
-    .select("email, created_at")
+    .select("id, email, created_at")
     .order("created_at", { ascending: true });
 
-  // Filter out excluded emails from all users
+  // Get excluded user IDs and filter out excluded emails
+  const excludedUserIds = (allUsersRaw || [])
+    .filter(u => EXCLUDED_EMAILS.includes(u.email?.toLowerCase() || ''))
+    .map(u => u.id);
+
   const allUsers = (allUsersRaw || []).filter(
     u => !EXCLUDED_EMAILS.includes(u.email?.toLowerCase() || '')
   );
 
-  // Fetch messages for message trend (within period)
-  const { data: messages, error: messagesError } = await supabase
-    .from("messages")
-    .select("created_at")
-    .gte("created_at", startDate.toISOString())
-    .order("created_at", { ascending: true });
+  // Get chat IDs belonging to excluded users
+  let excludedChatIds: string[] = [];
+  if (excludedUserIds.length > 0) {
+    const { data: excludedChats } = await supabase
+      .from("chats")
+      .select("id")
+      .in("user_id", excludedUserIds);
+    excludedChatIds = (excludedChats || []).map(c => c.id);
+  }
 
-  // Fetch ALL messages for cumulative count
-  const { data: allMessages } = await supabase
-    .from("messages")
-    .select("created_at")
-    .order("created_at", { ascending: true });
+  // Fetch messages for message trend (within period) - excluding messages from excluded users
+  let messages: { created_at: string }[] = [];
+  if (excludedChatIds.length > 0) {
+    const { data, error: messagesError } = await supabase
+      .from("messages")
+      .select("created_at, chat_id")
+      .gte("created_at", startDate.toISOString())
+      .order("created_at", { ascending: true });
+
+    messages = (data || []).filter(m => !excludedChatIds.includes(m.chat_id));
+    if (messagesError) console.error("Messages error:", messagesError);
+  } else {
+    const { data, error: messagesError } = await supabase
+      .from("messages")
+      .select("created_at")
+      .gte("created_at", startDate.toISOString())
+      .order("created_at", { ascending: true });
+    messages = data || [];
+    if (messagesError) console.error("Messages error:", messagesError);
+  }
+
+  // Fetch ALL messages for cumulative count - excluding messages from excluded users
+  let allMessages: { created_at: string }[] = [];
+  if (excludedChatIds.length > 0) {
+    const { data } = await supabase
+      .from("messages")
+      .select("created_at, chat_id")
+      .order("created_at", { ascending: true });
+    allMessages = (data || []).filter(m => !excludedChatIds.includes(m.chat_id));
+  } else {
+    const { data } = await supabase
+      .from("messages")
+      .select("created_at")
+      .order("created_at", { ascending: true });
+    allMessages = data || [];
+  }
 
   // Group data by time period
   const userTrend = groupDataByPeriod(users || [], groupBy, startDate, now);
@@ -119,7 +157,7 @@ export async function GET(req: NextRequest) {
     messageTrend,
     avgTrend,
     period,
-    hasMessages: !messagesError && messages !== null
+    hasMessages: messages.length > 0
   });
 }
 
