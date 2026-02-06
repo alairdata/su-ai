@@ -14,6 +14,9 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || process.env.VIP_EMAILS || '')
   .map(email => email.trim().toLowerCase())
   .filter(email => email.length > 0);
 
+// Emails to exclude from aggregations/stats
+const EXCLUDED_EMAILS = ['datawithprincilla@gmail.com'];
+
 function isAdmin(email: string | null | undefined): boolean {
   if (!email) return false;
   return ADMIN_EMAILS.includes(email.toLowerCase());
@@ -58,9 +61,9 @@ export async function GET(req: NextRequest) {
   }
 
   // Fetch users for signup trend (within period)
-  const { data: users, error: usersError } = await supabase
+  const { data: usersRaw, error: usersError } = await supabase
     .from("users")
-    .select("created_at")
+    .select("email, created_at")
     .gte("created_at", startDate.toISOString())
     .order("created_at", { ascending: true });
 
@@ -69,11 +72,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Failed to fetch history" }, { status: 500 });
   }
 
+  // Filter out excluded emails
+  const users = (usersRaw || []).filter(
+    u => !EXCLUDED_EMAILS.includes(u.email?.toLowerCase() || '')
+  );
+
   // Fetch ALL users for cumulative count (for avg calculation)
-  const { data: allUsers } = await supabase
+  const { data: allUsersRaw } = await supabase
     .from("users")
-    .select("created_at")
+    .select("email, created_at")
     .order("created_at", { ascending: true });
+
+  // Filter out excluded emails from all users
+  const allUsers = (allUsersRaw || []).filter(
+    u => !EXCLUDED_EMAILS.includes(u.email?.toLowerCase() || '')
+  );
 
   // Fetch messages for message trend (within period)
   const { data: messages, error: messagesError } = await supabase
