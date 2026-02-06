@@ -4,6 +4,7 @@ import { authOptions } from "../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
 import Anthropic from "@anthropic-ai/sdk";
 import { webSearch, formatSearchResults } from "@/lib/search";
+import { getEffectivePlan, getPlanLimit } from "@/lib/plans";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,13 +36,6 @@ const tools: Anthropic.Tool[] = [
 // System prompt loaded from environment variable for security
 const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "You are a helpful AI assistant.";
 
-// Daily message limits per plan
-const PLAN_LIMITS: Record<string, number> = {
-  'Free': 10,
-  'Pro': 100,
-  'Plus': 300
-};
-
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -53,10 +47,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check daily message limit
-    const userPlan = session.user.plan || 'Free';
-    const dailyLimit = PLAN_LIMITS[userPlan] || PLAN_LIMITS['Free'];
-    const messagesUsedToday = session.user.messagesUsedToday || 0;
+    // Query DB for actual user data - don't trust JWT session alone
+    const { data: dbUser, error: userError } = await supabase
+      .from("users")
+      .select("plan, messages_used_today, email")
+      .eq("id", session.user.id)
+      .single();
+
+    if (userError || !dbUser) {
+      console.error("Failed to fetch user:", userError);
+      return NextResponse.json(
+        { error: "User not found." },
+        { status: 404 }
+      );
+    }
+
+    // Get effective plan (checks VIP status from DB email)
+    const userPlan = getEffectivePlan(dbUser.plan, dbUser.email);
+    const dailyLimit = getPlanLimit(userPlan);
+    const messagesUsedToday = dbUser.messages_used_today || 0;
 
     if (messagesUsedToday >= dailyLimit) {
       return NextResponse.json(

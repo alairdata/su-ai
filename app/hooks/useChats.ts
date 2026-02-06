@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import { PLAN_LIMITS } from '@/lib/constants';
 
 type Message = {
   id: string;
@@ -15,12 +16,6 @@ type Chat = {
   title: string;
   messages: Message[];
   created_at: string;
-};
-
-const PLAN_LIMITS: Record<string, number> = {
-  'Free': 10,
-  'Pro': 100,
-  'Plus': 300
 };
 
 // Helper to safely access localStorage (handles SSR)

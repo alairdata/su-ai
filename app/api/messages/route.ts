@@ -6,6 +6,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from "@/lib/rate-limit";
 import { sendMessageSchema, validateInput } from "@/lib/validations";
 import { sanitizeErrorForClient } from "@/lib/env";
+import { getEffectivePlan, getPlanLimit } from "@/lib/plans";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,12 +16,6 @@ const supabase = createClient(
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 });
-
-const PLAN_LIMITS: Record<string, number> = {
-  Free: 10,
-  Pro: 100,
-  Plus: 300,
-};
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -51,11 +46,30 @@ export async function POST(req: NextRequest) {
 
   const { chatId, message } = validation.data;
 
-  // Check message limits
-  const limit = PLAN_LIMITS[session.user.plan];
-  if (session.user.messagesUsedToday >= limit) {
+  // Query DB for actual user data - don't trust JWT session alone
+  const { data: dbUser, error: userError } = await supabase
+    .from("users")
+    .select("plan, messages_used_today, email")
+    .eq("id", session.user.id)
+    .single();
+
+  if (userError || !dbUser) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  // Get effective plan (checks VIP status from DB email)
+  const userPlan = getEffectivePlan(dbUser.plan, dbUser.email);
+  const dailyLimit = getPlanLimit(userPlan);
+  const messagesUsedToday = dbUser.messages_used_today || 0;
+
+  if (messagesUsedToday >= dailyLimit) {
     return NextResponse.json(
-      { error: "Daily message limit reached" },
+      {
+        error: `Daily message limit reached (${dailyLimit} messages). Please upgrade your plan.`,
+        limitReached: true,
+        plan: userPlan,
+        limit: dailyLimit
+      },
       { status: 429 }
     );
   }
@@ -118,7 +132,7 @@ export async function POST(req: NextRequest) {
       supabase
         .from("users")
         .update({
-          messages_used_today: session.user.messagesUsedToday + 1
+          messages_used_today: messagesUsedToday + 1
         })
         .eq("id", session.user.id),
       // Increment total_messages atomically using RPC
@@ -134,9 +148,9 @@ export async function POST(req: NextRequest) {
         .eq("id", chatId);
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       reply: assistantMessage,
-      messagesUsedToday: session.user.messagesUsedToday + 1
+      messagesUsedToday: messagesUsedToday + 1
     });
   } catch (error) {
     console.error("Claude API error:", error);
