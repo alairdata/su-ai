@@ -256,7 +256,7 @@ export async function POST(req: NextRequest) {
                   chat_id: chatId,
                   role: "assistant",
                   content: segment,
-                })
+                }).then(() => {})
               );
             }
           }
@@ -264,9 +264,9 @@ export async function POST(req: NextRequest) {
           savePromises.push(
             supabase.from("users").update({
               messages_used_today: messagesUsedToday + 1
-            }).eq("id", userId),
+            }).eq("id", userId).then(() => {}),
             // Increment total_messages atomically using RPC
-            supabase.rpc('increment_total_messages', { user_id_param: userId }),
+            supabase.rpc('increment_total_messages', { user_id_param: userId }).then(() => {}),
           );
 
           // Generate title for first message (using Haiku for speed)
@@ -290,7 +290,7 @@ export async function POST(req: NextRequest) {
                 .slice(0, 50);
 
               savePromises.push(
-                supabase.from("chats").update({ title: generatedTitle }).eq("id", chatId)
+                supabase.from("chats").update({ title: generatedTitle }).eq("id", chatId).then(() => {})
               );
 
               // Send title in stream
@@ -301,7 +301,7 @@ export async function POST(req: NextRequest) {
                 ? userMessage.substring(0, 30) + "..."
                 : userMessage;
               savePromises.push(
-                supabase.from("chats").update({ title: fallbackTitle }).eq("id", chatId)
+                supabase.from("chats").update({ title: fallbackTitle }).eq("id", chatId).then(() => {})
               );
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ title: fallbackTitle })}\n\n`));
             }
