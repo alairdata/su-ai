@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
       break;
     case "month":
       startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      groupBy = "day";
+      groupBy = "week";
       break;
     case "year":
       startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
       break;
     default:
       startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      groupBy = "day";
+      groupBy = "week";
   }
 
   // Fetch users for signup trend (within period)
@@ -178,18 +178,28 @@ function groupDataByPeriod(
   return result;
 }
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function getWeekNumber(date: Date): number {
+  const startOfYear = new Date(date.getFullYear(), 0, 1);
+  const days = Math.floor((date.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
+  return Math.ceil((days + startOfYear.getDay() + 1) / 7);
+}
+
 function getGroupKey(date: Date, groupBy: "hour" | "day" | "week" | "month"): string {
   switch (groupBy) {
     case "hour":
-      return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:00`;
+      // Daily view: "00:00", "01:00", etc.
+      return `${String(date.getHours()).padStart(2, '0')}:00`;
     case "day":
-      return `${date.getMonth() + 1}/${date.getDate()}`;
+      // Weekly view: "Jan 1", "Jan 2", etc.
+      return `${MONTH_NAMES[date.getMonth()]} ${date.getDate()}`;
     case "week":
-      const weekStart = new Date(date);
-      weekStart.setDate(date.getDate() - date.getDay());
-      return `${weekStart.getMonth() + 1}/${weekStart.getDate()}`;
+      // Monthly view: "Week 1", "Week 2", etc.
+      return `Week ${getWeekNumber(date)}`;
     case "month":
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      // Yearly view: "Jan", "Feb", etc.
+      return MONTH_NAMES[date.getMonth()];
     default:
       return date.toISOString().split('T')[0];
   }
