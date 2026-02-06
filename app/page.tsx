@@ -3563,7 +3563,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   messageActions: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '16px',
     opacity: 0.5,
     marginTop: '4px',
     marginLeft: '4px',
@@ -3571,7 +3571,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   messageActionsUser: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '16px',
     opacity: 0.5,
     marginTop: '4px',
     marginRight: '4px',
