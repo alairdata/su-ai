@@ -15,15 +15,17 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Cron secret to prevent unauthorized access
+// Cron secret to prevent unauthorized access - REQUIRED
 const CRON_SECRET = process.env.CRON_SECRET;
 
 export async function GET(req: NextRequest) {
   // Verify cron secret (for Vercel Cron or external cron services)
+  // SECURITY: Secret is REQUIRED - never allow requests without it
   const authHeader = req.headers.get('authorization');
   const cronSecret = authHeader?.replace('Bearer ', '');
 
-  if (CRON_SECRET && cronSecret !== CRON_SECRET) {
+  if (!CRON_SECRET || cronSecret !== CRON_SECRET) {
+    console.error('Cron billing: Unauthorized access attempt');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

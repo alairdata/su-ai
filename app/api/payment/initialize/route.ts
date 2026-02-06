@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
+import { createClient } from '@supabase/supabase-js';
 import {
   initializeTransaction,
   PLAN_CONFIG,
@@ -11,6 +12,11 @@ import {
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from '@/lib/rate-limit';
 import { initializePaymentSchema, validateInput } from '@/lib/validations';
 import { sanitizeErrorForClient } from '@/lib/env';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(request: Request) {
   try {
@@ -49,6 +55,29 @@ export async function POST(request: Request) {
 
     const userId = session.user.id;
     const email = session.user.email;
+
+    // SECURITY: Verify user's current plan from database
+    const { data: dbUser, error: userError } = await supabase
+      .from('users')
+      .select('plan, subscription_status')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !dbUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Prevent payment for same or lower tier plan
+    const planTiers: Record<string, number> = { 'Free': 0, 'Pro': 1, 'Plus': 2 };
+    const currentTier = planTiers[dbUser.plan] || 0;
+    const requestedTier = planTiers[plan] || 0;
+
+    if (requestedTier <= currentTier && dbUser.subscription_status === 'active') {
+      return NextResponse.json(
+        { error: `You already have ${dbUser.plan} plan or higher. Cannot downgrade via payment.` },
+        { status: 400 }
+      );
+    }
 
     // Convert USD price to GHS pesewas (live rate)
     const amountInPesewas = await usdToGhsPesewas(planConfig.priceUSD);

@@ -9,21 +9,27 @@ const supabase = createClient(
 );
 
 // Admin emails - comma-separated in env var
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || process.env.VIP_EMAILS || '')
+// SECURITY: Do NOT fallback to VIP_EMAILS - admin access must be explicit
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .split(',')
   .map(email => email.trim().toLowerCase())
   .filter(email => email.length > 0);
 
 function isAdmin(email: string | null | undefined): boolean {
   if (!email) return false;
+  if (ADMIN_EMAILS.length === 0) {
+    console.error('SECURITY: ADMIN_EMAILS not configured!');
+    return false;
+  }
   return ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
-// POST - Update a user's plan
+// POST - Update a user's plan (with audit logging)
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.email || !isAdmin(session.user.email)) {
+    console.error('Admin plan update: Unauthorized attempt by', session?.user?.email || 'unknown');
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -37,6 +43,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 
+  // Get current user data for audit log
+  const { data: targetUser } = await supabase
+    .from("users")
+    .select("email, plan")
+    .eq("id", userId)
+    .single();
+
+  const previousPlan = targetUser?.plan || 'Unknown';
+
   const { error } = await supabase
     .from("users")
     .update({ plan })
@@ -46,6 +61,28 @@ export async function POST(req: NextRequest) {
     console.error("Failed to update plan:", error);
     return NextResponse.json({ error: "Failed to update plan" }, { status: 500 });
   }
+
+  // AUDIT LOG: Record all admin plan changes
+  console.log('AUDIT: Admin plan change', {
+    timestamp: new Date().toISOString(),
+    adminEmail: session.user.email,
+    targetUserId: userId,
+    targetUserEmail: targetUser?.email || 'Unknown',
+    previousPlan,
+    newPlan: plan,
+  });
+
+  // Store audit log in database (fire and forget, don't block response)
+  supabase
+    .from("admin_audit_logs")
+    .insert({
+      admin_email: session.user.email,
+      action: 'plan_change',
+      target_user_id: userId,
+      target_user_email: targetUser?.email,
+      details: { previousPlan, newPlan: plan },
+    })
+    .then(() => {});
 
   return NextResponse.json({ success: true, plan });
 }

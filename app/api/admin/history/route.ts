@@ -9,7 +9,8 @@ const supabase = createClient(
 );
 
 // Admin emails - comma-separated in env var
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || process.env.VIP_EMAILS || '')
+// SECURITY: Do NOT fallback to VIP_EMAILS - admin access must be explicit
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .split(',')
   .map(email => email.trim().toLowerCase())
   .filter(email => email.length > 0);

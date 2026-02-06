@@ -9,28 +9,39 @@ const supabase = createClient(
 );
 
 // Admin emails - comma-separated in env var
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || process.env.VIP_EMAILS || '')
+// SECURITY: Do NOT fallback to VIP_EMAILS - admin access must be explicit
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .split(',')
   .map(email => email.trim().toLowerCase())
   .filter(email => email.length > 0);
 
 function isAdmin(email: string | null | undefined): boolean {
   if (!email) return false;
+  if (ADMIN_EMAILS.length === 0) {
+    console.error('SECURITY: ADMIN_EMAILS not configured!');
+    return false;
+  }
   return ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
-// GET - List all users
-export async function GET() {
+// GET - List all users (with safety limit)
+export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.email || !isAdmin(session.user.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // SECURITY: Limit results to prevent DOS and data exposure
+  const url = new URL(req.url);
+  const limitParam = url.searchParams.get('limit');
+  const limit = Math.min(parseInt(limitParam || '500'), 500); // Max 500 users
+
   const { data: users, error } = await supabase
     .from("users")
     .select("id, name, email, plan, messages_used_today, created_at, subscription_status, current_period_end, original_name")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
   if (error) {
     console.error("Failed to fetch users:", error);
