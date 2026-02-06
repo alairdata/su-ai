@@ -52,22 +52,35 @@ export type PlanType = 'Free' | 'Pro' | 'Plus';
 export type PaidPlanType = 'Pro' | 'Plus';
 
 // Cache for exchange rate (refresh every hour)
+// SECURITY: Store last known good rate to avoid hardcoded fallback issues
 let cachedRate: { rate: number; timestamp: number } | null = null;
+let lastKnownGoodRate: number | null = null; // Persists longer than cache
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+const STALE_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours for stale fallback
 
 // Get current USD to GHS exchange rate (live)
 export async function getExchangeRate(): Promise<number> {
-  const fallbackRate = 15.5;
-
   // Return cached rate if still valid
   if (cachedRate && Date.now() - cachedRate.timestamp < CACHE_DURATION) {
     return cachedRate.rate;
   }
 
   const apiKey = process.env.EXCHANGE_RATE_API_KEY;
+  const envFallbackRate = process.env.USD_TO_GHS_RATE ? parseFloat(process.env.USD_TO_GHS_RATE) : null;
+
   if (!apiKey) {
-    console.warn('No EXCHANGE_RATE_API_KEY, using fallback rate');
-    return fallbackRate;
+    // No API key - use env fallback or last known good rate
+    if (envFallbackRate) {
+      console.warn('No EXCHANGE_RATE_API_KEY, using USD_TO_GHS_RATE from env:', envFallbackRate);
+      return envFallbackRate;
+    }
+    if (lastKnownGoodRate) {
+      console.warn('No EXCHANGE_RATE_API_KEY, using last known good rate:', lastKnownGoodRate);
+      return lastKnownGoodRate;
+    }
+    // SECURITY: Fail payment instead of using potentially wrong hardcoded rate
+    console.error('CRITICAL: No exchange rate available - payment will fail');
+    throw new Error('Exchange rate unavailable. Please try again later.');
   }
 
   try {
@@ -78,15 +91,45 @@ export async function getExchangeRate(): Promise<number> {
 
     if (data.result === 'success' && data.conversion_rate) {
       cachedRate = { rate: data.conversion_rate, timestamp: Date.now() };
+      lastKnownGoodRate = data.conversion_rate; // Store as fallback
       console.log('Exchange rate fetched:', data.conversion_rate);
       return data.conversion_rate;
     }
 
-    console.warn('Exchange rate API error, using fallback:', data);
-    return fallbackRate;
+    // API returned error - try fallbacks
+    console.warn('Exchange rate API error:', data);
+    if (cachedRate && Date.now() - cachedRate.timestamp < STALE_CACHE_DURATION) {
+      console.warn('Using stale cached rate:', cachedRate.rate);
+      return cachedRate.rate;
+    }
+    if (lastKnownGoodRate) {
+      console.warn('Using last known good rate:', lastKnownGoodRate);
+      return lastKnownGoodRate;
+    }
+    if (envFallbackRate) {
+      console.warn('Using env fallback rate:', envFallbackRate);
+      return envFallbackRate;
+    }
+
+    throw new Error('Exchange rate unavailable. Please try again later.');
   } catch (error) {
     console.error('Failed to fetch exchange rate:', error);
-    return fallbackRate;
+
+    // Try fallbacks before failing
+    if (cachedRate && Date.now() - cachedRate.timestamp < STALE_CACHE_DURATION) {
+      console.warn('API failed, using stale cached rate:', cachedRate.rate);
+      return cachedRate.rate;
+    }
+    if (lastKnownGoodRate) {
+      console.warn('API failed, using last known good rate:', lastKnownGoodRate);
+      return lastKnownGoodRate;
+    }
+    if (envFallbackRate) {
+      console.warn('API failed, using env fallback rate:', envFallbackRate);
+      return envFallbackRate;
+    }
+
+    throw new Error('Exchange rate unavailable. Please try again later.');
   }
 }
 
@@ -95,7 +138,14 @@ export function getExchangeRateSync(): number {
   if (cachedRate && Date.now() - cachedRate.timestamp < CACHE_DURATION) {
     return cachedRate.rate;
   }
-  return parseFloat(process.env.USD_TO_GHS_RATE || '15.5');
+  if (lastKnownGoodRate) {
+    return lastKnownGoodRate;
+  }
+  const envRate = process.env.USD_TO_GHS_RATE;
+  if (envRate) {
+    return parseFloat(envRate);
+  }
+  throw new Error('Exchange rate unavailable');
 }
 
 // Convert USD to GHS (in pesewas - smallest unit)

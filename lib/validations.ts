@@ -21,11 +21,12 @@ const email = z
 
 const password = z
   .string()
-  .min(8, 'Password must be at least 8 characters')
+  .min(10, 'Password must be at least 10 characters')
   .max(128, 'Password too long')
   .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
   .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-  .regex(/[0-9]/, 'Password must contain at least one number');
+  .regex(/[0-9]/, 'Password must contain at least one number')
+  .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'Password must contain at least one special character');
 
 const name = z
   .string()
@@ -146,6 +147,18 @@ export const verifyPaymentSchema = z.object({
 
 export const upgradePlanSchema = z.object({
   plan: anyPlan,
+}).strict();
+
+// ============================================
+// Feedback Schema
+// ============================================
+
+export const feedbackSchema = z.object({
+  messageId: uuid,
+  chatId: uuid,
+  feedback: z.enum(['like', 'dislike'], {
+    message: 'Invalid feedback type. Must be "like" or "dislike"',
+  }),
 }).strict();
 
 // ============================================

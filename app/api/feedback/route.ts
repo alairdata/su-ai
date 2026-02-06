@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
+import { feedbackSchema, validateInput } from "@/lib/validations";
+import { rateLimit, getClientIP, rateLimitHeaders, getUserIPKey } from "@/lib/rate-limit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,22 +18,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Rate limiting - 30 feedback submissions per minute
+  const clientIP = getClientIP(req);
+  const rateLimitKey = getUserIPKey(session.user.id, clientIP, 'feedback');
+  const rateLimitResult = rateLimit(rateLimitKey, { limit: 30, windowSeconds: 60 });
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down." },
+      { status: 429, headers: rateLimitHeaders(rateLimitResult) }
+    );
+  }
+
   try {
-    const { messageId, chatId, feedback } = await req.json();
+    const body = await req.json();
 
-    if (!messageId || !chatId || !feedback) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+    // Schema validation
+    const validation = validateInput(feedbackSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    if (!['like', 'dislike'].includes(feedback)) {
-      return NextResponse.json(
-        { error: "Invalid feedback type" },
-        { status: 400 }
-      );
-    }
+    const { messageId, chatId, feedback } = validation.data;
 
     // Store feedback in database (upsert to handle updates)
     const { error } = await supabase

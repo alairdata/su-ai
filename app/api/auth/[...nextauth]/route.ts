@@ -10,6 +10,43 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// SECURITY: Simple in-memory rate limiter for login attempts
+const loginAttempts = new Map<string, { count: number; resetTime: number }>();
+const LOGIN_LIMIT = 5; // 5 attempts
+const LOGIN_WINDOW = 15 * 60 * 1000; // 15 minutes
+
+function checkLoginRateLimit(email: string): boolean {
+  const now = Date.now();
+  const key = email.toLowerCase();
+  const attempt = loginAttempts.get(key);
+
+  if (!attempt || now > attempt.resetTime) {
+    loginAttempts.set(key, { count: 1, resetTime: now + LOGIN_WINDOW });
+    return true;
+  }
+
+  if (attempt.count >= LOGIN_LIMIT) {
+    return false;
+  }
+
+  attempt.count++;
+  return true;
+}
+
+function resetLoginAttempts(email: string): void {
+  loginAttempts.delete(email.toLowerCase());
+}
+
+// Clean up old entries every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of loginAttempts.entries()) {
+    if (now > value.resetTime) {
+      loginAttempts.delete(key);
+    }
+  }
+}, 30 * 60 * 1000);
+
 // VIP emails that get free Plus access (comma-separated in env var)
 // Example: VIP_EMAILS=admin@example.com,vip@example.com
 const VIP_EMAILS = (process.env.VIP_EMAILS || '')
@@ -41,6 +78,11 @@ export const authOptions: NextAuthOptions = {
         // Normalize email to lowercase for consistent lookup
         const normalizedEmail = credentials.email.toLowerCase().trim();
 
+        // SECURITY: Rate limit login attempts
+        if (!checkLoginRateLimit(normalizedEmail)) {
+          throw new Error("Too many login attempts. Please try again in 15 minutes.");
+        }
+
         // Check if user exists in users table (only verified users are here)
         const { data: user, error } = await supabase
           .from('users')
@@ -71,6 +113,9 @@ export const authOptions: NextAuthOptions = {
         if (!isValidPassword) {
           throw new Error("Invalid email or password");
         }
+
+        // SECURITY: Reset rate limit on successful login
+        resetLoginAttempts(normalizedEmail);
 
         return {
           id: user.id,
