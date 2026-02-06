@@ -1882,11 +1882,11 @@ function HomePage() {
                               className="message-bubble"
                               style={{
                                 ...currentStyles.messageBubbleAssistant,
-                                background: isDark ? '#3a2a2a' : '#fef2f2',
-                                border: `1px solid ${isDark ? '#5c3c3c' : '#fecaca'}`,
+                                background: theme === 'dark' ? '#3a2a2a' : '#fef2f2',
+                                border: `1px solid ${theme === 'dark' ? '#5c3c3c' : '#fecaca'}`,
                               }}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isDark ? '#fca5a5' : '#dc2626' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: theme === 'dark' ? '#fca5a5' : '#dc2626' }}>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <circle cx="12" cy="12" r="10"/>
                                   <line x1="12" y1="8" x2="12" y2="12"/>
@@ -1903,10 +1903,10 @@ function HomePage() {
                                     marginLeft: 'auto',
                                     padding: '6px 12px',
                                     fontSize: '13px',
-                                    background: isDark ? '#4a3a3a' : '#fee2e2',
-                                    border: `1px solid ${isDark ? '#6c4c4c' : '#fca5a5'}`,
+                                    background: theme === 'dark' ? '#4a3a3a' : '#fee2e2',
+                                    border: `1px solid ${theme === 'dark' ? '#6c4c4c' : '#fca5a5'}`,
                                     borderRadius: '8px',
-                                    color: isDark ? '#fca5a5' : '#dc2626',
+                                    color: theme === 'dark' ? '#fca5a5' : '#dc2626',
                                     cursor: 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
