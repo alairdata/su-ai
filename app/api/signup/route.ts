@@ -33,7 +33,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const { name, email, password } = validation.data;
+    const { name, email, password, website } = validation.data;
+
+    // SECURITY: Honeypot check - if filled, likely a bot
+    // Return fake success to not alert the bot
+    if (website && website.length > 0) {
+      console.log('Bot detected via honeypot:', email);
+      return NextResponse.json({
+        message: 'Account created! Check your email to verify your account.',
+        success: true,
+      });
+    }
 
     // Block disposable emails
     if (isDisposableEmail(email)) {

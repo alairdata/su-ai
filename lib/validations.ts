@@ -79,6 +79,8 @@ export const signupSchema = z.object({
   name,
   email,
   password,
+  // SECURITY: Honeypot field - bots will fill this, real users won't see it
+  website: z.string().max(0, 'Invalid submission').optional(),
 }).strict(); // Reject unexpected fields
 
 export const loginSchema = z.object({

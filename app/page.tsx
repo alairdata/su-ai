@@ -58,6 +58,7 @@ function HomePage() {
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
+  const [honeypot, setHoneypot] = useState(""); // SECURITY: Honeypot for bot detection
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authSuccess, setAuthSuccess] = useState("");
@@ -403,6 +404,7 @@ function HomePage() {
           name: authName,
           email: authEmail,
           password: authPassword,
+          website: honeypot, // SECURITY: Honeypot field
         }),
       });
 
@@ -1253,6 +1255,19 @@ function HomePage() {
                           )}
                         </button>
                       </div>
+                    </div>
+                    {/* SECURITY: Honeypot field - hidden from users, filled by bots */}
+                    <div style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }} aria-hidden="true">
+                      <label htmlFor="website">Website</label>
+                      <input
+                        type="text"
+                        id="website"
+                        name="website"
+                        value={honeypot}
+                        onChange={(e) => setHoneypot(e.target.value)}
+                        tabIndex={-1}
+                        autoComplete="off"
+                      />
                     </div>
                     <button
                       type="submit"

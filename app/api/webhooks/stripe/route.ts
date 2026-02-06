@@ -9,7 +9,23 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// SECURITY: Track processed webhook event IDs to prevent replay attacks
+const processedWebhooks = new Set<string>();
+const WEBHOOK_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+// Clean up old entries periodically
+setInterval(() => {
+  processedWebhooks.clear(); // Simple clear every 24 hours
+}, WEBHOOK_CACHE_DURATION);
+
 export async function POST(req: NextRequest) {
+  // SECURITY: Validate Content-Type header
+  const contentType = req.headers.get('content-type');
+  if (!contentType?.includes('application/json')) {
+    console.error('Invalid content-type:', contentType);
+    return NextResponse.json({ error: 'Invalid content type' }, { status: 400 });
+  }
+
   const body = await req.text();
   const signature = req.headers.get('stripe-signature');
 
@@ -26,6 +42,18 @@ export async function POST(req: NextRequest) {
     console.error('Webhook signature verification failed:', error);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
+
+  // SECURITY: Prevent webhook replay attacks using event ID
+  const eventId = event.id;
+  if (eventId) {
+    if (processedWebhooks.has(eventId)) {
+      console.log('Duplicate webhook ignored:', eventId);
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+    processedWebhooks.add(eventId);
+  }
+
+  console.log('Stripe webhook received:', event.type);
 
   try {
     switch (event.type) {
