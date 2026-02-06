@@ -29,7 +29,7 @@ export async function GET() {
 
   const { data: users, error } = await supabase
     .from("users")
-    .select("id, name, email, plan, messages_used_today, total_messages, created_at, subscription_status, current_period_end, original_name")
+    .select("id, name, email, plan, messages_used_today, created_at, subscription_status, current_period_end, original_name")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -37,7 +37,7 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
   }
 
-  // Get last active timestamp for each user (last message sent)
+  // Get last active timestamp and message count for each user
   const userIds = (users || []).map(u => u.id);
 
   // Get all chats with their user_id
@@ -53,31 +53,39 @@ export async function GET() {
     userChatIds.set(chat.user_id, existing);
   }
 
-  // Get last message timestamp per chat
-  const allChatIds = Array.from(new Set((chats || []).map(c => c.id)));
-
   const lastActiveMap = new Map<string, string>();
+  const messageCountMap = new Map<string, number>();
 
-  if (allChatIds.length > 0) {
-    // Get the most recent message for each user's chats
-    for (const [userId, chatIds] of userChatIds.entries()) {
-      const { data: lastMsg } = await supabase
-        .from("messages")
-        .select("created_at")
-        .in("chat_id", chatIds)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+  // Get the most recent message and count for each user's chats
+  for (const [userId, chatIds] of userChatIds.entries()) {
+    if (chatIds.length === 0) continue;
 
-      if (lastMsg) {
-        lastActiveMap.set(userId, lastMsg.created_at);
-      }
+    // Get last message
+    const { data: lastMsg } = await supabase
+      .from("messages")
+      .select("created_at")
+      .in("chat_id", chatIds)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (lastMsg) {
+      lastActiveMap.set(userId, lastMsg.created_at);
     }
+
+    // Get message count
+    const { count } = await supabase
+      .from("messages")
+      .select("*", { count: "exact", head: true })
+      .in("chat_id", chatIds);
+
+    messageCountMap.set(userId, count || 0);
   }
 
-  // Add last_active to each user
+  // Add last_active and total_messages to each user
   const usersWithActivity = (users || []).map(user => ({
     ...user,
+    total_messages: messageCountMap.get(user.id) || 0,
     last_active: lastActiveMap.get(user.id) || null
   }));
 
