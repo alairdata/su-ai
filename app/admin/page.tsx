@@ -425,7 +425,7 @@ export default function AdminPage() {
                       fontSize: "12px",
                     }}
                     labelStyle={{ color: "#666", marginBottom: "4px" }}
-                    formatter={(value: number) => [value.toFixed(1), "Avg"]}
+                    formatter={(value) => [typeof value === 'number' ? value.toFixed(1) : '0', "Avg"]}
                   />
                   <Line
                     type="monotone"
