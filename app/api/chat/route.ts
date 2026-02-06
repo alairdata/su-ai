@@ -247,7 +247,7 @@ export async function POST(req: NextRequest) {
 
           // Stream complete - save to database in background
           // Save each message segment separately
-          const savePromises: Promise<unknown>[] = [];
+          const savePromises: PromiseLike<unknown>[] = [];
 
           for (const segment of messageSegments) {
             if (segment.trim()) {
