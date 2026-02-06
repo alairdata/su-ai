@@ -50,13 +50,7 @@ export async function GET() {
   const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
   const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  // Get total messages count (excluding messages from excluded users)
-  const excludedUserIds = (allUsers || [])
-    .filter(u => EXCLUDED_EMAILS.includes(u.email?.toLowerCase() || ''))
-    .map(u => u.id);
-
-  // For now, get total count - we can't easily filter by user in count query
-  // So we'll use the filtered user count for avg calculation
+  // Get total messages count
   const { count: totalMessages } = await supabase
     .from("messages")
     .select("*", { count: "exact", head: true });
