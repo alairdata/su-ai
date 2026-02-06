@@ -1824,7 +1824,7 @@ function HomePage() {
                                   disabled={chatLoading}
                                   style={{
                                     ...currentStyles.actionButton,
-                                    ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {}),
+                                    ...(isMobile ? { padding: '6px', minWidth: '32px', minHeight: '32px' } : {}),
                                     opacity: chatLoading ? 0.3 : 1,
                                   }}
                                   title="Retry message"
@@ -1840,7 +1840,7 @@ function HomePage() {
                                   disabled={chatLoading}
                                   style={{
                                     ...currentStyles.actionButton,
-                                    ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {}),
+                                    ...(isMobile ? { padding: '6px', minWidth: '32px', minHeight: '32px' } : {}),
                                     opacity: chatLoading ? 0.3 : 1,
                                   }}
                                   title="Edit message"
@@ -1854,7 +1854,7 @@ function HomePage() {
                                   onClick={() => handleCopyMessage(m.content, m.id)}
                                   style={{
                                     ...currentStyles.actionButton,
-                                    ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {})
+                                    ...(isMobile ? { padding: '6px', minWidth: '32px', minHeight: '32px' } : {})
                                   }}
                                   title="Copy message"
                                 >
@@ -1958,7 +1958,7 @@ function HomePage() {
                                 onClick={() => handleCopyMessage(m.content, m.id)}
                                 style={{
                                   ...currentStyles.actionButton,
-                                  ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {})
+                                  ...(isMobile ? { padding: '6px', minWidth: '32px', minHeight: '32px' } : {})
                                 }}
                                 title="Copy message"
                               >
@@ -1978,7 +1978,7 @@ function HomePage() {
                                 onClick={() => handleFeedback(m.id, 'like')}
                                 style={{
                                   ...currentStyles.actionButton,
-                                  ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {}),
+                                  ...(isMobile ? { padding: '6px', minWidth: '32px', minHeight: '32px' } : {}),
                                   ...(messageFeedback[m.id] === 'like' ? { color: '#10b981', opacity: 1 } : {}),
                                 }}
                                 title="Good response"
@@ -1992,7 +1992,7 @@ function HomePage() {
                                 onClick={() => handleFeedback(m.id, 'dislike')}
                                 style={{
                                   ...currentStyles.actionButton,
-                                  ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {}),
+                                  ...(isMobile ? { padding: '6px', minWidth: '32px', minHeight: '32px' } : {}),
                                   ...(messageFeedback[m.id] === 'dislike' ? { color: '#ef4444', opacity: 1 } : {}),
                                 }}
                                 title="Bad response"
@@ -2010,7 +2010,7 @@ function HomePage() {
                                 disabled={chatLoading}
                                 style={{
                                   ...currentStyles.actionButton,
-                                  ...(isMobile ? { padding: '12px', minWidth: '44px', minHeight: '44px' } : {}),
+                                  ...(isMobile ? { padding: '6px', minWidth: '32px', minHeight: '32px' } : {}),
                                   opacity: chatLoading ? 0.3 : 1,
                                 }}
                                 title="Regenerate response"
