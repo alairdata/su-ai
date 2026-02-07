@@ -65,9 +65,33 @@ export async function POST(req: NextRequest) {
     // Get effective plan (checks VIP status from DB email)
     const userPlan = getEffectivePlan(dbUser.plan, dbUser.email);
     const dailyLimit = getPlanLimit(userPlan);
-    const messagesUsedToday = dbUser.messages_used_today || 0;
 
-    if (messagesUsedToday >= dailyLimit) {
+    // SECURITY: Atomic increment to prevent race condition
+    // This increments AND returns the new count in one operation
+    const { data: incrementResult, error: incrementError } = await supabase
+      .rpc('increment_messages_used_today', {
+        user_id_param: session.user.id,
+        daily_limit: dailyLimit
+      });
+
+    // If increment failed or limit exceeded, reject the request
+    if (incrementError) {
+      console.error("Failed to increment message count:", incrementError);
+      // Fallback to non-atomic check if RPC doesn't exist
+      const messagesUsedToday = dbUser.messages_used_today || 0;
+      if (messagesUsedToday >= dailyLimit) {
+        return NextResponse.json(
+          {
+            error: `Daily message limit reached (${dailyLimit} messages). Please upgrade your plan for more messages.`,
+            limitReached: true,
+            plan: userPlan,
+            limit: dailyLimit
+          },
+          { status: 429 }
+        );
+      }
+    } else if (incrementResult === false) {
+      // RPC returned false = limit exceeded
       return NextResponse.json(
         {
           error: `Daily message limit reached (${dailyLimit} messages). Please upgrade your plan for more messages.`,
@@ -78,6 +102,8 @@ export async function POST(req: NextRequest) {
         { status: 429 }
       );
     }
+
+    // Message count already incremented atomically above
 
     const body = await req.json();
     const userMessage: string = body.message || "";
@@ -122,22 +148,26 @@ export async function POST(req: NextRequest) {
     let allMessages = (chat.messages as Array<{ id: string; role: "user" | "assistant"; content: string; created_at: string }>) || [];
 
     // Handle regenerate: delete messages from the specified index onwards
+    // SECURITY: Only delete messages that belong to this chat (verified by chat ownership above)
     if (isRegenerate && regenerateFromIndex !== undefined) {
       const messagesToDelete = allMessages.slice(regenerateFromIndex + 1);
       if (messagesToDelete.length > 0) {
         const idsToDelete = messagesToDelete.map(m => m.id);
-        await supabase.from("messages").delete().in("id", idsToDelete);
+        // SECURITY: Add chat_id check to prevent cross-chat message deletion
+        await supabase.from("messages").delete().in("id", idsToDelete).eq("chat_id", chatId);
       }
       // Keep only messages up to and including the user message
       allMessages = allMessages.slice(0, regenerateFromIndex + 1);
     }
 
     // Handle edit: delete messages from the specified index onwards, then add the new message
+    // SECURITY: Only delete messages that belong to this chat (verified by chat ownership above)
     if (editFromMessageIndex !== undefined) {
       const messagesToDelete = allMessages.slice(editFromMessageIndex);
       if (messagesToDelete.length > 0) {
         const idsToDelete = messagesToDelete.map(m => m.id);
-        await supabase.from("messages").delete().in("id", idsToDelete);
+        // SECURITY: Add chat_id check to prevent cross-chat message deletion
+        await supabase.from("messages").delete().in("id", idsToDelete).eq("chat_id", chatId);
       }
       // Keep only messages before the edited message
       allMessages = allMessages.slice(0, editFromMessageIndex);
@@ -145,13 +175,17 @@ export async function POST(req: NextRequest) {
 
     const isFirstMessage = allMessages.length === 0;
 
-    // Save user message immediately (don't wait) - only if not regenerating
+    // SECURITY: Save user message and AWAIT to prevent data loss
     if (!isRegenerate) {
-      supabase.from("messages").insert({
+      const { error: msgError } = await supabase.from("messages").insert({
         chat_id: chatId,
         role: "user",
         content: userMessage,
-      }).then(() => {});
+      });
+      if (msgError) {
+        console.error("Failed to save user message:", msgError);
+        return NextResponse.json({ error: "Failed to save message" }, { status: 500 });
+      }
     }
 
     // Build messages for API
@@ -293,11 +327,9 @@ export async function POST(req: NextRequest) {
             }
           }
 
+          // SECURITY: Message count already incremented atomically at request start
+          // Only increment total_messages here
           savePromises.push(
-            supabase.from("users").update({
-              messages_used_today: messagesUsedToday + 1
-            }).eq("id", userId).then(() => {}),
-            // Increment total_messages atomically using RPC
             supabase.rpc('increment_total_messages', { user_id_param: userId }).then(() => {}),
           );
 

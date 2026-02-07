@@ -2,8 +2,12 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import { createClient } from '@supabase/supabase-js';
-import { verifyTransaction, getNextBillingDate } from '@/lib/paystack';
+import { verifyTransaction, getNextBillingDate, PLAN_CONFIG } from '@/lib/paystack';
 import { sendSubscriptionEmail } from '@/lib/email';
+
+// SECURITY: Valid plans that can be purchased
+const VALID_PAID_PLANS = ['Pro', 'Plus'] as const;
+type PaidPlanType = typeof VALID_PAID_PLANS[number];
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,6 +50,7 @@ export async function POST(request: Request) {
       const userId = metadata?.userId;
       const authorization = paystackResponse.data.authorization;
       const customer = paystackResponse.data.customer;
+      const amountPaid = paystackResponse.data.amount; // Amount in pesewas
 
       // Verify the user matches
       if (userId !== session.user.id) {
@@ -60,6 +65,35 @@ export async function POST(request: Request) {
           { error: 'Plan not found in transaction' },
           { status: 400 }
         );
+      }
+
+      // SECURITY: Validate plan is a valid paid plan
+      if (!VALID_PAID_PLANS.includes(plan as PaidPlanType)) {
+        console.error('SECURITY: Invalid plan in payment metadata:', plan);
+        return NextResponse.json(
+          { error: 'Invalid plan type' },
+          { status: 400 }
+        );
+      }
+
+      // SECURITY: Verify amount paid matches expected plan price (with 10% tolerance for exchange rate fluctuation)
+      const expectedPlanConfig = PLAN_CONFIG[plan as PaidPlanType];
+      if (expectedPlanConfig) {
+        // Amount is in pesewas, we need to verify it's reasonable
+        // Minimum expected: priceUSD * 10 (assuming ~10 GHS/USD minimum) * 100 (pesewas)
+        const minExpectedPesewas = expectedPlanConfig.priceUSD * 10 * 100 * 0.9; // 10% tolerance
+        if (amountPaid < minExpectedPesewas) {
+          console.error('SECURITY: Amount paid too low:', {
+            amountPaid,
+            minExpected: minExpectedPesewas,
+            plan,
+            userId
+          });
+          return NextResponse.json(
+            { error: 'Payment amount mismatch' },
+            { status: 400 }
+          );
+        }
       }
 
       // Check if authorization is reusable (for recurring billing)

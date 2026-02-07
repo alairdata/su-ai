@@ -18,6 +18,14 @@ const supabase = createClient(
 // Cron secret to prevent unauthorized access - REQUIRED
 const CRON_SECRET = process.env.CRON_SECRET;
 
+// SECURITY: Track processed users to prevent duplicate charges in same run
+const processedUsersThisRun = new Set<string>();
+
+// SECURITY: Simple lock to prevent concurrent cron runs
+let cronRunning = false;
+let lastCronRun = 0;
+const MIN_CRON_INTERVAL = 5 * 60 * 1000; // 5 minutes minimum between runs
+
 export async function GET(req: NextRequest) {
   // Verify cron secret (for Vercel Cron or external cron services)
   // SECURITY: Secret is REQUIRED - never allow requests without it
@@ -28,6 +36,23 @@ export async function GET(req: NextRequest) {
     console.error('Cron billing: Unauthorized access attempt');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  // SECURITY: Prevent concurrent cron runs
+  if (cronRunning) {
+    console.warn('Cron billing: Already running, skipping duplicate execution');
+    return NextResponse.json({ error: 'Cron already running' }, { status: 409 });
+  }
+
+  // SECURITY: Prevent too-frequent runs (idempotency window)
+  const now = Date.now();
+  if (now - lastCronRun < MIN_CRON_INTERVAL) {
+    console.warn('Cron billing: Too soon since last run, skipping');
+    return NextResponse.json({ error: 'Cron run too recent' }, { status: 429 });
+  }
+
+  cronRunning = true;
+  lastCronRun = now;
+  processedUsersThisRun.clear();
 
   console.log('Starting billing cron job...');
 
@@ -65,6 +90,20 @@ export async function GET(req: NextRequest) {
 
     for (const user of users) {
       results.processed++;
+
+      // SECURITY: Skip if already processed in this run (duplicate prevention)
+      if (processedUsersThisRun.has(user.id)) {
+        console.warn('Skipping duplicate user in same run:', user.id);
+        continue;
+      }
+      processedUsersThisRun.add(user.id);
+
+      // SECURITY: Double-check period end is actually in the past
+      const periodEnd = new Date(user.current_period_end);
+      if (periodEnd > now) {
+        console.warn('Skipping user - period not yet ended:', user.id, periodEnd);
+        continue;
+      }
 
       try {
         // If subscription is canceling, downgrade to Free
@@ -179,6 +218,10 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('Billing cron job error:', error);
     return NextResponse.json({ error: 'Cron job failed' }, { status: 500 });
+  } finally {
+    // SECURITY: Always release lock
+    cronRunning = false;
+    processedUsersThisRun.clear();
   }
 }
 

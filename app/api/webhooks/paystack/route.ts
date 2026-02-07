@@ -8,14 +8,23 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Track processed webhook references to prevent replay attacks
-const processedWebhooks = new Set<string>();
-const WEBHOOK_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+// SECURITY: Database-based webhook deduplication (works across instances)
+async function isWebhookProcessed(eventId: string, eventType: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('check_and_record_webhook', {
+    p_event_id: eventId,
+    p_provider: 'paystack',
+    p_event_type: eventType
+  });
 
-// Clean up old entries periodically
-setInterval(() => {
-  processedWebhooks.clear(); // Simple clear every 24 hours
-}, WEBHOOK_CACHE_DURATION);
+  if (error) {
+    // If RPC fails, fall back to allowing the webhook (better to process twice than miss)
+    console.error('Webhook dedup check failed:', error);
+    return false;
+  }
+
+  // RPC returns true if event is NEW (not processed), false if duplicate
+  return !data;
+}
 
 export async function POST(req: NextRequest) {
   // SECURITY: Validate Content-Type header
@@ -47,15 +56,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  // SECURITY: Prevent webhook replay attacks using reference
+  // SECURITY: Prevent webhook replay attacks using database deduplication
   const reference = event.data?.reference;
   if (reference) {
-    const webhookKey = `${event.event}:${reference}`;
-    if (processedWebhooks.has(webhookKey)) {
-      console.log('Duplicate webhook ignored:', webhookKey);
+    const eventId = `${event.event}:${reference}`;
+    const isDuplicate = await isWebhookProcessed(eventId, event.event);
+    if (isDuplicate) {
+      console.log('Duplicate webhook ignored:', eventId);
       return NextResponse.json({ received: true, duplicate: true });
     }
-    processedWebhooks.add(webhookKey);
   }
 
   console.log('Paystack webhook received:', event.event);

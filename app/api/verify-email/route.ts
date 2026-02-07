@@ -33,19 +33,35 @@ export async function GET(request: NextRequest) {
         .from('pending_users')
         .delete()
         .eq('id', pendingUser.id);
-        
+
       return NextResponse.redirect(new URL('/?error=token-expired', request.url));
     }
 
-    // Move user from pending_users to users table
+    // SECURITY: Delete from pending_users FIRST to prevent race condition/token reuse
+    // This ensures the token can only be used once even with concurrent requests
+    const { data: deletedUser, error: deleteError } = await supabase
+      .from('pending_users')
+      .delete()
+      .eq('id', pendingUser.id)
+      .eq('verification_token', token) // Double-check token matches
+      .select()
+      .single();
+
+    // If deletion failed or returned no data, token was already used (race condition)
+    if (deleteError || !deletedUser) {
+      console.log('Token already used or race condition detected:', token);
+      return NextResponse.redirect(new URL('/?error=token-already-used', request.url));
+    }
+
+    // Now create user - token is consumed, safe from race condition
     const { error: createError } = await supabase
       .from('users')
       .insert([
         {
-          name: pendingUser.name,
-          original_name: pendingUser.name, // Store original name at signup
-          email: pendingUser.email,
-          password_hash: pendingUser.password_hash,
+          name: deletedUser.name,
+          original_name: deletedUser.name, // Store original name at signup
+          email: deletedUser.email,
+          password_hash: deletedUser.password_hash,
           plan: 'Free',
           messages_used_today: 0,
           email_verified: true, // Already verified!
@@ -56,14 +72,16 @@ export async function GET(request: NextRequest) {
 
     if (createError) {
       console.error('Failed to create verified user:', createError);
+      // Re-insert pending user since we deleted it but couldn't create the user
+      try {
+        await supabase.from('pending_users').insert([deletedUser]);
+      } catch (reinsertError) {
+        console.error('Failed to re-insert pending user:', reinsertError);
+      }
       return NextResponse.redirect(new URL('/?error=verification-failed', request.url));
     }
 
-    // Delete from pending_users
-    await supabase
-      .from('pending_users')
-      .delete()
-      .eq('id', pendingUser.id);
+    // User created successfully - pending user already deleted above
 
     // Redirect to login with success message
     return NextResponse.redirect(new URL('/?verified=true', request.url));

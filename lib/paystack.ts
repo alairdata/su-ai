@@ -58,6 +58,23 @@ let lastKnownGoodRate: number | null = null; // Persists longer than cache
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 const STALE_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours for stale fallback
 
+// SECURITY: Exchange rate bounds to prevent currency manipulation attacks
+// These should be updated if GHS/USD rate changes significantly (currently ~15 GHS/USD)
+const MIN_EXCHANGE_RATE = 8; // Minimum reasonable rate
+const MAX_EXCHANGE_RATE = 30; // Maximum reasonable rate
+
+function validateExchangeRate(rate: number): boolean {
+  if (typeof rate !== 'number' || isNaN(rate)) {
+    console.error('SECURITY: Invalid exchange rate type:', rate);
+    return false;
+  }
+  if (rate < MIN_EXCHANGE_RATE || rate > MAX_EXCHANGE_RATE) {
+    console.error('SECURITY: Exchange rate out of bounds:', rate, `(expected ${MIN_EXCHANGE_RATE}-${MAX_EXCHANGE_RATE})`);
+    return false;
+  }
+  return true;
+}
+
 // Get current USD to GHS exchange rate (live)
 export async function getExchangeRate(): Promise<number> {
   // Return cached rate if still valid
@@ -90,6 +107,11 @@ export async function getExchangeRate(): Promise<number> {
     const data = await response.json();
 
     if (data.result === 'success' && data.conversion_rate) {
+      // SECURITY: Validate rate is within reasonable bounds
+      if (!validateExchangeRate(data.conversion_rate)) {
+        console.error('SECURITY: Exchange rate failed validation, rejecting:', data.conversion_rate);
+        throw new Error('Exchange rate validation failed. Please try again later.');
+      }
       cachedRate = { rate: data.conversion_rate, timestamp: Date.now() };
       lastKnownGoodRate = data.conversion_rate; // Store as fallback
       console.log('Exchange rate fetched:', data.conversion_rate);
