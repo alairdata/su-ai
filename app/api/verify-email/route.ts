@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { rateLimit, getClientIP } from '@/lib/rate-limit';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,6 +8,14 @@ const supabase = createClient(
 );
 
 export async function GET(request: NextRequest) {
+  // SECURITY: Rate limit verification attempts to prevent brute force
+  const clientIP = getClientIP(request);
+  const rateLimitResult = rateLimit(`verify-email:${clientIP}`, { limit: 10, windowSeconds: 60 * 15 }); // 10 per 15 min
+
+  if (!rateLimitResult.success) {
+    return NextResponse.redirect(new URL('/?error=too-many-attempts', request.url));
+  }
+
   const { searchParams } = new URL(request.url);
   const token = searchParams.get('token');
 

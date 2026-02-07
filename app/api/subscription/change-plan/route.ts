@@ -142,11 +142,13 @@ export async function POST(req: NextRequest) {
 
     } else if (isDowngrade) {
       // DOWNGRADE: Plus → Pro
-      // Schedule the change for end of billing period (just update status)
+      // SECURITY: Schedule the change and record the target plan
+      // This prevents manipulation of what plan to downgrade to
       await supabase
         .from("users")
         .update({
           subscription_status: 'downgrading',
+          scheduled_plan: newPlan, // Track what plan to downgrade to
         })
         .eq("id", user.id);
 

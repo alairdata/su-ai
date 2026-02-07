@@ -377,12 +377,8 @@ function HomePage() {
     });
 
     if (result?.error) {
-      if (result.error === "NO_ACCOUNT") {
-        setAuthError("Account not found. Please sign up to create an account.");
-        setAuthMode("signup");
-      } else {
-        setAuthError(result.error);
-      }
+      // SECURITY: Show error message directly - no special handling to prevent enumeration
+      setAuthError(result.error);
     } else {
       setAuthEmail("");
       setAuthPassword("");

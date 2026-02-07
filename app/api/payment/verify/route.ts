@@ -96,13 +96,15 @@ export async function POST(request: Request) {
         }
       }
 
-      // Check if authorization is reusable (for recurring billing)
-      if (!authorization?.reusable) {
-        console.warn('Authorization is not reusable for user:', userId);
-      }
-
       // Calculate next billing date (30 days from now)
       const currentPeriodEnd = getNextBillingDate();
+
+      // SECURITY: Only save authorization if it's reusable
+      // Non-reusable authorizations will fail on recurring billing
+      const isReusable = authorization?.reusable === true;
+      if (!isReusable) {
+        console.warn('SECURITY: Authorization is not reusable for user:', userId, '- recurring billing will fail');
+      }
 
       // Update user's plan and save authorization for recurring billing
       const { error: updateError } = await supabase
@@ -113,7 +115,8 @@ export async function POST(request: Request) {
           current_period_end: currentPeriodEnd.toISOString(),
           // Paystack-specific fields
           paystack_customer_code: customer?.customer_code || null,
-          paystack_authorization: authorization?.authorization_code || null,
+          // SECURITY: Only save authorization if reusable
+          paystack_authorization: isReusable ? (authorization?.authorization_code || null) : null,
           paystack_card_last4: authorization?.last4 || null,
           paystack_card_brand: authorization?.card_type || null,
           // Clear any Stripe fields if migrating

@@ -39,6 +39,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing userId or plan" }, { status: 400 });
   }
 
+  // SECURITY: Validate userId is a valid UUID format
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(userId)) {
+    return NextResponse.json({ error: "Invalid user ID format" }, { status: 400 });
+  }
+
   if (!["Free", "Pro", "Plus"].includes(plan)) {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
@@ -72,8 +78,9 @@ export async function POST(req: NextRequest) {
     newPlan: plan,
   });
 
-  // Store audit log in database (fire and forget, don't block response)
-  supabase
+  // SECURITY: Store audit log in database with error handling
+  // This is critical for compliance - log errors but don't block the response
+  const auditPromise = supabase
     .from("admin_audit_logs")
     .insert({
       admin_email: session.user.email,
@@ -81,8 +88,21 @@ export async function POST(req: NextRequest) {
       target_user_id: userId,
       target_user_email: targetUser?.email,
       details: { previousPlan, newPlan: plan },
-    })
-    .then(() => {});
+    });
+
+  // Don't block response, but log any errors
+  auditPromise.then(({ error: auditError }) => {
+    if (auditError) {
+      // CRITICAL: Audit log failed - this should alert monitoring
+      console.error('CRITICAL: Failed to save admin audit log:', {
+        error: auditError,
+        adminEmail: session.user.email,
+        action: 'plan_change',
+        targetUserId: userId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
 
   return NextResponse.json({ success: true, plan });
 }

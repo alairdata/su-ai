@@ -1,8 +1,15 @@
+
 -- Security Fixes Migration
 -- Run this in your Supabase SQL Editor
 
 -- 1. Add session_version column for session invalidation on password reset
 ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INTEGER DEFAULT 1;
+
+-- 1b. Add scheduled_plan column for tracking downgrade target
+ALTER TABLE users ADD COLUMN IF NOT EXISTS scheduled_plan TEXT;
+
+-- 1c. Add reset_timezone column for preventing timezone manipulation
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_timezone TEXT;
 
 -- 2. Function to atomically increment messages_used_today with limit check
 -- Returns true if increment succeeded, false if limit would be exceeded

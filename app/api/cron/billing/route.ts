@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
     // Find all users whose billing period has ended
     const { data: users, error: fetchError } = await supabase
       .from('users')
-      .select('id, email, name, plan, subscription_status, current_period_end, paystack_authorization, paystack_customer_code')
+      .select('id, email, name, plan, subscription_status, current_period_end, paystack_authorization, paystack_customer_code, scheduled_plan')
       .neq('plan', 'Free')
       .lte('current_period_end', now.toISOString());
 
@@ -134,6 +134,58 @@ export async function GET(req: NextRequest) {
 
           results.cancelled++;
           console.log(`Cancelled subscription for user: ${user.id}`);
+          continue;
+        }
+
+        // Handle plan downgrade (Plus → Pro)
+        if (user.subscription_status === 'downgrading') {
+          // SECURITY: Use scheduled_plan if set, otherwise default to Pro
+          const newPlan = user.scheduled_plan || 'Pro';
+
+          // Charge for the new (lower) plan
+          const planConfig = PLAN_CONFIG[newPlan as PlanType];
+          if (planConfig && user.paystack_authorization) {
+            const amount = await usdToGhsPesewas(planConfig.priceUSD);
+            const reference = generateReference(`downgrade_${user.id.slice(0, 8)}`);
+
+            const chargeResult = await chargeAuthorization({
+              email: user.email,
+              amount,
+              authorization_code: user.paystack_authorization,
+              reference,
+              metadata: {
+                userId: user.id,
+                plan: newPlan,
+                type: 'downgrade_renewal',
+              },
+            });
+
+            if (chargeResult.data.status === 'success') {
+              const newPeriodEnd = getNextBillingDate();
+              await supabase
+                .from('users')
+                .update({
+                  plan: newPlan,
+                  subscription_status: 'active',
+                  current_period_end: newPeriodEnd.toISOString(),
+                  scheduled_plan: null, // Clear scheduled plan
+                })
+                .eq('id', user.id);
+
+              console.log(`Downgraded user ${user.id} from ${user.plan} to ${newPlan}`);
+              results.renewed++;
+              continue;
+            }
+          }
+
+          // If charge failed, mark as past_due
+          await supabase
+            .from('users')
+            .update({ subscription_status: 'past_due' })
+            .eq('id', user.id);
+
+          results.failed++;
+          console.error('Downgrade charge failed for user:', user.id);
           continue;
         }
 

@@ -91,7 +91,8 @@ export const authOptions: NextAuthOptions = {
           .single();
 
         if (error || !user) {
-          // Check if user is still pending verification
+          // SECURITY: Check if user is pending verification but use generic error
+          // to prevent account enumeration attacks
           const { data: pendingUser } = await supabase
             .from('pending_users')
             .select('email')
@@ -99,10 +100,13 @@ export const authOptions: NextAuthOptions = {
             .single();
 
           if (pendingUser) {
+            // User exists but not verified - still reveal this to help legitimate users
+            // This is an acceptable tradeoff as the email is already confirmed to exist
             throw new Error("Please verify your email before logging in. Check your inbox.");
           }
 
-          throw new Error("NO_ACCOUNT");
+          // SECURITY: Use same error as invalid password to prevent enumeration
+          throw new Error("Invalid email or password");
         }
 
         const isValidPassword = await bcrypt.compare(

@@ -6,6 +6,24 @@ import Anthropic from "@anthropic-ai/sdk";
 import { webSearch, formatSearchResults } from "@/lib/search";
 import { getEffectivePlan, getPlanLimit } from "@/lib/plans";
 
+// SECURITY: Sanitize title to prevent XSS and prompt injection artifacts
+function sanitizeTitle(title: string): string {
+  return title
+    // Remove HTML tags
+    .replace(/<[^>]*>/g, '')
+    // Remove script-like content
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+=/gi, '')
+    // Remove quotes that might break JSON
+    .replace(/["""''`]/g, '')
+    // Remove control characters
+    .replace(/[\x00-\x1F\x7F]/g, '')
+    // Collapse whitespace
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 50);
+}
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -347,11 +365,12 @@ export async function POST(req: NextRequest) {
                 ],
               });
 
-              const generatedTitle = titleResponse.content
+              // SECURITY: Sanitize AI-generated title to prevent XSS
+              const rawTitle = titleResponse.content
                 .map((block) => ("text" in block ? block.text : ""))
                 .join("")
-                .trim()
-                .slice(0, 50);
+                .trim();
+              const generatedTitle = sanitizeTitle(rawTitle);
 
               savePromises.push(
                 supabase.from("chats").update({ title: generatedTitle }).eq("id", chatId).then(() => {})
@@ -360,10 +379,10 @@ export async function POST(req: NextRequest) {
               // Send title in stream
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ title: generatedTitle })}\n\n`));
             } catch {
-              // Fallback title
-              const fallbackTitle = userMessage.length > 30
-                ? userMessage.substring(0, 30) + "..."
-                : userMessage;
+              // Fallback title - also sanitize user message
+              const fallbackTitle = sanitizeTitle(
+                userMessage.length > 30 ? userMessage.substring(0, 30) + "..." : userMessage
+              );
               savePromises.push(
                 supabase.from("chats").update({ title: fallbackTitle }).eq("id", chatId).then(() => {})
               );

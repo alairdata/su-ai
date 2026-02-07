@@ -41,6 +41,30 @@ export async function POST(req: NextRequest) {
 
     const { messageId, chatId, feedback } = validation.data;
 
+    // SECURITY: Verify the chat belongs to this user before accepting feedback
+    const { data: chat, error: chatError } = await supabase
+      .from("chats")
+      .select("id")
+      .eq("id", chatId)
+      .eq("user_id", session.user.id)
+      .single();
+
+    if (chatError || !chat) {
+      return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+    }
+
+    // SECURITY: Verify the message exists in this chat
+    const { data: message, error: msgError } = await supabase
+      .from("messages")
+      .select("id")
+      .eq("id", messageId)
+      .eq("chat_id", chatId)
+      .single();
+
+    if (msgError || !message) {
+      return NextResponse.json({ error: "Message not found" }, { status: 404 });
+    }
+
     // Store feedback in database (upsert to handle updates)
     const { error } = await supabase
       .from("message_feedback")
