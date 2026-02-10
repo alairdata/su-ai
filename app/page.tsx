@@ -73,8 +73,8 @@ function HomePage() {
   // Message feedback state (like/dislike)
   const [messageFeedback, setMessageFeedback] = useState<Record<string, 'like' | 'dislike'>>({});
 
-  // Update banner state
-  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+  // Update banner state (true for preview, auto-detection handles it in production)
+  const [showUpdateBanner, setShowUpdateBanner] = useState(true);
 
   // Plus menu state
   const [showPlusMenu, setShowPlusMenu] = useState(false);

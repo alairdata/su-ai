@@ -1,10 +1,18 @@
 import { NextResponse } from 'next/server';
 
-// This value is set at build time and stays constant for the lifetime of the deployment
-const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA || process.env.BUILD_ID || Date.now().toString();
+// Force this route to be dynamic (not cached by Next.js)
+export const dynamic = 'force-dynamic';
+
+// VERCEL_GIT_COMMIT_SHA is set by Vercel on every deployment - stable within a deploy
+// Fallback to a build-time timestamp baked into the bundle
+const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA || '20260210';
 
 export async function GET() {
   return NextResponse.json({ buildId: BUILD_ID }, {
-    headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    },
   });
 }
