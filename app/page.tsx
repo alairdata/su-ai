@@ -73,6 +73,9 @@ function HomePage() {
   // Message feedback state (like/dislike)
   const [messageFeedback, setMessageFeedback] = useState<Record<string, 'like' | 'dislike'>>({});
 
+  // Update banner state
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+
   // Plus menu state
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const plusMenuRef = useRef<HTMLDivElement>(null);
@@ -175,6 +178,59 @@ function HomePage() {
     };
     autoDetectTimezone();
   }, [session?.user]);
+
+  // Check for app updates by polling a lightweight endpoint
+  useEffect(() => {
+    let initialBuildId: string | null = null;
+
+    const checkForUpdate = async () => {
+      try {
+        // Fetch the app shell and extract the build ID from Next.js
+        const res = await fetch('/', { method: 'HEAD', cache: 'no-store' });
+        const buildId = res.headers.get('x-nextjs-cache') || res.headers.get('etag') || '';
+
+        if (!initialBuildId) {
+          initialBuildId = buildId;
+        } else if (buildId && buildId !== initialBuildId) {
+          setShowUpdateBanner(true);
+        }
+      } catch {
+        // Silently ignore network errors
+      }
+    };
+
+    // Also check via Next.js build manifest which changes on every deploy
+    const checkBuildManifest = async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const nextData = (window as any).__NEXT_DATA__;
+        const buildId = nextData?.buildId || 'unknown';
+        const res = await fetch(`/_next/static/${buildId}/_buildManifest.js`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) {
+          // Build manifest 404 means new build was deployed
+          setShowUpdateBanner(true);
+        }
+      } catch {
+        // Silently ignore
+      }
+    };
+
+    // Poll every 5 minutes
+    const interval = setInterval(() => {
+      checkForUpdate();
+      checkBuildManifest();
+    }, 5 * 60 * 1000);
+
+    // Initial check after 30 seconds
+    const timeout = setTimeout(checkForUpdate, 30000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, []);
 
   // Detect mobile and handle orientation changes
   useEffect(() => {
@@ -1593,6 +1649,30 @@ function HomePage() {
               </button>
             </div>
           </div>
+
+          {showUpdateBanner && (
+            <div style={currentStyles.updateBanner}>
+              <div style={currentStyles.updateBannerContent}>
+                <span style={currentStyles.updateBannerText}>
+                  Hey, this is probably that old boring version
+                </span>
+                <div style={currentStyles.updateBannerActions}>
+                  <button
+                    style={currentStyles.updateBannerRefresh}
+                    onClick={() => window.location.reload()}
+                  >
+                    Refresh
+                  </button>
+                  <button
+                    style={currentStyles.updateBannerDismiss}
+                    onClick={() => setShowUpdateBanner(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div style={currentStyles.chatWrapper}>
             <div
@@ -4143,6 +4223,49 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     cursor: 'pointer',
     color: 'white',
   },
+  updateBanner: {
+    background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+    padding: '10px 16px',
+    borderBottom: '1px solid #333',
+  },
+  updateBannerContent: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    maxWidth: '900px',
+    margin: '0 auto',
+  },
+  updateBannerText: {
+    color: '#e0e0e0',
+    fontSize: '13px',
+    lineHeight: 1.4,
+  },
+  updateBannerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexShrink: 0,
+  },
+  updateBannerRefresh: {
+    background: '#fff',
+    color: '#1a1a1a',
+    border: 'none',
+    borderRadius: '6px',
+    padding: '6px 14px',
+    fontSize: '12px',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  updateBannerDismiss: {
+    background: 'none',
+    border: 'none',
+    color: '#888',
+    fontSize: '16px',
+    cursor: 'pointer',
+    padding: '4px',
+    lineHeight: 1,
+  },
 };
 
 // Dark Mode Styles
@@ -4501,6 +4624,11 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
     ...lightStyles.deleteCancelBtn,
     border: '1px solid #3a3a3a',
     color: '#fff',
+  },
+  updateBanner: {
+    ...lightStyles.updateBanner,
+    background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)',
+    borderBottom: '1px solid #2a2a2a',
   },
 };
 
