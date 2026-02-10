@@ -176,14 +176,22 @@ function HomePage() {
     autoDetectTimezone();
   }, [session?.user]);
 
-  // "Still there?" prompt — shows every 30 minutes to force a page reload
+  // Force refresh: check server version after 1 second — if there's a newer
+  // version than what the user last refreshed to, show "Still there?" prompt.
+  // After they click Continue (reload), localStorage matches → no more prompt.
   useEffect(() => {
-    const THIRTY_MINUTES = 30 * 60 * 1000;
-    const interval = setInterval(() => {
-      setShowStillThere(true);
-    }, THIRTY_MINUTES);
-
-    return () => clearInterval(interval);
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/version', { cache: 'no-store' });
+        const { buildId: serverBuildId } = await res.json();
+        const lastForcedVersion = localStorage.getItem('last_forced_version');
+        if (lastForcedVersion !== serverBuildId) {
+          localStorage.setItem('last_forced_version', serverBuildId);
+          setShowStillThere(true);
+        }
+      } catch {}
+    }, 1000);
+    return () => clearTimeout(timeout);
   }, []);
 
   // Detect mobile and handle orientation changes
