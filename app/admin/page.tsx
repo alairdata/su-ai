@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import {
   LineChart,
   Line,
+  AreaChart,
+  Area,
   BarChart,
   Bar,
   XAxis,
@@ -324,7 +326,7 @@ export default function AdminPage() {
               <div style={styles.chartLoading}>Loading...</div>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
-                <LineChart
+                <AreaChart
                   data={userTrend.map((u, i) => ({
                     label: u.label,
                     users: u.cumulative,
@@ -332,6 +334,16 @@ export default function AdminPage() {
                   }))}
                   margin={{ top: 5, right: 50, bottom: 5, left: 0 }}
                 >
+                  <defs>
+                    <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
+                    </linearGradient>
+                    <linearGradient id="colorMessages" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
                   <XAxis
                     dataKey="label"
                     axisLine={false}
@@ -364,25 +376,25 @@ export default function AdminPage() {
                     }}
                   />
                   <Legend />
-                  <Line
+                  <Area
                     yAxisId="left"
                     type="monotone"
                     dataKey="users"
                     stroke="#3b82f6"
-                    strokeWidth={2.5}
-                    dot={false}
+                    strokeWidth={2}
+                    fill="url(#colorUsers)"
                     name="Users"
                   />
-                  <Line
+                  <Area
                     yAxisId="right"
                     type="monotone"
                     dataKey="messages"
                     stroke="#8b5cf6"
-                    strokeWidth={2.5}
-                    dot={false}
+                    strokeWidth={2}
+                    fill="url(#colorMessages)"
                     name="Messages"
                   />
-                </LineChart>
+                </AreaChart>
               </ResponsiveContainer>
             )}
           </div>
