@@ -64,23 +64,22 @@ export function useChats() {
     setStoredChatId(chatId);
   };
 
-  // Sync local message count from session on initial load or user change
+  // Track user changes (for clearing stored chat on account switch)
   const userId = session?.user?.id ?? null;
-  const sessionMessagesUsed = session?.user?.messagesUsedToday ?? 0;
   const lastUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Only sync when user changes (login) or on first load
     if (userId && userId !== lastUserIdRef.current) {
-      setLocalMessagesUsed(sessionMessagesUsed);
-      // Clear stored chat when user changes (different user logging in)
+      // Reset local counter so it falls back to session value from DB
+      setLocalMessagesUsed(null);
+      // Clear stored chat when switching accounts
       if (lastUserIdRef.current !== null) {
         setStoredChatId(null);
         setCurrentChatIdState(null);
       }
       lastUserIdRef.current = userId;
     }
-  }, [userId, sessionMessagesUsed]);
+  }, [userId]);
 
 
   // Load chats from API when user logs in
