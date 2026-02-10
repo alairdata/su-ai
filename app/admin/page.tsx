@@ -243,9 +243,30 @@ export default function AdminPage() {
     <div style={styles.container}>
       <div style={styles.header}>
         <h1 style={styles.title}>Admin Dashboard</h1>
-        <button onClick={() => router.push("/")} style={styles.backBtn}>
-          ← Back to app
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={async () => {
+              if (!confirm('Force logout ALL users? They will need to sign in again.')) return;
+              try {
+                const res = await fetch('/api/admin/force-logout', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                  alert(`Done! ${data.usersAffected} users will be logged out.`);
+                } else {
+                  alert('Failed: ' + (data.error || 'Unknown error'));
+                }
+              } catch {
+                alert('Failed to force logout users');
+              }
+            }}
+            style={{ ...styles.backBtn, background: '#ef4444', color: '#fff', border: 'none' }}
+          >
+            Force Logout All
+          </button>
+          <button onClick={() => router.push("/")} style={styles.backBtn}>
+            ← Back to app
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards - Period-specific */}
@@ -615,16 +636,47 @@ export default function AdminPage() {
                     }
                   </td>
                   <td style={styles.td}>
-                    <select
-                      value={user.plan}
-                      onChange={(e) => updatePlan(user.id, e.target.value)}
-                      disabled={updatingUser === user.id}
-                      style={styles.select}
-                    >
-                      <option value="Free">Free</option>
-                      <option value="Pro">Pro</option>
-                      <option value="Plus">Plus</option>
-                    </select>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <select
+                        value={user.plan}
+                        onChange={(e) => updatePlan(user.id, e.target.value)}
+                        disabled={updatingUser === user.id}
+                        style={styles.select}
+                      >
+                        <option value="Free">Free</option>
+                        <option value="Pro">Pro</option>
+                        <option value="Plus">Plus</option>
+                      </select>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Force logout ${user.name}?`)) return;
+                          try {
+                            const res = await fetch('/api/admin/force-logout', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ userId: user.id }),
+                            });
+                            const data = await res.json();
+                            if (data.success) alert(`${user.name} will be logged out.`);
+                            else alert('Failed: ' + (data.error || 'Unknown error'));
+                          } catch {
+                            alert('Failed to force logout user');
+                          }
+                        }}
+                        style={{
+                          padding: '4px 8px',
+                          background: '#ef4444',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          whiteSpace: 'nowrap' as const,
+                        }}
+                      >
+                        Logout
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
