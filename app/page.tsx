@@ -2433,12 +2433,17 @@ function HomePage() {
 
                 <div style={currentStyles.modalSection}>
                   <h3 style={currentStyles.modalSectionTitle}>Timezone</h3>
-                  <p style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>
+                  <p style={{ fontSize: '13px', color: theme === 'dark' ? '#888' : '#666', marginBottom: '12px' }}>
                     Your daily message limit resets at midnight in your timezone.
                   </p>
-                  <p style={{ fontSize: '14px', color: theme === 'dark' ? '#ccc' : '#333', margin: 0 }}>
-                    {session?.user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone} (auto-detected)
-                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '14px', color: theme === 'dark' ? '#ccc' : '#333' }}>
+                      {session?.user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone}
+                    </span>
+                    <span style={{ fontSize: '12px', color: theme === 'dark' ? '#666' : '#999' }}>
+                      (auto-detected)
+                    </span>
+                  </div>
                 </div>
 
                 <div style={currentStyles.modalSection}>
