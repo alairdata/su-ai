@@ -73,8 +73,6 @@ function HomePage() {
   // Message feedback state (like/dislike)
   const [messageFeedback, setMessageFeedback] = useState<Record<string, 'like' | 'dislike'>>({});
 
-  // Update banner state (true for preview, auto-detection handles it in production)
-
   // Plus menu state
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const plusMenuRef = useRef<HTMLDivElement>(null);
@@ -178,37 +176,14 @@ function HomePage() {
     autoDetectTimezone();
   }, [session?.user]);
 
-  // Force refresh when a new version is deployed
-  // CLIENT_BUILD_ID is baked into the JS bundle at build time via next.config.ts
+  // "Still there?" prompt — shows every 30 minutes to force a page reload
   useEffect(() => {
-    const clientBuildId = process.env.NEXT_PUBLIC_BUILD_ID || 'dev';
+    const THIRTY_MINUTES = 30 * 60 * 1000;
+    const interval = setInterval(() => {
+      setShowStillThere(true);
+    }, THIRTY_MINUTES);
 
-    const checkForUpdate = async () => {
-      try {
-        const res = await fetch('/api/version', { cache: 'no-store' });
-        const data = await res.json();
-        const serverBuildId = data.buildId;
-
-        // If server version differs from what's baked into this bundle, we're stale
-        if (serverBuildId !== clientBuildId) {
-          const lastRefreshedTo = sessionStorage.getItem('refreshed_to_version');
-          if (lastRefreshedTo === serverBuildId) return; // Already refreshed to this version
-          sessionStorage.setItem('refreshed_to_version', serverBuildId);
-          window.location.reload();
-        }
-      } catch {
-        // Silently ignore
-      }
-    };
-
-    // First check after 5 seconds, then every 30 seconds
-    const timeout = setTimeout(checkForUpdate, 5000);
-    const interval = setInterval(checkForUpdate, 30 * 1000);
-
-    return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, []);
 
   // Detect mobile and handle orientation changes
@@ -1428,7 +1403,7 @@ function HomePage() {
               Ready to continue chatting with So Unfiltered AI?
             </p>
             <button
-              onClick={() => setShowStillThere(false)}
+              onClick={() => window.location.reload()}
               style={currentStyles.authBtn}
               className="auth-btn-ripple"
             >

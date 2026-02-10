@@ -2,27 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { PLAN_LIMITS } from '@/lib/constants';
 
-// CLIENT_BUILD_ID is baked into the JS bundle at build time via next.config.ts
-const CLIENT_BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID || 'dev';
-
-async function checkForVersionChange(): Promise<boolean> {
-  try {
-    const res = await fetch('/api/version', { cache: 'no-store' });
-    const data = await res.json();
-
-    // If server version differs from what's baked into this bundle, we're stale
-    if (data.buildId !== CLIENT_BUILD_ID) {
-      const lastRefreshedTo = sessionStorage.getItem('refreshed_to_version');
-      if (lastRefreshedTo === data.buildId) return false; // Already refreshed
-      sessionStorage.setItem('refreshed_to_version', data.buildId);
-      return true;
-    }
-  } catch {
-    // Silently ignore
-  }
-  return false;
-}
-
 type Message = {
   id: string;
   role: "user" | "assistant";
@@ -511,10 +490,6 @@ export function useChats() {
       pendingChatIdRef.current = null;
       abortControllerRef.current = null;
 
-      // Check if app was updated — auto-refresh once after message is sent
-      checkForVersionChange().then(changed => {
-        if (changed) window.location.reload();
-      });
     }
   };
 
