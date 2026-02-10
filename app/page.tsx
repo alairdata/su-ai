@@ -179,12 +179,14 @@ function HomePage() {
     autoDetectTimezone();
   }, [session?.user]);
 
-  // Check for app updates by polling /api/version
+  // Check for app updates — force refresh when new version detected
   useEffect(() => {
     let initialBuildId: string | null = null;
 
     const checkForUpdate = async () => {
       try {
+        if (sessionStorage.getItem('version_refreshed')) return;
+
         const res = await fetch('/api/version', { cache: 'no-store' });
         const data = await res.json();
         const buildId = data.buildId;
@@ -192,18 +194,19 @@ function HomePage() {
         if (!initialBuildId) {
           initialBuildId = buildId;
         } else if (buildId !== initialBuildId) {
-          setShowUpdateBanner(true);
+          sessionStorage.setItem('version_refreshed', '1');
+          window.location.reload();
         }
       } catch {
         // Silently ignore network errors
       }
     };
 
-    // First check after 30 seconds to store the initial build ID
-    const timeout = setTimeout(checkForUpdate, 30000);
+    // First check after 15 seconds to store the initial build ID
+    const timeout = setTimeout(checkForUpdate, 15000);
 
-    // Then poll every 1 minute
-    const interval = setInterval(checkForUpdate, 60 * 1000);
+    // Then poll every 30 seconds
+    const interval = setInterval(checkForUpdate, 30 * 1000);
 
     return () => {
       clearTimeout(timeout);
@@ -1628,30 +1631,6 @@ function HomePage() {
               </button>
             </div>
           </div>
-
-          {showUpdateBanner && (
-            <div style={currentStyles.updateBanner}>
-              <div style={currentStyles.updateBannerContent}>
-                <span style={currentStyles.updateBannerText}>
-                  Hey, this is probably that old boring version
-                </span>
-                <div style={currentStyles.updateBannerActions}>
-                  <button
-                    style={currentStyles.updateBannerRefresh}
-                    onClick={() => window.location.reload()}
-                  >
-                    Refresh
-                  </button>
-                  <button
-                    style={currentStyles.updateBannerDismiss}
-                    onClick={() => setShowUpdateBanner(false)}
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div style={currentStyles.chatWrapper}>
             <div
