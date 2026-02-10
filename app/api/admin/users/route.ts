@@ -113,12 +113,18 @@ export async function GET(req: NextRequest) {
   }
 
   // Add last_active, total_messages, and days_active to each user
-  const usersWithActivity = (users || []).map(user => ({
-    ...user,
-    total_messages: messageCountMap.get(user.id) || 0,
-    days_active: daysActiveMap.get(user.id) || 0,
-    last_active: lastActiveMap.get(user.id) || null
-  }));
+  const today = new Date();
+  const usersWithActivity = (users || []).map(user => {
+    const joinedDate = new Date(user.created_at);
+    const diffMs = today.getTime() - joinedDate.getTime();
+    const daysSinceJoined = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1; // +1 to count join day
+    return {
+      ...user,
+      total_messages: messageCountMap.get(user.id) || 0,
+      days_active: daysSinceJoined,
+      last_active: lastActiveMap.get(user.id) || null
+    };
+  });
 
   return NextResponse.json({ users: usersWithActivity });
 }
