@@ -411,7 +411,13 @@ export default function AdminPage() {
               <div style={styles.chartLoading}>Loading...</div>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={avgTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                <AreaChart data={avgTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                  <defs>
+                    <linearGradient id="colorAvg" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
                   <XAxis
                     dataKey="label"
                     axisLine={false}
@@ -435,15 +441,15 @@ export default function AdminPage() {
                     }}
                     formatter={(value) => [typeof value === 'number' ? value.toFixed(1) : '0', "Avg"]}
                   />
-                  <Line
+                  <Area
                     type="monotone"
                     dataKey="avg"
                     stroke="#10b981"
-                    strokeWidth={2.5}
-                    dot={false}
+                    strokeWidth={2}
+                    fill="url(#colorAvg)"
                     activeDot={{ r: 4, fill: "#10b981", stroke: "#fff", strokeWidth: 2 }}
                   />
-                </LineChart>
+                </AreaChart>
               </ResponsiveContainer>
             )}
           </div>
