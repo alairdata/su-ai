@@ -103,12 +103,6 @@ export function useChats() {
     }
   }, [userId, sessionMessagesUsed]);
 
-  // Store initial build ID on first load
-  useEffect(() => {
-    if (!initialBuildId) {
-      checkForVersionChange();
-    }
-  }, []);
 
   // Load chats from API when user logs in
   useEffect(() => {
