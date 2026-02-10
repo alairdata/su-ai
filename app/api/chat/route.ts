@@ -203,6 +203,7 @@ export async function POST(req: NextRequest) {
         chat_id: chatId,
         role: "user",
         content: userMessage,
+        user_email: dbUser.email,
       });
       if (msgError) {
         console.error("Failed to save user message:", msgError);
