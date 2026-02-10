@@ -2,24 +2,19 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { PLAN_LIMITS } from '@/lib/constants';
 
-// Store initial build ID on first load
-let initialBuildId: string | null = null;
+// CLIENT_BUILD_ID is baked into the JS bundle at build time via next.config.ts
+const CLIENT_BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID || 'dev';
 
 async function checkForVersionChange(): Promise<boolean> {
   try {
-    // Don't check more than once per session
-    if (sessionStorage.getItem('version_refreshed')) return false;
-
     const res = await fetch('/api/version', { cache: 'no-store' });
     const data = await res.json();
 
-    if (!initialBuildId) {
-      initialBuildId = data.buildId;
-      return false;
-    }
-
-    if (data.buildId !== initialBuildId) {
-      sessionStorage.setItem('version_refreshed', '1');
+    // If server version differs from what's baked into this bundle, we're stale
+    if (data.buildId !== CLIENT_BUILD_ID) {
+      const lastRefreshedTo = sessionStorage.getItem('refreshed_to_version');
+      if (lastRefreshedTo === data.buildId) return false; // Already refreshed
+      sessionStorage.setItem('refreshed_to_version', data.buildId);
       return true;
     }
   } catch {

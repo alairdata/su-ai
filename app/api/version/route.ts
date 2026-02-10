@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 // VERCEL_GIT_COMMIT_SHA is set by Vercel on every deployment - stable within a deploy
 // Fallback to a build-time timestamp baked into the bundle
-const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA || '20260210b';
+const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA || '20260210c';
 
 export async function GET() {
   return NextResponse.json({ buildId: BUILD_ID }, {

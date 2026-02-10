@@ -74,7 +74,6 @@ function HomePage() {
   const [messageFeedback, setMessageFeedback] = useState<Record<string, 'like' | 'dislike'>>({});
 
   // Update banner state (true for preview, auto-detection handles it in production)
-  const [showUpdateBanner, setShowUpdateBanner] = useState(true);
 
   // Plus menu state
   const [showPlusMenu, setShowPlusMenu] = useState(false);
@@ -179,33 +178,31 @@ function HomePage() {
     autoDetectTimezone();
   }, [session?.user]);
 
-  // Check for app updates — force refresh when new version detected
+  // Force refresh when a new version is deployed
+  // CLIENT_BUILD_ID is baked into the JS bundle at build time via next.config.ts
   useEffect(() => {
-    let initialBuildId: string | null = null;
+    const clientBuildId = process.env.NEXT_PUBLIC_BUILD_ID || 'dev';
 
     const checkForUpdate = async () => {
       try {
-        if (sessionStorage.getItem('version_refreshed')) return;
-
         const res = await fetch('/api/version', { cache: 'no-store' });
         const data = await res.json();
-        const buildId = data.buildId;
+        const serverBuildId = data.buildId;
 
-        if (!initialBuildId) {
-          initialBuildId = buildId;
-        } else if (buildId !== initialBuildId) {
-          sessionStorage.setItem('version_refreshed', '1');
+        // If server version differs from what's baked into this bundle, we're stale
+        if (serverBuildId !== clientBuildId) {
+          const lastRefreshedTo = sessionStorage.getItem('refreshed_to_version');
+          if (lastRefreshedTo === serverBuildId) return; // Already refreshed to this version
+          sessionStorage.setItem('refreshed_to_version', serverBuildId);
           window.location.reload();
         }
       } catch {
-        // Silently ignore network errors
+        // Silently ignore
       }
     };
 
-    // First check after 15 seconds to store the initial build ID
-    const timeout = setTimeout(checkForUpdate, 15000);
-
-    // Then poll every 30 seconds
+    // First check after 5 seconds, then every 30 seconds
+    const timeout = setTimeout(checkForUpdate, 5000);
     const interval = setInterval(checkForUpdate, 30 * 1000);
 
     return () => {
@@ -4129,49 +4126,6 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     cursor: 'pointer',
     color: 'white',
   },
-  updateBanner: {
-    background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-    padding: '10px 16px',
-    borderBottom: '1px solid #333',
-  },
-  updateBannerContent: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    maxWidth: '900px',
-    margin: '0 auto',
-  },
-  updateBannerText: {
-    color: '#e0e0e0',
-    fontSize: '13px',
-    lineHeight: 1.4,
-  },
-  updateBannerActions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    flexShrink: 0,
-  },
-  updateBannerRefresh: {
-    background: '#fff',
-    color: '#1a1a1a',
-    border: 'none',
-    borderRadius: '6px',
-    padding: '6px 14px',
-    fontSize: '12px',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  updateBannerDismiss: {
-    background: 'none',
-    border: 'none',
-    color: '#888',
-    fontSize: '16px',
-    cursor: 'pointer',
-    padding: '4px',
-    lineHeight: 1,
-  },
 };
 
 // Dark Mode Styles
@@ -4530,11 +4484,6 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
     ...lightStyles.deleteCancelBtn,
     border: '1px solid #3a3a3a',
     color: '#fff',
-  },
-  updateBanner: {
-    ...lightStyles.updateBanner,
-    background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)',
-    borderBottom: '1px solid #2a2a2a',
   },
 };
 
