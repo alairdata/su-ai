@@ -95,20 +95,13 @@ export async function POST(req: NextRequest) {
     // If increment failed or limit exceeded, reject the request
     if (incrementError) {
       console.error("Failed to increment message count:", incrementError);
-      // Fallback to non-atomic check if RPC doesn't exist
-      const messagesUsedToday = dbUser.messages_used_today || 0;
-      if (messagesUsedToday >= dailyLimit) {
-        return NextResponse.json(
-          {
-            error: `Daily message limit reached (${dailyLimit} messages). Please upgrade your plan for more messages.`,
-            limitReached: true,
-            plan: userPlan,
-            limit: dailyLimit
-          },
-          { status: 429 }
-        );
-      }
-    } else if (incrementResult === false) {
+      return NextResponse.json(
+        { error: "Unable to verify message limit. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    if (incrementResult === false) {
       // RPC returned false = limit exceeded
       return NextResponse.json(
         {
@@ -137,9 +130,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!chatId) {
+    // SECURITY: Validate message length to prevent oversized requests
+    const MAX_MESSAGE_LENGTH = 32000;
+    if (userMessage.length > MAX_MESSAGE_LENGTH) {
       return NextResponse.json(
-        { error: "No chat ID provided." },
+        { error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters allowed.` },
+        { status: 400 }
+      );
+    }
+
+    // SECURITY: Validate chatId format (UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!chatId || !uuidRegex.test(chatId)) {
+      return NextResponse.json(
+        { error: "Invalid chat ID." },
         { status: 400 }
       );
     }
