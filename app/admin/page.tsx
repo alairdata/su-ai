@@ -325,7 +325,7 @@ export default function AdminPage() {
             {chartLoading ? (
               <div style={styles.chartLoading}>Loading...</div>
             ) : (
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={280}>
                 <AreaChart
                   data={userTrend.map((u, i) => ({
                     label: u.label,
@@ -410,12 +410,12 @@ export default function AdminPage() {
             {chartLoading ? (
               <div style={styles.chartLoading}>Loading...</div>
             ) : (
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={avgTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <defs>
-                    <linearGradient id="colorAvg" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
+                    <linearGradient id="gradientAvg" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.03} />
                     </linearGradient>
                   </defs>
                   <XAxis
@@ -446,7 +446,7 @@ export default function AdminPage() {
                     dataKey="avg"
                     stroke="#10b981"
                     strokeWidth={2}
-                    fill="url(#colorAvg)"
+                    fill="url(#gradientAvg)"
                     activeDot={{ r: 4, fill: "#10b981", stroke: "#fff", strokeWidth: 2 }}
                   />
                 </AreaChart>
@@ -465,7 +465,7 @@ export default function AdminPage() {
             {chartLoading ? (
               <div style={styles.chartLoading}>Loading...</div>
             ) : (
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={280}>
                 <BarChart
                   data={topUsers}
                   layout="vertical"
@@ -507,7 +507,7 @@ export default function AdminPage() {
             {chartLoading ? (
               <div style={styles.chartLoading}>Loading...</div>
             ) : (
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={messageDistribution} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <XAxis
                     dataKey="bucket"
