@@ -1,6 +1,32 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { PLAN_LIMITS } from '@/lib/constants';
+
+// Store initial build ID on first load
+let initialBuildId: string | null = null;
+
+async function checkForVersionChange(): Promise<boolean> {
+  try {
+    // Don't check more than once per session
+    if (sessionStorage.getItem('version_refreshed')) return false;
+
+    const res = await fetch('/api/version', { cache: 'no-store' });
+    const data = await res.json();
+
+    if (!initialBuildId) {
+      initialBuildId = data.buildId;
+      return false;
+    }
+
+    if (data.buildId !== initialBuildId) {
+      sessionStorage.setItem('version_refreshed', '1');
+      return true;
+    }
+  } catch {
+    // Silently ignore
+  }
+  return false;
+}
 
 type Message = {
   id: string;
@@ -81,6 +107,13 @@ export function useChats() {
       lastUserIdRef.current = userId;
     }
   }, [userId, sessionMessagesUsed]);
+
+  // Store initial build ID on first load
+  useEffect(() => {
+    if (!initialBuildId) {
+      checkForVersionChange();
+    }
+  }, []);
 
   // Load chats from API when user logs in
   useEffect(() => {
@@ -488,6 +521,11 @@ export function useChats() {
       setSearchQuery(null);
       pendingChatIdRef.current = null;
       abortControllerRef.current = null;
+
+      // Check if app was updated — auto-refresh once after message is sent
+      checkForVersionChange().then(changed => {
+        if (changed) window.location.reload();
+      });
     }
   };
 

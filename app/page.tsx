@@ -202,8 +202,8 @@ function HomePage() {
     // First check after 30 seconds to store the initial build ID
     const timeout = setTimeout(checkForUpdate, 30000);
 
-    // Then poll every 3 minutes
-    const interval = setInterval(checkForUpdate, 3 * 60 * 1000);
+    // Then poll every 1 minute
+    const interval = setInterval(checkForUpdate, 60 * 1000);
 
     return () => {
       clearTimeout(timeout);
