@@ -57,11 +57,10 @@ export async function POST(req: NextRequest) {
   }
 
   // All users logout (exclude admins)
-  const { error, count } = await supabase
+  const { error } = await supabase
     .from("users")
     .update({ force_logout: true })
-    .not('email', 'in', `(${ADMIN_EMAILS.join(',')})`)
-    .select('id', { count: 'exact', head: true });
+    .not('email', 'in', `(${ADMIN_EMAILS.join(',')})`);
 
   if (error) {
     console.error("Failed to force logout:", error);
@@ -71,8 +70,8 @@ export async function POST(req: NextRequest) {
   console.log('AUDIT: Force logout all users', {
     timestamp: new Date().toISOString(),
     adminEmail: session.user.email,
-    usersAffected: count,
+    scope: 'all',
   });
 
-  return NextResponse.json({ success: true, usersAffected: count });
+  return NextResponse.json({ success: true });
 }

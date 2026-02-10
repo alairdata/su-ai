@@ -251,7 +251,7 @@ export default function AdminPage() {
                 const res = await fetch('/api/admin/force-logout', { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
-                  alert(`Done! ${data.usersAffected} users will be logged out.`);
+                  alert('Done! All users will be logged out.');
                 } else {
                   alert('Failed: ' + (data.error || 'Unknown error'));
                 }
