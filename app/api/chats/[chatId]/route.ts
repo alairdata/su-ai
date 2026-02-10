@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from "@/lib/rate-limit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,10 +20,24 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Rate limiting - 60 requests per minute
+  const clientIP = getClientIP(req);
+  const rateLimitKey = getUserIPKey(session.user.id, clientIP, 'chat-get');
+  const rateLimitResult = rateLimit(rateLimitKey, RATE_LIMITS.chats);
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down." },
+      { status: 429, headers: rateLimitHeaders(rateLimitResult) }
+    );
+  }
+
   const { chatId } = await params;
 
-  if (!chatId) {
-    return NextResponse.json({ error: "Chat ID required" }, { status: 400 });
+  // SECURITY: Validate chatId format (UUID)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!chatId || !uuidRegex.test(chatId)) {
+    return NextResponse.json({ error: "Invalid chat ID" }, { status: 400 });
   }
 
   const { data: chat, error } = await supabase

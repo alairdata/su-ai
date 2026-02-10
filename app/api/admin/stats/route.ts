@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimit, getClientIP, rateLimitHeaders } from "@/lib/rate-limit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,20 +16,38 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .map(email => email.trim().toLowerCase())
   .filter(email => email.length > 0);
 
-// Emails to exclude from aggregations/stats
-const EXCLUDED_EMAILS = ['datawithprincilla@gmail.com'];
+// SECURITY: Emails to exclude from aggregations/stats - moved to env var
+const EXCLUDED_EMAILS = (process.env.EXCLUDED_STATS_EMAILS || '')
+  .split(',')
+  .map(email => email.trim().toLowerCase())
+  .filter(email => email.length > 0);
 
 function isAdmin(email: string | null | undefined): boolean {
   if (!email) return false;
   return ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
+// SECURITY: Rate limit for admin endpoints
+const ADMIN_RATE_LIMIT = { limit: 60, windowSeconds: 60 };
+
 // GET - Get dashboard stats
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.email || !isAdmin(session.user.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limiting for admin endpoints
+  const clientIP = getClientIP(req);
+  const rateLimitKey = `admin-stats:${session.user.id}:${clientIP}`;
+  const rateLimitResult = rateLimit(rateLimitKey, ADMIN_RATE_LIMIT);
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: rateLimitHeaders(rateLimitResult) }
+    );
   }
 
   // Get user counts by plan (include id and email for filtering)

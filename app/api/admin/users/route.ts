@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimit, getClientIP, rateLimitHeaders } from "@/lib/rate-limit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,12 +25,27 @@ function isAdmin(email: string | null | undefined): boolean {
   return ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
+// SECURITY: Rate limit for admin endpoints
+const ADMIN_RATE_LIMIT = { limit: 30, windowSeconds: 60 };
+
 // GET - List all users (with safety limit)
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.email || !isAdmin(session.user.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limiting for admin endpoints
+  const clientIP = getClientIP(req);
+  const rateLimitKey = `admin-users:${session.user.id}:${clientIP}`;
+  const rateLimitResult = rateLimit(rateLimitKey, ADMIN_RATE_LIMIT);
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: rateLimitHeaders(rateLimitResult) }
+    );
   }
 
   // SECURITY: Limit results to prevent DOS and data exposure
@@ -37,9 +53,10 @@ export async function GET(req: Request) {
   const limitParam = url.searchParams.get('limit');
   const limit = Math.min(parseInt(limitParam || '500'), 500); // Max 500 users
 
+  // SECURITY: Don't expose original_name to prevent PII leakage
   const { data: users, error } = await supabase
     .from("users")
-    .select("id, name, email, plan, messages_used_today, created_at, subscription_status, current_period_end, original_name")
+    .select("id, name, email, plan, messages_used_today, created_at, subscription_status, current_period_end")
     .order("created_at", { ascending: false })
     .limit(limit);
 

@@ -31,6 +31,10 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // SECURITY: Limit number of chats and messages to prevent large payload DoS
+  const MAX_CHATS = 100;
+  const MAX_MESSAGES_PER_CHAT = 50;
+
   const { data: chats, error } = await supabase
     .from("chats")
     .select(`
@@ -46,7 +50,17 @@ export async function GET(req: NextRequest) {
     `)
     .eq("user_id", session.user.id)
     .order("created_at", { ascending: false })
-    .order("created_at", { referencedTable: "messages", ascending: true });
+    .order("created_at", { referencedTable: "messages", ascending: true })
+    .limit(MAX_CHATS);
+
+  // Trim messages per chat to prevent oversized responses
+  if (chats) {
+    for (const chat of chats) {
+      if (chat.messages && chat.messages.length > MAX_MESSAGES_PER_CHAT) {
+        chat.messages = chat.messages.slice(-MAX_MESSAGES_PER_CHAT); // Keep last N messages
+      }
+    }
+  }
 
   if (error) {
     return NextResponse.json({ error: sanitizeErrorForClient(error) }, { status: 500 });
