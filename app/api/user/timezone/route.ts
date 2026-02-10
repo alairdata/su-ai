@@ -11,7 +11,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// POST - Update user's timezone
+// POST - Auto-detect and save user's timezone (only if not already set)
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
 
@@ -19,14 +19,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // SECURITY: Rate limit timezone changes to prevent reset abuse
-  // Only allow 2 timezone changes per day
+  // SECURITY: Rate limit to prevent abuse
   const clientIP = getClientIP(req);
   const rateLimitResult = rateLimit(`timezone:${session.user.id}`, { limit: 2, windowSeconds: 60 * 60 * 24 });
 
   if (!rateLimitResult.success) {
     return NextResponse.json(
-      { error: "Too many timezone changes. You can change your timezone twice per day." },
+      { error: "Too many requests." },
       { status: 429, headers: rateLimitHeaders(rateLimitResult) }
     );
   }
@@ -41,22 +40,19 @@ export async function POST(req: NextRequest) {
 
   const { timezone } = validation.data;
 
-  // Get current user data to check if reset_timezone needs to be set
+  // SECURITY: Only allow setting timezone if user doesn't already have one
+  // This prevents users from changing timezone to manipulate daily resets
   const { data: currentUser } = await supabase
     .from("users")
     .select("timezone, reset_timezone")
     .eq("id", session.user.id)
     .single();
 
-  // SECURITY: If reset_timezone is not set yet, set it to current timezone
-  // This prevents users from changing timezone to trigger early resets
-  const updateData: Record<string, string> = { timezone };
-
-  // Only update reset_timezone if it hasn't been set yet
-  // This preserves the timezone that was active at last reset
-  if (!currentUser?.reset_timezone) {
-    updateData.reset_timezone = timezone;
+  if (currentUser?.timezone) {
+    return NextResponse.json({ success: true, timezone: currentUser.timezone });
   }
+
+  const updateData: Record<string, string> = { timezone, reset_timezone: timezone };
 
   const { error } = await supabase
     .from("users")
