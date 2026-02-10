@@ -179,19 +179,19 @@ function HomePage() {
     autoDetectTimezone();
   }, [session?.user]);
 
-  // Check for app updates by polling a lightweight endpoint
+  // Check for app updates by polling /api/version
   useEffect(() => {
     let initialBuildId: string | null = null;
 
     const checkForUpdate = async () => {
       try {
-        // Fetch the app shell and extract the build ID from Next.js
-        const res = await fetch('/', { method: 'HEAD', cache: 'no-store' });
-        const buildId = res.headers.get('x-nextjs-cache') || res.headers.get('etag') || '';
+        const res = await fetch('/api/version', { cache: 'no-store' });
+        const data = await res.json();
+        const buildId = data.buildId;
 
         if (!initialBuildId) {
           initialBuildId = buildId;
-        } else if (buildId && buildId !== initialBuildId) {
+        } else if (buildId !== initialBuildId) {
           setShowUpdateBanner(true);
         }
       } catch {
@@ -199,36 +199,15 @@ function HomePage() {
       }
     };
 
-    // Also check via Next.js build manifest which changes on every deploy
-    const checkBuildManifest = async () => {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const nextData = (window as any).__NEXT_DATA__;
-        const buildId = nextData?.buildId || 'unknown';
-        const res = await fetch(`/_next/static/${buildId}/_buildManifest.js`, {
-          cache: 'no-store',
-        });
-        if (!res.ok) {
-          // Build manifest 404 means new build was deployed
-          setShowUpdateBanner(true);
-        }
-      } catch {
-        // Silently ignore
-      }
-    };
+    // First check after 30 seconds to store the initial build ID
+    const timeout = setTimeout(checkForUpdate, 30000);
 
-    // Poll every 5 minutes
-    const interval = setInterval(() => {
-      checkForUpdate();
-      checkBuildManifest();
-    }, 5 * 60 * 1000);
-
-    // Initial check after 20 seconds
-    const timeout = setTimeout(checkForUpdate, 20000);
+    // Then poll every 3 minutes
+    const interval = setInterval(checkForUpdate, 3 * 60 * 1000);
 
     return () => {
-      clearInterval(interval);
       clearTimeout(timeout);
+      clearInterval(interval);
     };
   }, []);
 
