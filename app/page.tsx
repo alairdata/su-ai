@@ -223,8 +223,8 @@ function HomePage() {
       checkBuildManifest();
     }, 5 * 60 * 1000);
 
-    // Initial check after 30 seconds
-    const timeout = setTimeout(checkForUpdate, 30000);
+    // Initial check after 20 seconds
+    const timeout = setTimeout(checkForUpdate, 20000);
 
     return () => {
       clearInterval(interval);
