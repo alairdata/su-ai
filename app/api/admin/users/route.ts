@@ -89,11 +89,12 @@ export async function GET(req: NextRequest) {
   for (const [userId, chatIds] of userChatIds.entries()) {
     if (chatIds.length === 0) continue;
 
-    // Get all messages for this user to calculate stats
+    // Get only USER messages (not assistant) to calculate stats
     const { data: userMessages } = await supabase
       .from("messages")
       .select("created_at")
       .in("chat_id", chatIds)
+      .eq("role", "user")
       .order("created_at", { ascending: false });
 
     if (userMessages && userMessages.length > 0) {
