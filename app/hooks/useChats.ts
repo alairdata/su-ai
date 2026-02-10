@@ -453,6 +453,8 @@ export function useChats() {
       // If user stopped the generation, don't show error - keep whatever was streamed
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('Generation stopped by user');
+        // Backend already counted this message, so update frontend count
+        setLocalMessagesUsed(prev => (prev ?? 0) + 1);
         // Remove empty assistant message if no content was streamed
         if (!streamedContent) {
           setChats(prev => prev.map(c =>
@@ -733,6 +735,8 @@ export function useChats() {
       // If user stopped the generation, don't show error - keep whatever was streamed
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('Generation stopped by user');
+        // Backend already counted this message, so update frontend count
+        setLocalMessagesUsed(prev => (prev ?? 0) + 1);
         if (!streamedContent) {
           setChats(prev => prev.map(c =>
             c.id === currentChatId
@@ -939,6 +943,8 @@ export function useChats() {
       // If user stopped the generation, don't show error - keep whatever was streamed
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('Generation stopped by user');
+        // Backend already counted this message, so update frontend count
+        setLocalMessagesUsed(prev => (prev ?? 0) + 1);
         if (!streamedContent) {
           setChats(prev => prev.map(c =>
             c.id === currentChatId

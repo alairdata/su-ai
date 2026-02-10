@@ -309,26 +309,9 @@ export const authOptions: NextAuthOptions = {
 
           console.log('Reset check:', { currentDateStr, lastResetStr, resetTimezone, lastResetDate: user.last_reset_date });
 
-          // Reset if last reset was on a different day in the RESET timezone
-          if (!lastResetStr || lastResetStr !== currentDateStr) {
-            console.log('Triggering reset - dates differ or no last reset');
-            const { error: updateError } = await supabase
-              .from('users')
-              .update({
-                messages_used_today: 0,
-                last_reset_date: now.toISOString(),
-              })
-              .eq('id', token.id);
-
-            if (updateError) {
-              console.error('Failed to update last_reset_date:', updateError.message);
-            }
-
-            session.user.messagesUsedToday = 0;
-          } else {
-            console.log('No reset needed - same day');
-            session.user.messagesUsedToday = user.messages_used_today;
-          }
+          // Daily reset is now handled atomically by the increment_messages_used_today RPC
+          // Session callback only reads the current count — no more resetting here
+          session.user.messagesUsedToday = user.messages_used_today;
         }
       }
       return session;
