@@ -89,6 +89,12 @@ export function sanitizeErrorForClient(error: unknown): string {
       'Missing price ID',
       'STRIPE_',
       'Stripe',
+      'Exchange rate',
+      'Paystack',
+      'Payment',
+      'Please try again',
+      'Cannot downgrade',
+      'already have',
     ];
 
     for (const safeError of safeErrors) {
