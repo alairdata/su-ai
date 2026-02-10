@@ -176,22 +176,16 @@ function HomePage() {
     autoDetectTimezone();
   }, [session?.user]);
 
-  // Force refresh: check server version after 1 second — if there's a newer
-  // version than what the user last refreshed to, show "Still there?" prompt.
-  // After they click Continue (reload), localStorage matches → no more prompt.
+  // Force refresh: show "Still there?" on every new browser session.
+  // sessionStorage is cleared when the tab/browser closes, so next visit = fresh reload.
   useEffect(() => {
-    const timeout = setTimeout(async () => {
-      try {
-        const res = await fetch('/api/version', { cache: 'no-store' });
-        const { buildId: serverBuildId } = await res.json();
-        const lastForcedVersion = localStorage.getItem('last_forced_version');
-        if (lastForcedVersion !== serverBuildId) {
-          localStorage.setItem('last_forced_version', serverBuildId);
-          setShowStillThere(true);
-        }
-      } catch {}
-    }, 1000);
-    return () => clearTimeout(timeout);
+    if (!sessionStorage.getItem('session_active')) {
+      const timeout = setTimeout(() => {
+        sessionStorage.setItem('session_active', '1');
+        setShowStillThere(true);
+      }, 1000);
+      return () => clearTimeout(timeout);
+    }
   }, []);
 
   // Detect mobile and handle orientation changes

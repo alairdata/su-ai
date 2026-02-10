@@ -216,6 +216,25 @@ export const authOptions: NextAuthOptions = {
         session.user.messagesUsedToday = token.messagesUsedToday as number;
         session.user.isNewUser = token.isNewUser as boolean;
 
+        // Force logout check — separate query so it always works
+        try {
+          const { data: logoutCheck } = await supabase
+            .from('users')
+            .select('force_logout')
+            .eq('id', token.id)
+            .single();
+          if (logoutCheck?.force_logout) {
+            await supabase
+              .from('users')
+              .update({ force_logout: false })
+              .eq('id', token.id);
+            session.user.isDeleted = true;
+            return session;
+          }
+        } catch {
+          // Column might not exist yet — skip
+        }
+
         // Fetch fresh user data from database (including plan for upgrades)
         // First try with reset_timezone, fall back to without if column doesn't exist
         let user: {
@@ -229,12 +248,11 @@ export const authOptions: NextAuthOptions = {
           is_new_user?: boolean;
           subscription_status?: string | null;
           current_period_end?: string | null;
-          force_logout?: boolean;
         } | null = null;
 
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('name, plan, messages_used_today, total_messages, last_reset_date, timezone, reset_timezone, is_new_user, subscription_status, current_period_end, force_logout')
+          .select('name, plan, messages_used_today, total_messages, last_reset_date, timezone, reset_timezone, is_new_user, subscription_status, current_period_end')
           .eq('id', token.id)
           .single();
 
@@ -258,16 +276,6 @@ export const authOptions: NextAuthOptions = {
           user = fallbackData ? { ...fallbackData, total_messages: 0 } : null;
         } else {
           user = userData;
-        }
-
-        // Force logout: admin triggered — clear the flag and invalidate session
-        if (user?.force_logout) {
-          await supabase
-            .from('users')
-            .update({ force_logout: false })
-            .eq('id', token.id);
-          session.user.isDeleted = true;
-          return session;
         }
 
         if (user) {
