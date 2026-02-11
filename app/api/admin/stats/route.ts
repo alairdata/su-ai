@@ -86,18 +86,21 @@ export async function GET(req: NextRequest) {
   }
 
   // Get total messages count (excluding messages from excluded users' chats)
+  // ONLY count user messages, not assistant responses
   let totalMessages = 0;
   if (excludedChatIds.length > 0) {
-    // Count messages NOT in excluded chats
+    // Count user messages NOT in excluded chats
     const { count } = await supabase
       .from("messages")
       .select("*", { count: "exact", head: true })
+      .eq("role", "user")
       .not("chat_id", "in", `(${excludedChatIds.join(",")})`);
     totalMessages = count || 0;
   } else {
     const { count } = await supabase
       .from("messages")
-      .select("*", { count: "exact", head: true });
+      .select("*", { count: "exact", head: true })
+      .eq("role", "user");
     totalMessages = count || 0;
   }
 

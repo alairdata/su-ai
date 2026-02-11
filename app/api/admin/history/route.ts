@@ -114,11 +114,13 @@ export async function GET(req: NextRequest) {
   }
 
   // Fetch messages for message trend (within period) - excluding messages from excluded users
+  // ONLY count user messages, not assistant responses
   let messages: { created_at: string; chat_id?: string }[] = [];
   if (excludedChatIds.length > 0) {
     const { data, error: messagesError } = await supabase
       .from("messages")
       .select("created_at, chat_id")
+      .eq("role", "user")
       .gte("created_at", startDate.toISOString())
       .order("created_at", { ascending: true });
 
@@ -128,6 +130,7 @@ export async function GET(req: NextRequest) {
     const { data, error: messagesError } = await supabase
       .from("messages")
       .select("created_at, chat_id")
+      .eq("role", "user")
       .gte("created_at", startDate.toISOString())
       .order("created_at", { ascending: true });
     messages = data || [];
@@ -135,17 +138,20 @@ export async function GET(req: NextRequest) {
   }
 
   // Fetch ALL messages for cumulative count - excluding messages from excluded users
+  // ONLY count user messages, not assistant responses
   let allMessages: { created_at: string }[] = [];
   if (excludedChatIds.length > 0) {
     const { data } = await supabase
       .from("messages")
       .select("created_at, chat_id")
+      .eq("role", "user")
       .order("created_at", { ascending: true });
     allMessages = (data || []).filter(m => !excludedChatIds.includes(m.chat_id));
   } else {
     const { data } = await supabase
       .from("messages")
       .select("created_at")
+      .eq("role", "user")
       .order("created_at", { ascending: true });
     allMessages = data || [];
   }
@@ -168,10 +174,12 @@ export async function GET(req: NextRequest) {
   }
 
   // Also count messages from chats created before the period but messages sent in period
+  // ONLY count user messages, not assistant responses
   if (excludedChatIds.length > 0) {
     const { data: periodMessages } = await supabase
       .from("messages")
       .select("chat_id")
+      .eq("role", "user")
       .gte("created_at", startDate.toISOString());
 
     const { data: allChats } = await supabase
@@ -191,6 +199,7 @@ export async function GET(req: NextRequest) {
     const { data: periodMessages } = await supabase
       .from("messages")
       .select("chat_id")
+      .eq("role", "user")
       .gte("created_at", startDate.toISOString());
 
     const { data: allChats } = await supabase
