@@ -26,6 +26,7 @@ interface User {
   messages_used_today: number;
   total_messages: number;
   days_active: number;
+  active_days: number;
   created_at: string;
   last_active?: string | null;
   subscription_status: string | null;
@@ -103,7 +104,7 @@ export default function AdminPage() {
   const [chartLoading, setChartLoading] = useState(false);
 
   // Sorting
-  const [sortField, setSortField] = useState<'total_messages' | 'days_active' | 'created_at' | 'avg_msgs_day' | null>(null);
+  const [sortField, setSortField] = useState<'total_messages' | 'days_active' | 'active_days' | 'created_at' | 'avg_msgs_day' | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   // Pagination
@@ -234,7 +235,7 @@ export default function AdminPage() {
     return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
   }) : filteredUsers;
 
-  const toggleSort = (field: 'total_messages' | 'days_active' | 'created_at' | 'avg_msgs_day') => {
+  const toggleSort = (field: 'total_messages' | 'days_active' | 'active_days' | 'created_at' | 'avg_msgs_day') => {
     if (sortField === field) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     } else {
@@ -626,7 +627,10 @@ export default function AdminPage() {
                 Messages {sortField === 'total_messages' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
               </th>
               <th style={{ ...styles.th, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('days_active')}>
-                Days Active {sortField === 'days_active' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                Days Since Joined {sortField === 'days_active' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+              </th>
+              <th style={{ ...styles.th, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('active_days')}>
+                Days Active {sortField === 'active_days' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
               </th>
               <th style={{ ...styles.th, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('created_at')}>
                 Joined {sortField === 'created_at' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
@@ -673,6 +677,9 @@ export default function AdminPage() {
                   </td>
                   <td style={styles.td}>
                     {user.days_active || 0}
+                  </td>
+                  <td style={styles.td}>
+                    {user.active_days || 0}
                   </td>
                   <td style={styles.td}>
                     {new Date(user.created_at).toLocaleDateString()}
