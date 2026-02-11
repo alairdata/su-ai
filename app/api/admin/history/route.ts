@@ -156,25 +156,9 @@ export async function GET(req: NextRequest) {
     allMessages = data || [];
   }
 
-  // Fetch chats with message counts for top users - within period
-  const { data: chatsWithCounts } = await supabase
-    .from("chats")
-    .select("id, user_id")
-    .gte("created_at", startDate.toISOString());
-
   // Count messages per user in period
-  const userMessageCounts: Map<string, number> = new Map();
-  const filteredChats = (chatsWithCounts || []).filter(c => !excludedUserIds.includes(c.user_id));
-
-  // Get message counts per chat
-  for (const chat of filteredChats) {
-    const chatMessages = messages.filter(m => m.chat_id === chat.id);
-    const currentCount = userMessageCounts.get(chat.user_id) || 0;
-    userMessageCounts.set(chat.user_id, currentCount + chatMessages.length);
-  }
-
-  // Also count messages from chats created before the period but messages sent in period
   // ONLY count user messages, not assistant responses
+  const userMessageCounts: Map<string, number> = new Map();
   if (excludedChatIds.length > 0) {
     const { data: periodMessages } = await supabase
       .from("messages")
