@@ -219,8 +219,8 @@ export default function AdminPage() {
       aVal = new Date(a.created_at).getTime();
       bVal = new Date(b.created_at).getTime();
     } else {
-      aVal = (a as Record<string, number>)[sortField] || 0;
-      bVal = (b as Record<string, number>)[sortField] || 0;
+      aVal = (a as unknown as Record<string, number>)[sortField] || 0;
+      bVal = (b as unknown as Record<string, number>)[sortField] || 0;
     }
     return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
   }) : filteredUsers;
