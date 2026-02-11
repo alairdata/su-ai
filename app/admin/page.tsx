@@ -213,9 +213,9 @@ export default function AdminPage() {
     u.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Helper: compute avg msgs/day for a user
+  // Helper: compute avg msgs/day for a user (total messages / days active)
   const getAvgMsgsDay = (user: User) => {
-    const days = user.days_active || 1;
+    const days = user.active_days || 1;
     return (user.total_messages || 0) / days;
   };
 
