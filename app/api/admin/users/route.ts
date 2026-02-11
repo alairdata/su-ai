@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
   }
 
-  // Get last active timestamp and message count for each user
+  // Get message counts per user (only user messages, not assistant)
   const userIds = (users || []).map(u => u.id);
 
   // Get all chats with their user_id
@@ -81,38 +81,24 @@ export async function GET(req: NextRequest) {
     userChatIds.set(chat.user_id, existing);
   }
 
-  const lastActiveMap = new Map<string, string>();
   const messageCountMap = new Map<string, number>();
-  const daysActiveMap = new Map<string, number>();
 
-  // Get the most recent message, count, and days active for each user's chats
+  // Get message count for each user's chats (count only, no full rows)
   for (const [userId, chatIds] of userChatIds.entries()) {
     if (chatIds.length === 0) continue;
 
-    // Get only USER messages (not assistant) to calculate stats
-    const { data: userMessages } = await supabase
+    const { count } = await supabase
       .from("messages")
-      .select("created_at")
+      .select("*", { count: "exact", head: true })
       .in("chat_id", chatIds)
-      .eq("role", "user")
-      .order("created_at", { ascending: false });
+      .eq("role", "user");
 
-    if (userMessages && userMessages.length > 0) {
-      // Last active = most recent message
-      lastActiveMap.set(userId, userMessages[0].created_at);
-
-      // Total messages
-      messageCountMap.set(userId, userMessages.length);
-
-      // Days active = unique days with messages
-      const uniqueDays = new Set(
-        userMessages.map(m => new Date(m.created_at).toISOString().split('T')[0])
-      );
-      daysActiveMap.set(userId, uniqueDays.size);
+    if (count && count > 0) {
+      messageCountMap.set(userId, count);
     }
   }
 
-  // Add last_active, total_messages, and days_active to each user
+  // Add total_messages and days_active (days since joined) to each user
   const today = new Date();
   const usersWithActivity = (users || []).map(user => {
     const joinedDate = new Date(user.created_at);
@@ -122,7 +108,6 @@ export async function GET(req: NextRequest) {
       ...user,
       total_messages: messageCountMap.get(user.id) || 0,
       days_active: daysSinceJoined,
-      last_active: lastActiveMap.get(user.id) || null
     };
   });
 

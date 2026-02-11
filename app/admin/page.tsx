@@ -27,7 +27,7 @@ interface User {
   total_messages: number;
   days_active: number;
   created_at: string;
-  last_active: string | null;
+  last_active?: string | null;
   subscription_status: string | null;
   current_period_end: string | null;
   original_name: string | null;
@@ -103,7 +103,7 @@ export default function AdminPage() {
   const [chartLoading, setChartLoading] = useState(false);
 
   // Sorting
-  const [sortField, setSortField] = useState<'total_messages' | 'days_active' | 'created_at' | null>(null);
+  const [sortField, setSortField] = useState<'total_messages' | 'days_active' | 'created_at' | 'avg_msgs_day' | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   // Pagination
@@ -212,12 +212,21 @@ export default function AdminPage() {
     u.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Helper: compute avg msgs/day for a user
+  const getAvgMsgsDay = (user: User) => {
+    const days = user.days_active || 1;
+    return (user.total_messages || 0) / days;
+  };
+
   // Sort
   const sortedUsers = sortField ? [...filteredUsers].sort((a, b) => {
     let aVal: number, bVal: number;
     if (sortField === 'created_at') {
       aVal = new Date(a.created_at).getTime();
       bVal = new Date(b.created_at).getTime();
+    } else if (sortField === 'avg_msgs_day') {
+      aVal = getAvgMsgsDay(a);
+      bVal = getAvgMsgsDay(b);
     } else {
       aVal = (a as unknown as Record<string, number>)[sortField] || 0;
       bVal = (b as unknown as Record<string, number>)[sortField] || 0;
@@ -225,7 +234,7 @@ export default function AdminPage() {
     return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
   }) : filteredUsers;
 
-  const toggleSort = (field: 'total_messages' | 'days_active' | 'created_at') => {
+  const toggleSort = (field: 'total_messages' | 'days_active' | 'created_at' | 'avg_msgs_day') => {
     if (sortField === field) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     } else {
@@ -316,8 +325,12 @@ export default function AdminPage() {
             <div style={styles.statLabel}>Messages ({chartPeriod})</div>
           </div>
           <div style={styles.statCard}>
-            <div style={styles.statValue}>{stats.avgMessagesPerUser}</div>
-            <div style={styles.statLabel}>Avg Msgs/User (All)</div>
+            <div style={styles.statValue}>
+              {users.length > 0
+                ? (users.reduce((sum, u) => sum + getAvgMsgsDay(u), 0) / users.length).toFixed(1)
+                : '0'}
+            </div>
+            <div style={styles.statLabel}>Avg Msgs/Day</div>
           </div>
           <div style={styles.statCard}>
             <div style={styles.statValue}>{stats.activeSubscriptions}</div>
@@ -450,7 +463,7 @@ export default function AdminPage() {
           {/* Chart 2: Avg Messages per User */}
           <div style={styles.chartCard}>
             <div style={styles.chartHeader2}>
-              <h3 style={styles.chartTitle}>Avg Messages / User</h3>
+              <h3 style={styles.chartTitle}>Avg Messages / Day</h3>
               <span style={{ ...styles.chartBadge, background: "#d1fae5", color: "#059669" }}>
                 {avgTrend.length > 0 ? avgTrend[avgTrend.length - 1]?.avg?.toFixed(1) || 0 : 0} avg
               </span>
@@ -618,7 +631,9 @@ export default function AdminPage() {
               <th style={{ ...styles.th, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('created_at')}>
                 Joined {sortField === 'created_at' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
               </th>
-              <th style={styles.th}>Last Active</th>
+              <th style={{ ...styles.th, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('avg_msgs_day')}>
+                Avg Msgs/Day {sortField === 'avg_msgs_day' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+              </th>
               <th style={styles.th}>Actions</th>
             </tr>
           </thead>
@@ -663,10 +678,7 @@ export default function AdminPage() {
                     {new Date(user.created_at).toLocaleDateString()}
                   </td>
                   <td style={styles.td}>
-                    {user.last_active
-                      ? new Date(user.last_active).toLocaleDateString()
-                      : "Never"
-                    }
+                    {getAvgMsgsDay(user).toFixed(1)}
                   </td>
                   <td style={styles.td}>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
