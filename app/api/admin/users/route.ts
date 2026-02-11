@@ -126,11 +126,13 @@ export async function GET(req: NextRequest) {
   }
 
   // Add total_messages, days_active (since joined), and active_days (with messages) to each user
-  const today = new Date();
+  const todayDate = new Date().toISOString().split('T')[0];
+  const todayMs = new Date(todayDate).getTime();
   const usersWithActivity = (users || []).map(user => {
-    const joinedDate = new Date(user.created_at);
-    const diffMs = today.getTime() - joinedDate.getTime();
-    const daysSinceJoined = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1; // +1 to count join day
+    // Use calendar dates (UTC) to match how active_days is counted
+    const joinDate = new Date(user.created_at).toISOString().split('T')[0];
+    const joinMs = new Date(joinDate).getTime();
+    const daysSinceJoined = Math.round((todayMs - joinMs) / (1000 * 60 * 60 * 24)) + 1; // +1 to count join day
     return {
       ...user,
       total_messages: messageCountMap.get(user.id) || 0,
