@@ -304,7 +304,7 @@ function HomePage() {
   // Calculate progress percentage
   const getProgressPercentage = () => {
     if (!session?.user) return 0;
-    const limits: Record<string, number> = { Free: 5, Pro: 100, Plus: 300 };
+    const limits: Record<string, number> = { Free: 10, Pro: 100, Plus: 300 };
     const limit = limits[session.user.plan as keyof typeof limits];
     if (limit === Infinity) return 100;
     return (messagesUsed / limit) * 100;
@@ -709,7 +709,7 @@ function HomePage() {
         }
         showConfirm(
           "Cancel Subscription?",
-          `Your ${currentPlan} subscription will remain active until the end of your billing period. After that, you'll be on the Free plan with 5 messages/day.`,
+          `Your ${currentPlan} subscription will remain active until the end of your billing period. After that, you'll be on the Free plan with 10 messages/day.`,
           "Cancel Subscription",
           doCancelSubscription,
           true
@@ -1580,7 +1580,7 @@ function HomePage() {
             <div style={{...currentStyles.userInfo, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
               <div style={{ fontSize: 13, color: theme === 'dark' ? '#fff' : '#1a1a1a' }}>{session?.user?.name}</div>
               <div style={{ fontSize: 11, color: theme === 'dark' ? '#999' : '#666' }}>
-                {session?.user?.plan} plan • {messagesUsed}/{session?.user?.plan === 'Free' ? 5 : session?.user?.plan === 'Pro' ? 100 : 300} msgs
+                {session?.user?.plan} plan • {messagesUsed}/{session?.user?.plan === 'Free' ? 10 : session?.user?.plan === 'Pro' ? 100 : 300} msgs
               </div>
             </div>
           </div>
@@ -2404,7 +2404,7 @@ function HomePage() {
                   <div style={currentStyles.planCurrentBadge}>
                     <div style={currentStyles.planBadgeLarge}>{session?.user?.plan}</div>
                     <div style={currentStyles.planDescription}>
-                      {session?.user?.plan === "Free" && `${messagesUsed}/5 messages used today`}
+                      {session?.user?.plan === "Free" && `${messagesUsed}/10 messages used today`}
                       {session?.user?.plan === "Pro" && `${messagesUsed}/100 messages used today`}
                       {session?.user?.plan === "Plus" && `${messagesUsed}/300 messages used today`}
                     </div>
@@ -2473,7 +2473,7 @@ function HomePage() {
                       <h5 style={currentStyles.planCardTitle}>Free</h5>
                       <div style={currentStyles.planPrice}>$0<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
-                        <li style={currentStyles.planFeature}>5 messages per day</li>
+                        <li style={currentStyles.planFeature}>10 messages per day</li>
                         <li style={currentStyles.planFeature}>Basic support</li>
                         <li style={currentStyles.planFeature}>Chat on web</li>
                         <li style={currentStyles.planFeature}>Limited uploads</li>
