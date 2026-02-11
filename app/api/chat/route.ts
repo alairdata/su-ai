@@ -211,13 +211,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Build messages for API
-    // For regenerate: the user message is already in allMessages, don't duplicate
+    // Build messages for API — only send last 10 messages to save tokens
+    const MAX_HISTORY = 10;
+    const recentMessages = allMessages.slice(-MAX_HISTORY);
+
+    // For regenerate: the user message is already in recentMessages, don't duplicate
     // For new/edit: add the new user message
     const apiMessages: Anthropic.MessageParam[] = isRegenerate
-      ? allMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content }))
+      ? recentMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content }))
       : [
-          ...allMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+          ...recentMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
           { role: "user" as const, content: userMessage }
         ];
 
