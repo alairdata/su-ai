@@ -68,37 +68,64 @@ export async function GET(req: NextRequest) {
   // Get message counts per user (only user messages, not assistant)
   const userIds = (users || []).map(u => u.id);
 
-  // Get all chats with their user_id
-  const { data: chats } = await supabase
-    .from("chats")
-    .select("id, user_id")
-    .in("user_id", userIds);
+  // Get all chats with their user_id (paginate to avoid Supabase 1000-row default limit)
+  const allChats: { id: string; user_id: string }[] = [];
+  let chatOffset = 0;
+  const chatPageSize = 1000;
+  while (true) {
+    const { data: chatPage } = await supabase
+      .from("chats")
+      .select("id, user_id")
+      .in("user_id", userIds)
+      .range(chatOffset, chatOffset + chatPageSize - 1);
+    if (!chatPage || chatPage.length === 0) break;
+    allChats.push(...chatPage);
+    if (chatPage.length < chatPageSize) break;
+    chatOffset += chatPageSize;
+  }
 
   const userChatIds = new Map<string, string[]>();
-  for (const chat of (chats || [])) {
+  for (const chat of allChats) {
     const existing = userChatIds.get(chat.user_id) || [];
     existing.push(chat.id);
     userChatIds.set(chat.user_id, existing);
   }
 
   const messageCountMap = new Map<string, number>();
+  const activeDaysMap = new Map<string, number>();
 
-  // Get message count for each user's chats (count only, no full rows)
+  // Get message dates for each user's chats (paginate to get all messages)
   for (const [userId, chatIds] of userChatIds.entries()) {
     if (chatIds.length === 0) continue;
 
-    const { count } = await supabase
-      .from("messages")
-      .select("*", { count: "exact", head: true })
-      .in("chat_id", chatIds)
-      .eq("role", "user");
+    const allUserMessages: { created_at: string }[] = [];
+    let msgOffset = 0;
+    const msgPageSize = 1000;
+    while (true) {
+      const { data: msgPage } = await supabase
+        .from("messages")
+        .select("created_at")
+        .in("chat_id", chatIds)
+        .eq("role", "user")
+        .range(msgOffset, msgOffset + msgPageSize - 1);
+      if (!msgPage || msgPage.length === 0) break;
+      allUserMessages.push(...msgPage);
+      if (msgPage.length < msgPageSize) break;
+      msgOffset += msgPageSize;
+    }
 
-    if (count && count > 0) {
-      messageCountMap.set(userId, count);
+    if (allUserMessages.length > 0) {
+      messageCountMap.set(userId, allUserMessages.length);
+
+      // Count unique days with at least one message
+      const uniqueDays = new Set(
+        allUserMessages.map(m => new Date(m.created_at).toISOString().split('T')[0])
+      );
+      activeDaysMap.set(userId, uniqueDays.size);
     }
   }
 
-  // Add total_messages and days_active (days since joined) to each user
+  // Add total_messages, days_active (since joined), and active_days (with messages) to each user
   const today = new Date();
   const usersWithActivity = (users || []).map(user => {
     const joinedDate = new Date(user.created_at);
@@ -108,6 +135,7 @@ export async function GET(req: NextRequest) {
       ...user,
       total_messages: messageCountMap.get(user.id) || 0,
       days_active: daysSinceJoined,
+      active_days: activeDaysMap.get(user.id) || 0,
     };
   });
 
