@@ -26,6 +26,7 @@ function HomePage() {
   const [resetEmail, setResetEmail] = useState("");
   const [showWelcome, setShowWelcome] = useState(false);
   const [showStillThere, setShowStillThere] = useState(false);
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [selectedTimezone, setSelectedTimezone] = useState("");
   const [isUpdatingTimezone, setIsUpdatingTimezone] = useState(false);
@@ -175,6 +176,35 @@ function HomePage() {
     };
     autoDetectTimezone();
   }, [session?.user]);
+
+  // Check for app updates — show banner when new version detected
+  useEffect(() => {
+    let initialBuildId: string | null = null;
+
+    const checkForUpdate = async () => {
+      try {
+        const res = await fetch('/api/version', { cache: 'no-store' });
+        const data = await res.json();
+        const buildId = data.buildId;
+
+        if (!initialBuildId) {
+          initialBuildId = buildId;
+        } else if (buildId !== initialBuildId) {
+          setShowUpdateBanner(true);
+        }
+      } catch {
+        // Silently ignore network errors
+      }
+    };
+
+    const timeout = setTimeout(checkForUpdate, 15000);
+    const interval = setInterval(checkForUpdate, 30 * 1000);
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Force refresh: show "Still there?" on every new browser session.
   // sessionStorage is cleared when the tab/browser closes, so next visit = fresh reload.
@@ -1605,6 +1635,49 @@ function HomePage() {
               </button>
             </div>
           </div>
+
+          {showUpdateBanner && (
+            <div style={{
+              background: '#1a1a1a',
+              color: '#fff',
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              fontSize: '14px',
+            }}>
+              <span>Hey, this is probably that old boring version</span>
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  background: '#fff',
+                  color: '#1a1a1a',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '6px 14px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                }}
+              >
+                Refresh
+              </button>
+              <button
+                onClick={() => setShowUpdateBanner(false)}
+                style={{
+                  background: 'transparent',
+                  color: '#999',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  padding: '2px 6px',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           <div style={currentStyles.chatWrapper}>
             <div
