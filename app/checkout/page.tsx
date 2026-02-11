@@ -11,7 +11,7 @@ const PLAN_CONFIG = {
     name: 'Pro Plan',
     features: [
       '100 messages per day',
-      '10x more than Free',
+      '20x more than Free',
       'Expanded memory and context',
       'Early access to new features',
       'Advanced reasoning models',
@@ -24,7 +24,7 @@ const PLAN_CONFIG = {
     features: [
       'Everything in Pro',
       '300 messages per day',
-      '30x more than Free, 3x more than Pro',
+      '60x more than Free, 3x more than Pro',
       'Higher outputs for more tasks',
       'Priority access at high traffic',
       'Early access to advanced features',

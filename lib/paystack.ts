@@ -7,11 +7,11 @@ const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 export const PLAN_CONFIG = {
   Free: {
     priceUSD: 0,
-    messagesPerDay: 10,
+    messagesPerDay: 5,
     name: 'Free Plan',
-    description: '10 messages per day',
+    description: '5 messages per day',
     features: [
-      '10 messages per day',
+      '5 messages per day',
       'Basic support',
       'Chat on web',
       'Limited uploads',
@@ -22,10 +22,10 @@ export const PLAN_CONFIG = {
     priceUSD: 4.99,
     messagesPerDay: 100,
     name: 'Pro Plan',
-    description: '100 messages per day - 10x more than Free',
+    description: '100 messages per day - 20x more than Free',
     features: [
       '100 messages per day',
-      '10x more than Free',
+      '20x more than Free',
       'Expanded memory and context',
       'Early access to new features',
       'Advanced reasoning models',
