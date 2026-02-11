@@ -613,6 +613,35 @@ export default function AdminPage() {
         <span style={styles.resultCount}>
           {sortedUsers.length} user{sortedUsers.length !== 1 ? "s" : ""} found
         </span>
+        <button
+          onClick={() => {
+            const headers = ["Name", "Email", "Plan", "Status", "Total Messages", "Days Since Joined", "Days Active", "Joined", "Avg Msgs/Day"];
+            const rows = sortedUsers.map(u => [
+              u.name || "",
+              u.email || "",
+              u.plan,
+              (u.total_messages || 0) > 0 ? "Active" : "Inactive",
+              u.total_messages || 0,
+              u.days_active || 0,
+              u.active_days || 0,
+              new Date(u.created_at).toLocaleDateString(),
+              getAvgMsgsDay(u).toFixed(1),
+            ]);
+            const csv = [headers, ...rows].map(row =>
+              row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")
+            ).join("\n");
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `users-${new Date().toISOString().split("T")[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          style={styles.exportBtn}
+        >
+          Export CSV
+        </button>
       </div>
 
       {/* Users Table */}
@@ -981,6 +1010,16 @@ const styles: { [key: string]: React.CSSProperties } = {
     alignItems: "center",
     gap: "16px",
     flexWrap: "wrap" as const,
+  },
+  exportBtn: {
+    padding: "10px 18px",
+    background: "#1a1a1a",
+    color: "#fff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontSize: "13px",
+    fontWeight: 500,
   },
   searchInput: {
     width: "100%",
