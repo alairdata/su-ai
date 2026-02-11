@@ -211,18 +211,74 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Build messages for API — only send last 10 messages to save tokens
+    // Build messages for API — summarize old context, keep recent messages raw
     const MAX_HISTORY = 10;
-    const recentMessages = allMessages.slice(-MAX_HISTORY);
+    const RECENT_RAW = 4; // Keep last 4 messages as-is
+    const historyMessages = allMessages.slice(-MAX_HISTORY);
 
-    // For regenerate: the user message is already in recentMessages, don't duplicate
-    // For new/edit: add the new user message
-    const apiMessages: Anthropic.MessageParam[] = isRegenerate
-      ? recentMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content }))
-      : [
-          ...recentMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-          { role: "user" as const, content: userMessage }
+    let apiMessages: Anthropic.MessageParam[];
+
+    if (historyMessages.length > RECENT_RAW) {
+      // Split into older messages (to summarize) and recent (to keep raw)
+      const olderMessages = historyMessages.slice(0, -RECENT_RAW);
+      const recentMessages = historyMessages.slice(-RECENT_RAW);
+
+      // Summarize older messages with Haiku (cheap and fast)
+      let contextSummary = "";
+      try {
+        const summaryInput = olderMessages
+          .map((m) => `${m.role}: ${m.content.slice(0, 300)}`)
+          .join("\n");
+
+        const summaryResponse = await anthropic.messages.create({
+          model: "claude-3-5-haiku-20241022",
+          max_tokens: 150,
+          messages: [
+            {
+              role: "user",
+              content: `Summarize this conversation in 2-3 sentences. Focus on key topics and any important details:\n\n${summaryInput}`
+            }
+          ],
+        });
+
+        contextSummary = summaryResponse.content
+          .map((block) => ("text" in block ? block.text : ""))
+          .join("")
+          .trim();
+      } catch {
+        // If summary fails, just use recent messages without summary
+        contextSummary = "";
+      }
+
+      // Build API messages: [summary context] + [recent raw] + [new message]
+      const rawRecent = recentMessages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+
+      if (contextSummary) {
+        apiMessages = [
+          { role: "user" as const, content: `[Earlier conversation context]: ${contextSummary}` },
+          { role: "assistant" as const, content: "Understood, I have that context." },
+          ...rawRecent,
         ];
+      } else {
+        apiMessages = [...rawRecent];
+      }
+
+      // Add new user message for non-regenerate
+      if (!isRegenerate) {
+        apiMessages.push({ role: "user" as const, content: userMessage });
+      }
+    } else {
+      // Short conversation — send all messages raw
+      apiMessages = isRegenerate
+        ? historyMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content }))
+        : [
+            ...historyMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+            { role: "user" as const, content: userMessage }
+          ];
+    }
 
     // Track full response for saving to database
     let fullResponse = "";
