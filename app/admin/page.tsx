@@ -102,6 +102,10 @@ export default function AdminPage() {
   const [chartPeriod, setChartPeriod] = useState<Period>("month");
   const [chartLoading, setChartLoading] = useState(false);
 
+  // Sorting
+  const [sortField, setSortField] = useState<'total_messages' | 'days_active' | 'created_at' | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -208,11 +212,34 @@ export default function AdminPage() {
     u.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Sort
+  const sortedUsers = sortField ? [...filteredUsers].sort((a, b) => {
+    let aVal: number, bVal: number;
+    if (sortField === 'created_at') {
+      aVal = new Date(a.created_at).getTime();
+      bVal = new Date(b.created_at).getTime();
+    } else {
+      aVal = (a as Record<string, number>)[sortField] || 0;
+      bVal = (b as Record<string, number>)[sortField] || 0;
+    }
+    return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
+  }) : filteredUsers;
+
+  const toggleSort = (field: 'total_messages' | 'days_active' | 'created_at') => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('desc');
+    }
+    setCurrentPage(1);
+  };
+
   // Pagination calculations
-  const totalPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE);
+  const totalPages = Math.ceil(sortedUsers.length / USERS_PER_PAGE);
   const startIndex = (currentPage - 1) * USERS_PER_PAGE;
   const endIndex = startIndex + USERS_PER_PAGE;
-  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+  const paginatedUsers = sortedUsers.slice(startIndex, endIndex);
 
   const goToPage = (page: number) => {
     if (page >= 1 && page <= totalPages) {
@@ -570,7 +597,7 @@ export default function AdminPage() {
           style={styles.searchInput}
         />
         <span style={styles.resultCount}>
-          {filteredUsers.length} user{filteredUsers.length !== 1 ? "s" : ""} found
+          {sortedUsers.length} user{sortedUsers.length !== 1 ? "s" : ""} found
         </span>
       </div>
 
@@ -582,9 +609,15 @@ export default function AdminPage() {
               <th style={styles.th}>User</th>
               <th style={styles.th}>Plan</th>
               <th style={styles.th}>Status</th>
-              <th style={styles.th}>Messages</th>
-              <th style={styles.th}>Days Active</th>
-              <th style={styles.th}>Joined</th>
+              <th style={{ ...styles.th, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('total_messages')}>
+                Messages {sortField === 'total_messages' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+              </th>
+              <th style={{ ...styles.th, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('days_active')}>
+                Days Active {sortField === 'days_active' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+              </th>
+              <th style={{ ...styles.th, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('created_at')}>
+                Joined {sortField === 'created_at' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+              </th>
               <th style={styles.th}>Last Active</th>
               <th style={styles.th}>Actions</th>
             </tr>
@@ -685,7 +718,7 @@ export default function AdminPage() {
         </table>
       </div>
 
-      {filteredUsers.length === 0 && (
+      {sortedUsers.length === 0 && (
         <div style={styles.noResults}>No users found</div>
       )}
 
@@ -716,7 +749,7 @@ export default function AdminPage() {
           <div style={styles.pageInfo}>
             Page {currentPage} of {totalPages}
             <span style={styles.pageRange}>
-              ({startIndex + 1}-{Math.min(endIndex, filteredUsers.length)} of {filteredUsers.length})
+              ({startIndex + 1}-{Math.min(endIndex, sortedUsers.length)} of {sortedUsers.length})
             </span>
           </div>
 
