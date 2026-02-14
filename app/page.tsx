@@ -326,8 +326,24 @@ function HomePage() {
 
   const [greeting, setGreeting] = useState("");
 
+  const suggestedPrompts = [
+    "Roast my business idea",
+    "Give me brutally honest life advice",
+    "Explain something like I'm 5 but make it unhinged",
+    "Write me a bio that actually slaps",
+    "Settle this argument for me",
+    "Help me craft the perfect comeback",
+    "Hype me up like a motivational speaker on Red Bull",
+    "Tell me what I'm doing wrong with my life",
+  ];
+
+  const [displayedPrompts, setDisplayedPrompts] = useState<string[]>([]);
+
   useEffect(() => {
     setGreeting(getGreeting());
+    // Pick 4 random prompts
+    const shuffled = [...suggestedPrompts].sort(() => Math.random() - 0.5);
+    setDisplayedPrompts(shuffled.slice(0, 4));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, currentChat]);
 
@@ -1711,6 +1727,33 @@ function HomePage() {
                     </div>
                   )}
 
+                  {/* Suggested prompt chips */}
+                  {displayedPrompts.length > 0 && canSendMessage() && (
+                    <div style={{
+                      ...currentStyles.promptGrid,
+                      ...(isMobile ? currentStyles.promptGridMobile : {}),
+                    }}>
+                      {displayedPrompts.map((prompt) => (
+                        <button
+                          key={prompt}
+                          style={currentStyles.promptChip}
+                          onClick={async () => {
+                            setInput(prompt);
+                            await sendMessage(prompt);
+                          }}
+                          onMouseEnter={(e) => {
+                            Object.assign(e.currentTarget.style, currentStyles.promptChipHover);
+                          }}
+                          onMouseLeave={(e) => {
+                            Object.assign(e.currentTarget.style, currentStyles.promptChip);
+                          }}
+                        >
+                          {prompt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Input area centered with greeting */}
                   <div style={{
                     ...currentStyles.inputWrapper,
@@ -2907,6 +2950,43 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     fontSize: '14px',
     color: '#666',
     marginTop: '16px',
+  },
+  promptGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '10px',
+    marginTop: '20px',
+    maxWidth: '500px',
+    width: '100%',
+  },
+  promptGridMobile: {
+    gridTemplateColumns: '1fr',
+  },
+  promptChip: {
+    padding: '10px 16px',
+    borderRadius: '20px',
+    border: '1px solid #e0e0e0',
+    background: '#f5f5f5',
+    color: '#333',
+    fontSize: '13px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    textAlign: 'center' as const,
+    transition: 'background 0.15s, border-color 0.15s',
+    lineHeight: 1.4,
+  },
+  promptChipHover: {
+    padding: '10px 16px',
+    borderRadius: '20px',
+    border: '1px solid #ccc',
+    background: '#ebebeb',
+    color: '#333',
+    fontSize: '13px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    textAlign: 'center' as const,
+    transition: 'background 0.15s, border-color 0.15s',
+    lineHeight: 1.4,
   },
   remainingMessages: {
     color: '#999',
@@ -4359,6 +4439,18 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   greetingText: {
     ...lightStyles.greetingText,
     color: '#fff',
+  },
+  promptChip: {
+    ...lightStyles.promptChip,
+    background: '#2c2c2e',
+    border: '1px solid #3a3a3c',
+    color: '#e5e5e7',
+  },
+  promptChipHover: {
+    ...lightStyles.promptChipHover,
+    background: '#3a3a3c',
+    border: '1px solid #48484a',
+    color: '#e5e5e7',
   },
   recentItem: {
     ...lightStyles.recentItem,
