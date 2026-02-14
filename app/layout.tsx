@@ -37,9 +37,9 @@ export default function RootLayout({
             })(window, document, "clarity", "script", "v9865bw1hp");
           `}
         </Script>
-        <MixpanelInit />
       </head>
       <body className={inter.className} style={{ margin: 0, padding: 0, overflowX: 'hidden', width: '100%' }}>
+        <MixpanelInit />
         <Providers>{children}</Providers>
       </body>
     </html>
