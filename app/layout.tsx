@@ -39,8 +39,10 @@ export default function RootLayout({
         </Script>
       </head>
       <body className={inter.className} style={{ margin: 0, padding: 0, overflowX: 'hidden', width: '100%' }}>
-        <MixpanelInit />
-        <Providers>{children}</Providers>
+        <Providers>
+          <MixpanelInit />
+          {children}
+        </Providers>
       </body>
     </html>
   );
