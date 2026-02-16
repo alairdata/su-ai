@@ -3106,7 +3106,7 @@ function HomePage() {
                         <textarea
                           ref={textareaRef}
                           rows={1}
-                          placeholder={canSendMessage() ? "Ask anything — no filters, no limits..." : "Daily limit reached. Upgrade to continue."}
+                          placeholder={canSendMessage() ? "Talk, no filters..." : "Daily limit reached. Upgrade to continue."}
                           value={input}
                           onChange={handleInputChange}
                           onKeyDown={handleKeyDown}
@@ -3767,7 +3767,7 @@ function HomePage() {
                       <textarea
                         ref={textareaRef}
                         rows={1}
-                        placeholder={canSendMessage() ? "Ask anything — no filters, no limits..." : "Daily limit reached. Upgrade to continue."}
+                        placeholder={canSendMessage() ? "Talk, no filters..." : "Daily limit reached. Upgrade to continue."}
                         value={input}
                         onChange={handleInputChange}
                         onKeyDown={handleKeyDown}
