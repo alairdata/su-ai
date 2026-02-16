@@ -207,6 +207,38 @@ export function useChats() {
     }
   };
 
+  // Creates a chat AND adds it to the chats list immediately (for character creation flow)
+  const createChatWithEntry = async (): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/chats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'New conversation' }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.chat) {
+        console.error('Failed to create chat:', res.status, data);
+        return null;
+      }
+
+      // Add to chats list so currentChat won't be null (avoids infinite loading)
+      const newChat: Chat = {
+        id: data.chat.id,
+        title: data.chat.title || 'New conversation',
+        created_at: data.chat.created_at || new Date().toISOString(),
+        messages: [],
+      };
+      setChats(prev => [newChat, ...prev]);
+      setCurrentChatId(data.chat.id);
+      return data.chat.id;
+    } catch (error) {
+      console.error('Failed to create chat:', error);
+      return null;
+    }
+  };
+
   const sendMessage = async (input: string, imageUrl?: string, fileData?: { url: string; fileType: string; fileName: string }, characterId?: string) => {
     if (!input.trim() || isLoading || !canSendMessage()) return;
 
@@ -1049,6 +1081,7 @@ export function useChats() {
     messagesUsed,
     sendMessage,
     createNewChat,
+    createChatWithEntry,
     startNewChat,
     selectChat,
     renameChat,

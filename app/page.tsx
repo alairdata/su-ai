@@ -718,6 +718,7 @@ function HomePage() {
     sendMessage,
     startNewChat,
     createNewChat,
+    createChatWithEntry,
     selectChat,
     renameChat,
     deleteChat,
@@ -1354,11 +1355,11 @@ function HomePage() {
       return;
     }
 
-    // If no chat exists yet, create one first
+    // If no chat exists yet, create one (adds to chats list to avoid loading screen)
     let chatId = currentChatId;
     if (!chatId) {
-      console.log('No current chat, creating one...');
-      const newChatId = await createNewChat();
+      console.log('No current chat, creating one for character...');
+      const newChatId = await createChatWithEntry();
       if (!newChatId) {
         console.error('Failed to create chat for character');
         return;
