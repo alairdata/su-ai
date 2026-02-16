@@ -135,6 +135,23 @@ export async function POST(req: NextRequest) {
     const userPlan = getEffectivePlan(dbUser.plan, dbUser.email);
     const dailyLimit = getPlanLimit(userPlan);
 
+    // Parse body first to determine if image/file is attached (costs 2 messages)
+    const body = await req.json();
+    const userMessage: string = body.message || "";
+    const chatId: string = body.chatId;
+    const imageUrl: string | undefined = body.imageUrl;
+    const fileUrl: string | undefined = body.fileUrl || body.imageUrl;
+    const fileType: string | undefined = body.fileType || (body.imageUrl ? "image" : undefined);
+    const fileName: string | undefined = body.fileName;
+    const characterId: string | undefined = body.characterId;
+    const isRegenerate: boolean = body.regenerate || false;
+    const regenerateFromIndex: number | undefined = body.regenerateFromIndex;
+    const editFromMessageIndex: number | undefined = body.editFromMessageIndex;
+
+    // Images/files cost 2 messages, text costs 1
+    const hasAttachment = !!(imageUrl || fileUrl);
+    const messageCost = hasAttachment ? 2 : 1;
+
     // SECURITY: Atomic increment to prevent race condition
     // This increments AND returns the new count in one operation
     const { data: incrementResult, error: incrementError } = await supabase
@@ -165,19 +182,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Message count already incremented atomically above
+    // If attachment, deduct the extra message credit (first one already deducted above)
+    if (messageCost > 1) {
+      const { data: extraResult } = await supabase
+        .rpc('increment_messages_used_today', {
+          user_id_param: session.user.id,
+          daily_limit: dailyLimit
+        });
+      // If second deduction fails (hit limit), still allow the request
+      // since we already deducted 1 — just log it
+      if (extraResult === false) {
+        console.log("Image extra deduction hit limit, proceeding with 1 credit");
+      }
+    }
 
-    const body = await req.json();
-    const userMessage: string = body.message || "";
-    const chatId: string = body.chatId;
-    const imageUrl: string | undefined = body.imageUrl;
-    const fileUrl: string | undefined = body.fileUrl || body.imageUrl;
-    const fileType: string | undefined = body.fileType || (body.imageUrl ? "image" : undefined);
-    const fileName: string | undefined = body.fileName;
-    const characterId: string | undefined = body.characterId;
-    const isRegenerate: boolean = body.regenerate || false;
-    const regenerateFromIndex: number | undefined = body.regenerateFromIndex;
-    const editFromMessageIndex: number | undefined = body.editFromMessageIndex;
+    // Message count incremented atomically above
 
     if (!userMessage.trim()) {
       return NextResponse.json(

@@ -246,6 +246,9 @@ export function useChats() {
   const sendMessage = async (input: string, imageUrl?: string, fileData?: { url: string; fileType: string; fileName: string }, characterId?: string) => {
     if (!input.trim() || isLoading || !canSendMessage()) return;
 
+    // Images/files cost 2 messages, text costs 1
+    const messageCost = (imageUrl || fileData) ? 2 : 1;
+
     setIsLoading(true);
 
     let activeChatId = currentChatId;
@@ -484,8 +487,8 @@ export function useChats() {
 
               if (data.done) {
                 receivedDone = true;
-                // Update local message count
-                setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+                // Update local message count (images/files cost 2)
+                setLocalMessagesUsed(prev => (prev ?? 0) + messageCost);
               }
 
               if (data.error) {
@@ -519,7 +522,7 @@ export function useChats() {
                     : c
                 )
               );
-              setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+              setLocalMessagesUsed(prev => (prev ?? 0) + messageCost);
             }
           }
         } catch {
@@ -528,7 +531,7 @@ export function useChats() {
         }
       } else if (!receivedDone && streamedContent) {
         // We got content but no done signal - still count it as a message
-        setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+        setLocalMessagesUsed(prev => (prev ?? 0) + messageCost);
       }
 
     } catch (error) {
@@ -536,7 +539,7 @@ export function useChats() {
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('Generation stopped by user');
         // Backend already counted this message, so update frontend count
-        setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+        setLocalMessagesUsed(prev => (prev ?? 0) + messageCost);
         // Remove empty assistant message if no content was streamed
         if (!streamedContent) {
           setChats(prev => prev.map(c =>
