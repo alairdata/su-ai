@@ -3116,7 +3116,7 @@ function HomePage() {
                             el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
                           }}
                           disabled={chatLoading || !canSendMessage()}
-                          style={currentStyles.textarea}
+                          style={{ ...currentStyles.textarea, caretColor: input ? undefined : 'transparent' }}
                         />
                         {chatLoading ? (
                           <button
@@ -3777,7 +3777,7 @@ function HomePage() {
                           el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
                         }}
                         disabled={chatLoading || !canSendMessage()}
-                        style={currentStyles.textarea}
+                        style={{ ...currentStyles.textarea, caretColor: input ? undefined : 'transparent' }}
                       />
                       {chatLoading ? (
                         <button
