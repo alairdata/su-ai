@@ -10,6 +10,27 @@ import ReactMarkdown from "react-markdown";
 type View = "auth" | "chat";
 type AuthMode = "signin" | "signup";
 
+interface ChatCharacter {
+  id: string;
+  chat_id: string;
+  user_id: string;
+  name: string;
+  personality: string;
+  color_bg: string;
+  color_fg: string;
+  color_border: string;
+  color_bg_light: string;
+  color_tag: string;
+}
+
+const CHARACTER_COLORS = [
+  { name: 'purple', bg: '#2D1B4E', fg: '#B388FF', border: 'rgba(179,136,255,0.2)', bgLight: 'rgba(179,136,255,0.06)', tag: 'rgba(179,136,255,0.15)' },
+  { name: 'blue', bg: '#1B3A4E', fg: '#64D2FF', border: 'rgba(100,210,255,0.2)', bgLight: 'rgba(100,210,255,0.06)', tag: 'rgba(100,210,255,0.15)' },
+  { name: 'green', bg: '#1B4E2D', fg: '#69F0AE', border: 'rgba(105,240,174,0.2)', bgLight: 'rgba(105,240,174,0.06)', tag: 'rgba(105,240,174,0.15)' },
+  { name: 'pink', bg: '#4E1B35', fg: '#FF80AB', border: 'rgba(255,128,171,0.2)', bgLight: 'rgba(255,128,171,0.06)', tag: 'rgba(255,128,171,0.15)' },
+  { name: 'orange', bg: '#4E3A1B', fg: '#FFAB40', border: 'rgba(255,171,64,0.2)', bgLight: 'rgba(255,171,64,0.06)', tag: 'rgba(255,171,64,0.15)' },
+];
+
 const BoltLogo = ({ size = 40 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 60 60" fill="none">
     <defs>
@@ -668,6 +689,14 @@ function HomePage() {
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const plusMenuRef = useRef<HTMLDivElement>(null);
 
+  // Chat characters state
+  const [chatCharacters, setChatCharacters] = useState<ChatCharacter[]>([]);
+  const [showCharacterModal, setShowCharacterModal] = useState(false);
+  const [newCharName, setNewCharName] = useState('');
+  const [newCharPersonality, setNewCharPersonality] = useState('');
+  const [selectedColorIndex, setSelectedColorIndex] = useState(0);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+
   // File upload state (images + documents)
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
@@ -857,6 +886,26 @@ function HomePage() {
       setCurrentView("auth");
     }
   }, [isAuthenticated, isUnauthenticated]);
+
+  // Fetch characters when chat changes
+  useEffect(() => {
+    if (!currentChatId || currentChatId.startsWith('temp-')) {
+      setChatCharacters([]);
+      return;
+    }
+    const fetchCharacters = async () => {
+      try {
+        const res = await fetch(`/api/characters?chatId=${currentChatId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setChatCharacters(data.characters || []);
+        }
+      } catch {
+        // Silently ignore - characters are non-critical
+      }
+    };
+    fetchCharacters();
+  }, [currentChatId]);
 
   const messages = currentChat?.messages ?? [];
   // Don't show greeting while chats are loading (prevents flash when restoring from localStorage)
@@ -1296,6 +1345,61 @@ function HomePage() {
     setSelectedFileType(null);
   };
 
+  // Character CRUD
+  const addChatCharacter = async () => {
+    if (!newCharName.trim() || !currentChatId || chatCharacters.length >= 5) return;
+
+    const color = CHARACTER_COLORS[selectedColorIndex];
+    try {
+      const res = await fetch('/api/characters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatId: currentChatId,
+          name: newCharName.trim(),
+          personality: newCharPersonality.trim(),
+          color_bg: color.bg,
+          color_fg: color.fg,
+          color_border: color.border,
+          color_bg_light: color.bgLight,
+          color_tag: color.tag,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setChatCharacters(prev => [...prev, data.character]);
+        setNewCharName('');
+        setNewCharPersonality('');
+        setSelectedColorIndex(0);
+        setShowCharacterModal(false);
+      }
+    } catch (err) {
+      console.error('Failed to add character:', err);
+    }
+  };
+
+  const removeChatCharacter = async (charId: string) => {
+    try {
+      const res = await fetch(`/api/characters?id=${charId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setChatCharacters(prev => prev.filter(c => c.id !== charId));
+      }
+    } catch (err) {
+      console.error('Failed to remove character:', err);
+    }
+  };
+
+  // Input change handler with @mention detection
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInput(val);
+    if (chatCharacters.length > 0 && (val.endsWith('@') || val.match(/@\w{0,15}$/))) {
+      setShowMentionDropdown(true);
+    } else {
+      setShowMentionDropdown(false);
+    }
+  };
+
   const handleSend = async () => {
     if ((!input.trim() && !selectedFile) || chatLoading || !canSendMessage()) return;
 
@@ -1364,10 +1468,19 @@ function HomePage() {
       ? "Analyze this file"
       : "What's in this image?";
 
+    // Detect @mention for character routing
+    const mentionMatch = messageToSend.match(/@(\w+)/);
+    const mentionedChar = mentionMatch
+      ? chatCharacters.find(c => c.name.toLowerCase() === mentionMatch[1].toLowerCase())
+      : null;
+
+    setShowMentionDropdown(false);
+
     await sendMessage(
       messageToSend || defaultMsg,
       uploadResult?.fileType === "image" ? uploadResult.url : undefined,
-      uploadResult ? uploadResult : undefined
+      uploadResult ? uploadResult : undefined,
+      mentionedChar?.id
     );
   };
 
@@ -2506,6 +2619,49 @@ function HomePage() {
               </div>
             </div>
             <div style={currentStyles.topBarRight}>
+              {/* Character circles + Add button */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginRight: 4 }}>
+                {chatCharacters.map((char, i) => (
+                  <div
+                    key={char.id}
+                    onClick={() => setShowCharacterModal(true)}
+                    title={char.name}
+                    style={{
+                      width: 26, height: 26, borderRadius: '50%',
+                      background: char.color_bg, color: char.color_fg,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 9, fontWeight: 700,
+                      border: `2px solid ${theme === 'dark' ? '#0C0C0E' : '#F5F4F0'}`,
+                      marginLeft: i === 0 ? 0 : -6,
+                      cursor: 'pointer',
+                      transition: 'all 0.25s',
+                    }}
+                  >
+                    {char.name.substring(0, 2).toUpperCase()}
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowCharacterModal(true)}
+                title="Add chat character"
+                style={{
+                  width: 34, height: 34, borderRadius: 8,
+                  border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
+                  background: 'transparent',
+                  color: theme === 'dark' ? '#5A5660' : '#9A9590',
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  marginRight: 4,
+                  transition: 'all 0.25s',
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                  <circle cx="8.5" cy="7" r="4"/>
+                  <line x1="20" y1="8" x2="20" y2="14"/>
+                  <line x1="17" y1="11" x2="23" y2="11"/>
+                </svg>
+              </button>
               <div style={{ display: 'flex', gap: '4px', background: theme === 'dark' ? '#1A1A1E' : '#E4E3DF', borderRadius: '999px', padding: '3px' }}>
                 <button
                   onClick={() => theme !== 'light' && toggleTheme()}
@@ -2779,7 +2935,46 @@ function HomePage() {
                       </div>
                     )}
 
-                    <div style={currentStyles.inputCard}>
+                    <div style={{ ...currentStyles.inputCard, position: 'relative' as const }}>
+                      {/* @mention dropdown */}
+                      {showMentionDropdown && chatCharacters.length > 0 && (
+                        <div style={{
+                          position: 'absolute', bottom: 'calc(100% + 8px)', left: 12,
+                          background: theme === 'dark' ? '#1A1A1E' : '#E4E3DF',
+                          border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.13)'}`,
+                          borderRadius: 12, padding: 6, minWidth: 200,
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 50,
+                        }}>
+                          {chatCharacters.map(char => (
+                            <div
+                              key={char.id}
+                              onClick={() => {
+                                const atIdx = input.lastIndexOf('@');
+                                setInput(input.substring(0, atIdx) + '@' + char.name + ' ');
+                                setShowMentionDropdown(false);
+                              }}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 10,
+                                padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                                transition: 'background 0.15s',
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = theme === 'dark' ? '#222228' : '#DDDCD8'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                              <div style={{
+                                width: 24, height: 24, borderRadius: '50%',
+                                background: char.color_bg, color: char.color_fg,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 10, fontWeight: 700,
+                              }}>{char.name.substring(0, 2).toUpperCase()}</div>
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: char.color_fg }}>{char.name}</div>
+                                <div style={{ fontSize: 11, color: theme === 'dark' ? '#5A5660' : '#9A9590' }}>{char.personality?.substring(0, 30) || 'Character'}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {/* File preview strip */}
                       {(filePreviewUrl || (selectedFile && selectedFileType !== "image")) && (
                         <div style={{
@@ -2856,7 +3051,7 @@ function HomePage() {
                           rows={1}
                           placeholder={canSendMessage() ? "Ask anything — no filters, no limits..." : "Daily limit reached. Upgrade to continue."}
                           value={input}
-                          onChange={(e) => setInput(e.target.value)}
+                          onChange={handleInputChange}
                           onKeyDown={handleKeyDown}
                           onInput={(e) => {
                             const el = e.currentTarget;
@@ -2959,7 +3154,14 @@ function HomePage() {
                                 </div>
                                 <span style={currentStyles.upgradeBadge}>Upgrade</span>
                               </button>
-                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                              <button style={currentStyles.plusMenuItem} onClick={() => {
+                                setShowPlusMenu(false);
+                                if (session?.user?.plan && session.user.plan !== 'Free') {
+                                  setShowCharacterModal(true);
+                                } else {
+                                  setShowAccountModal(true);
+                                }
+                              }}>
                                 <div style={currentStyles.plusMenuItemContent}>
                                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -2967,7 +3169,9 @@ function HomePage() {
                                   </svg>
                                   <span>Add Chat Character</span>
                                 </div>
-                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                                {(!session?.user?.plan || session.user.plan === 'Free') && (
+                                  <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                                )}
                               </button>
                             </div>
                           )}
@@ -2981,7 +3185,7 @@ function HomePage() {
                           </svg>
                         </button>
                       </div>
-                      <span style={currentStyles.inputHint}>So-UnFiltered AI may produce inaccurate responses</span>
+                      <span style={currentStyles.inputHint}>{chatCharacters.length > 0 ? 'Type @ to mention a character' : 'So-UnFiltered AI may produce inaccurate responses'}</span>
                     </div>
                   </div>
                 </div>
@@ -3092,7 +3296,17 @@ function HomePage() {
                                     </span>
                                   </div>
                                 )}
-                                {m.content && <span>{m.content}</span>}
+                                {m.content && (
+                                  <span>
+                                    {m.content.split(/(@\w+)/g).map((part, pi) =>
+                                      part.match(/^@\w+$/) ? (
+                                        <span key={pi} style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30', fontWeight: 600 }}>{part}</span>
+                                      ) : (
+                                        <span key={pi}>{part}</span>
+                                      )
+                                    )}
+                                  </span>
+                                )}
                               </div>
                               <div style={currentStyles.messageActionsUser}>
                                 {/* Refresh/retry button */}
@@ -3199,20 +3413,67 @@ function HomePage() {
                               </div>
                             </div>
                           ) : m.content ? (
-                            <div
-                              className="message-bubble"
-                              style={currentStyles.messageBubbleAssistant}
-                            >
-                              <div style={currentStyles.messageText}>
-                                <ReactMarkdown
-                                  components={{
-                                    p: ({ children }) => <p style={{ margin: '0 0 0.75em 0', display: 'block' }}>{children}</p>,
-                                  }}
-                                >
-                                  {m.content}
-                                </ReactMarkdown>
+                            m.character_name ? (
+                              /* CHARACTER MESSAGE */
+                              <div style={{ display: 'flex', gap: '10px' }}>
+                                <div style={{
+                                  width: 28, height: 28, borderRadius: '50%',
+                                  background: m.character_color_bg || '#2D1B4E',
+                                  color: m.character_color_fg || '#B388FF',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 4,
+                                }}>
+                                  {m.character_name.substring(0, 2).toUpperCase()}
+                                </div>
+                                <div style={{ maxWidth: '80%', minWidth: 0 }}>
+                                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span style={{ color: m.character_color_fg || '#B388FF' }}>{m.character_name}</span>
+                                    <span style={{
+                                      fontSize: 8, padding: '1px 5px', borderRadius: 4,
+                                      fontWeight: 600, textTransform: 'uppercase' as const,
+                                      background: m.character_color_tag || 'rgba(179,136,255,0.15)',
+                                      color: m.character_color_fg || '#B388FF',
+                                    }}>Character</span>
+                                  </div>
+                                  <div
+                                    className="message-bubble"
+                                    style={{
+                                      padding: '12px 16px', borderRadius: '16px 16px 16px 4px',
+                                      fontSize: 14, lineHeight: 1.6,
+                                      background: m.character_color_bg_light || 'rgba(179,136,255,0.06)',
+                                      border: `1px solid ${m.character_color_border || 'rgba(179,136,255,0.2)'}`,
+                                      color: theme === 'dark' ? '#F0EDE8' : '#1A1918',
+                                    }}
+                                  >
+                                    <div style={currentStyles.messageText}>
+                                      <ReactMarkdown
+                                        components={{
+                                          p: ({ children }) => <p style={{ margin: '0 0 0.75em 0', display: 'block' }}>{children}</p>,
+                                        }}
+                                      >
+                                        {m.content}
+                                      </ReactMarkdown>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
+                            ) : (
+                              /* NORMAL AI MESSAGE */
+                              <div
+                                className="message-bubble"
+                                style={currentStyles.messageBubbleAssistant}
+                              >
+                                <div style={currentStyles.messageText}>
+                                  <ReactMarkdown
+                                    components={{
+                                      p: ({ children }) => <p style={{ margin: '0 0 0.75em 0', display: 'block' }}>{children}</p>,
+                                    }}
+                                  >
+                                    {m.content}
+                                  </ReactMarkdown>
+                                </div>
+                              </div>
+                            )
                           ) : (!isSearching && isLastAssistant) ? (
                             /* Typing indicator bubble - only for the LAST assistant message and only when not searching */
                             <div className="typing-bubble-wrapper">
@@ -3451,7 +3712,7 @@ function HomePage() {
                         rows={1}
                         placeholder={canSendMessage() ? "Ask anything — no filters, no limits..." : "Daily limit reached. Upgrade to continue."}
                         value={input}
-                        onChange={(e) => setInput(e.target.value)}
+                        onChange={handleInputChange}
                         onKeyDown={handleKeyDown}
                         onInput={(e) => {
                           const el = e.currentTarget;
@@ -3554,7 +3815,14 @@ function HomePage() {
                               </div>
                               <span style={currentStyles.upgradeBadge}>Upgrade</span>
                             </button>
-                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                            <button style={currentStyles.plusMenuItem} onClick={() => {
+                              setShowPlusMenu(false);
+                              if (session?.user?.plan && session.user.plan !== 'Free') {
+                                setShowCharacterModal(true);
+                              } else {
+                                setShowAccountModal(true);
+                              }
+                            }}>
                               <div style={currentStyles.plusMenuItemContent}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -3562,7 +3830,9 @@ function HomePage() {
                                 </svg>
                                 <span>Add Chat Character</span>
                               </div>
-                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                              {(!session?.user?.plan || session.user.plan === 'Free') && (
+                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                              )}
                             </button>
                           </div>
                         )}
@@ -3576,7 +3846,7 @@ function HomePage() {
                         </svg>
                       </button>
                     </div>
-                    <span style={currentStyles.inputHint}>So-UnFiltered AI may produce inaccurate responses</span>
+                    <span style={currentStyles.inputHint}>{chatCharacters.length > 0 ? 'Type @ to mention a character' : 'So-UnFiltered AI may produce inaccurate responses'}</span>
                   </div>
                 </div>
               </div>
@@ -4136,6 +4406,191 @@ function HomePage() {
       )}
 
       {/* Generic Confirmation Modal */}
+      {/* Character Modal */}
+      {showCharacterModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 300,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCharacterModal(false); }}
+        >
+          <div style={{
+            background: theme === 'dark' ? '#141416' : '#EDECE8',
+            border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.13)'}`,
+            borderRadius: 20, width: 440, maxWidth: '90vw', maxHeight: '85vh',
+            display: 'flex', flexDirection: 'column' as const,
+            boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+          }}>
+            {/* Header */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '20px 24px 16px',
+              borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
+            }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: theme === 'dark' ? '#F0EDE8' : '#1A1918' }}>Chat Characters</div>
+              <button
+                onClick={() => setShowCharacterModal(false)}
+                style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
+                  background: 'transparent',
+                  color: theme === 'dark' ? '#5A5660' : '#9A9590',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 16,
+                }}
+              >&times;</button>
+            </div>
+
+            {/* Existing characters */}
+            <div style={{
+              padding: '12px 24px',
+              borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: theme === 'dark' ? '#5A5660' : '#9A9590' }}>In this chat</span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: theme === 'dark' ? '#5A5660' : '#9A9590' }}>{chatCharacters.length}/5</span>
+              </div>
+
+              {chatCharacters.length === 0 ? (
+                <div style={{ padding: '12px 0', textAlign: 'center' as const, fontSize: 12, color: theme === 'dark' ? '#5A5660' : '#9A9590' }}>
+                  No characters yet. Add one below.
+                </div>
+              ) : (
+                chatCharacters.map((char) => (
+                  <div key={char.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0',
+                    borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
+                  }}>
+                    <div style={{
+                      width: 26, height: 26, borderRadius: '50%',
+                      background: char.color_bg, color: char.color_fg,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 9, fontWeight: 700,
+                    }}>{char.name.substring(0, 2).toUpperCase()}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: char.color_fg }}>{char.name}</div>
+                      <div style={{ fontSize: 11, color: theme === 'dark' ? '#5A5660' : '#9A9590', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{char.personality || 'No description'}</div>
+                    </div>
+                    <button
+                      onClick={() => removeChatCharacter(char.id)}
+                      style={{
+                        width: 22, height: 22, borderRadius: 6, border: 'none',
+                        background: 'transparent', color: theme === 'dark' ? '#5A5660' : '#9A9590',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
+                      }}
+                    >&times;</button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Add new character form */}
+            <div style={{ padding: '20px 24px', overflowY: 'auto' as const, flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: theme === 'dark' ? '#F0EDE8' : '#1A1918' }}>Add New Character</div>
+
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: theme === 'dark' ? '#F0EDE8' : '#1A1918' }}>Name</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: theme === 'dark' ? '#5A5660' : '#9A9590' }}>{newCharName.length}/16</span>
+                </div>
+                <input
+                  type="text"
+                  value={newCharName}
+                  onChange={(e) => setNewCharName(e.target.value)}
+                  maxLength={16}
+                  placeholder="e.g. Danny, Kofi, Coach..."
+                  style={{
+                    width: '100%', padding: '10px 12px', boxSizing: 'border-box' as const,
+                    background: theme === 'dark' ? '#0C0C0E' : '#F5F4F0',
+                    border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.13)'}`,
+                    borderRadius: 10, color: theme === 'dark' ? '#F0EDE8' : '#1A1918',
+                    fontFamily: "'Inter', sans-serif", fontSize: 14, outline: 'none',
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: theme === 'dark' ? '#F0EDE8' : '#1A1918' }}>Personality</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: theme === 'dark' ? '#5A5660' : '#9A9590' }}>{newCharPersonality.length}/300</span>
+                </div>
+                <textarea
+                  value={newCharPersonality}
+                  onChange={(e) => setNewCharPersonality(e.target.value)}
+                  maxLength={300}
+                  placeholder="Describe how they talk, their vibe..."
+                  style={{
+                    width: '100%', padding: '10px 12px', height: 64, boxSizing: 'border-box' as const,
+                    background: theme === 'dark' ? '#0C0C0E' : '#F5F4F0',
+                    border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.13)'}`,
+                    borderRadius: 10, color: theme === 'dark' ? '#F0EDE8' : '#1A1918',
+                    fontFamily: "'Inter', sans-serif", fontSize: 14, outline: 'none',
+                    resize: 'none' as const, lineHeight: 1.5,
+                  }}
+                />
+                <div style={{ fontSize: 11, color: theme === 'dark' ? '#5A5660' : '#9A9590', marginTop: 4 }}>
+                  e.g. &quot;A tough love mentor who doesn&apos;t sugarcoat anything&quot;
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6, color: theme === 'dark' ? '#F0EDE8' : '#1A1918' }}>Color</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {CHARACTER_COLORS.map((color, i) => (
+                    <div
+                      key={color.name}
+                      onClick={() => setSelectedColorIndex(i)}
+                      style={{
+                        width: 28, height: 28, borderRadius: '50%',
+                        background: color.fg, cursor: 'pointer',
+                        border: selectedColorIndex === i ? `2px solid ${theme === 'dark' ? '#F0EDE8' : '#1A1918'}` : '2px solid transparent',
+                        transition: 'all 0.2s',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: '14px 24px', display: 'flex', gap: 10, justifyContent: 'flex-end',
+              borderTop: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
+            }}>
+              <button
+                onClick={() => setShowCharacterModal(false)}
+                style={{
+                  padding: '10px 20px', borderRadius: 10,
+                  border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.13)'}`,
+                  background: 'transparent',
+                  color: theme === 'dark' ? '#8A8690' : '#6B6660',
+                  fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >Cancel</button>
+              <button
+                onClick={addChatCharacter}
+                disabled={!newCharName.trim() || chatCharacters.length >= 5}
+                style={{
+                  padding: '10px 24px', borderRadius: 10, border: 'none',
+                  background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+                  color: '#0C0C0E',
+                  fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  opacity: (!newCharName.trim() || chatCharacters.length >= 5) ? 0.4 : 1,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Character
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmModal.show && (
         <>
           <div style={currentStyles.modalOverlay} onClick={confirmModal.isLoading ? undefined : closeConfirmModal} />

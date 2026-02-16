@@ -53,7 +53,14 @@ export async function GET(
         created_at,
         image_url,
         file_type,
-        file_name
+        file_name,
+        character_id,
+        character_name,
+        character_color_bg,
+        character_color_fg,
+        character_color_border,
+        character_color_bg_light,
+        character_color_tag
       )
     `)
     .eq("id", chatId)

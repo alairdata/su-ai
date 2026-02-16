@@ -174,6 +174,7 @@ export async function POST(req: NextRequest) {
     const fileUrl: string | undefined = body.fileUrl || body.imageUrl;
     const fileType: string | undefined = body.fileType || (body.imageUrl ? "image" : undefined);
     const fileName: string | undefined = body.fileName;
+    const characterId: string | undefined = body.characterId;
     const isRegenerate: boolean = body.regenerate || false;
     const regenerateFromIndex: number | undefined = body.regenerateFromIndex;
     const editFromMessageIndex: number | undefined = body.editFromMessageIndex;
@@ -209,7 +210,7 @@ export async function POST(req: NextRequest) {
       .select(`
         id,
         user_id,
-        messages (id, role, content, created_at, image_url, file_type, file_name)
+        messages (id, role, content, created_at, image_url, file_type, file_name, character_name)
       `)
       .eq("id", chatId)
       .order("created_at", { referencedTable: "messages", ascending: true })
@@ -222,7 +223,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let allMessages = (chat.messages as Array<{ id: string; role: "user" | "assistant"; content: string; created_at: string; image_url?: string; file_type?: string; file_name?: string }>) || [];
+    let allMessages = (chat.messages as Array<{ id: string; role: "user" | "assistant"; content: string; created_at: string; image_url?: string; file_type?: string; file_name?: string; character_name?: string }>) || [];
 
     // Handle regenerate: delete messages from the specified index onwards
     // SECURITY: Only delete messages that belong to this chat (verified by chat ownership above)
@@ -311,7 +312,9 @@ export async function POST(req: NextRequest) {
       // Build API messages: [summary context] + [recent raw] + [new message]
       const rawRecent = await Promise.all(recentMessages.map(async (m) => ({
         role: m.role as "user" | "assistant",
-        content: m.role === "user" ? await buildMessageContent(m.content, m.image_url, m.file_type, m.file_name) : m.content,
+        content: m.role === "user"
+          ? await buildMessageContent(m.content, m.image_url, m.file_type, m.file_name)
+          : (m.character_name ? `[${m.character_name} said]: ${m.content}` : m.content),
       })));
 
       if (contextSummary) {
@@ -332,7 +335,9 @@ export async function POST(req: NextRequest) {
       // Short conversation — send all messages raw
       const builtHistory = await Promise.all(historyMessages.map(async (m) => ({
         role: m.role as "user" | "assistant",
-        content: m.role === "user" ? await buildMessageContent(m.content, m.image_url, m.file_type, m.file_name) : m.content,
+        content: m.role === "user"
+          ? await buildMessageContent(m.content, m.image_url, m.file_type, m.file_name)
+          : (m.character_name ? `[${m.character_name} said]: ${m.content}` : m.content),
       })));
       apiMessages = isRegenerate
         ? builtHistory
@@ -341,6 +346,35 @@ export async function POST(req: NextRequest) {
             { role: "user" as const, content: await buildMessageContent(userMessage, fileUrl, fileType, fileName) }
           ];
     }
+
+    // Look up character if @mentioned
+    let mentionedCharacter: { id: string; name: string; personality: string | null; color_bg: string; color_fg: string; color_border: string; color_bg_light: string; color_tag: string } | null = null;
+
+    if (characterId) {
+      const { data: charData } = await supabase
+        .from("chat_characters")
+        .select("id, name, personality, color_bg, color_fg, color_border, color_bg_light, color_tag")
+        .eq("id", characterId)
+        .eq("chat_id", chatId)
+        .single();
+
+      if (charData) {
+        mentionedCharacter = charData;
+      }
+    }
+
+    // Build effective system prompt
+    const effectiveSystemPrompt = mentionedCharacter
+      ? `You are ${mentionedCharacter.name}. ${mentionedCharacter.personality || 'You are a helpful AI character.'}
+
+IMPORTANT RULES:
+- You are NOT So-UnFiltered AI. You are ${mentionedCharacter.name}.
+- Stay in character at all times.
+- You have full context of the conversation so far.
+- Respond as ${mentionedCharacter.name} would respond based on your personality.
+- Keep your response concise and conversational.
+- Never break character or mention that you are an AI playing a role.`
+      : SYSTEM_PROMPT;
 
     // Track full response for saving to database
     let fullResponse = "";
@@ -358,13 +392,28 @@ export async function POST(req: NextRequest) {
           let continueLoop = true;
           let currentSegment = "";
 
+          // Send character info so frontend can style the response
+          if (mentionedCharacter) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+              characterInfo: {
+                id: mentionedCharacter.id,
+                name: mentionedCharacter.name,
+                color_bg: mentionedCharacter.color_bg,
+                color_fg: mentionedCharacter.color_fg,
+                color_border: mentionedCharacter.color_border,
+                color_bg_light: mentionedCharacter.color_bg_light,
+                color_tag: mentionedCharacter.color_tag,
+              }
+            })}\n\n`));
+          }
+
           while (continueLoop) {
             const stream = await anthropic.messages.create({
               model: "claude-sonnet-4-20250514",
               max_tokens: 1024,
               stream: true,
-              system: SYSTEM_PROMPT,
-              tools: tools,
+              system: effectiveSystemPrompt,
+              tools: mentionedCharacter ? undefined : tools, // Characters don't use web search
               messages: currentMessages,
             });
 
@@ -466,6 +515,15 @@ export async function POST(req: NextRequest) {
                   chat_id: chatId,
                   role: "assistant",
                   content: segment,
+                  ...(mentionedCharacter ? {
+                    character_id: mentionedCharacter.id,
+                    character_name: mentionedCharacter.name,
+                    character_color_bg: mentionedCharacter.color_bg,
+                    character_color_fg: mentionedCharacter.color_fg,
+                    character_color_border: mentionedCharacter.color_border,
+                    character_color_bg_light: mentionedCharacter.color_bg_light,
+                    character_color_tag: mentionedCharacter.color_tag,
+                  } : {}),
                 }).then(() => {})
               );
             }

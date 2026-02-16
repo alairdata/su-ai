@@ -10,6 +10,13 @@ type Message = {
   image_url?: string;
   file_type?: string;
   file_name?: string;
+  character_id?: string;
+  character_name?: string;
+  character_color_bg?: string;
+  character_color_fg?: string;
+  character_color_border?: string;
+  character_color_bg_light?: string;
+  character_color_tag?: string;
   isFinalized?: boolean; // True for messages that shouldn't show action buttons (e.g., pre-search messages)
   isError?: boolean; // True if this message failed to load - shows error state with retry
 };
@@ -200,7 +207,7 @@ export function useChats() {
     }
   };
 
-  const sendMessage = async (input: string, imageUrl?: string, fileData?: { url: string; fileType: string; fileName: string }) => {
+  const sendMessage = async (input: string, imageUrl?: string, fileData?: { url: string; fileType: string; fileName: string }, characterId?: string) => {
     if (!input.trim() || isLoading || !canSendMessage()) return;
 
     setIsLoading(true);
@@ -301,6 +308,7 @@ export function useChats() {
           fileUrl: fileData?.url || undefined,
           fileType: fileData?.fileType || undefined,
           fileName: fileData?.fileName || undefined,
+          characterId: characterId || undefined,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -336,6 +344,34 @@ export function useChats() {
               if (data.searching !== undefined) {
                 setIsSearching(data.searching);
                 setSearchQuery(data.query || null);
+              }
+
+              // Handle characterInfo - apply character styling to assistant message
+              if (data.characterInfo) {
+                const ci = data.characterInfo;
+                setChats(prev =>
+                  prev.map(c =>
+                    (c.id === realChatId || c.id === activeChatId)
+                      ? {
+                          ...c,
+                          messages: c.messages.map(m =>
+                            m.id === assistantMessageId
+                              ? {
+                                  ...m,
+                                  character_id: ci.id,
+                                  character_name: ci.name,
+                                  character_color_bg: ci.color_bg,
+                                  character_color_fg: ci.color_fg,
+                                  character_color_border: ci.color_border,
+                                  character_color_bg_light: ci.color_bg_light,
+                                  character_color_tag: ci.color_tag,
+                                }
+                              : m
+                          ),
+                        }
+                      : c
+                  )
+                );
               }
 
               // Handle finalizeMessage - mark current message as finalized (no action buttons)
