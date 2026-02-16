@@ -196,7 +196,7 @@ export const authOptions: NextAuthOptions = {
       if (token.id) {
         const { data: freshUser } = await supabase
           .from('users')
-          .select('plan, messages_used_today, is_new_user, onboarding_complete')
+          .select('plan, messages_used_today, is_new_user, onboarding_complete, whats_new_seen, created_at')
           .eq('id', token.id)
           .single();
 
@@ -205,6 +205,8 @@ export const authOptions: NextAuthOptions = {
           token.messagesUsedToday = freshUser.messages_used_today;
           token.isNewUser = freshUser.is_new_user || false;
           token.onboardingComplete = freshUser.onboarding_complete ?? false;
+          token.whatsNewSeen = freshUser.whats_new_seen || false;
+          token.createdAt = freshUser.created_at || null;
         }
       }
 
@@ -217,6 +219,8 @@ export const authOptions: NextAuthOptions = {
         session.user.messagesUsedToday = token.messagesUsedToday as number;
         session.user.isNewUser = token.isNewUser as boolean;
         session.user.onboardingComplete = token.onboardingComplete as boolean;
+        session.user.whatsNewSeen = token.whatsNewSeen as boolean;
+        session.user.createdAt = token.createdAt as string;
 
         // Force logout check — separate query so it always works
         try {
