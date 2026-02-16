@@ -45,7 +45,10 @@ export async function GET(req: NextRequest) {
         id,
         role,
         content,
-        created_at
+        created_at,
+        image_url,
+        file_type,
+        file_name
       )
     `)
     .eq("user_id", session.user.id)

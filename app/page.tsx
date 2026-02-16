@@ -668,6 +668,14 @@ function HomePage() {
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const plusMenuRef = useRef<HTMLDivElement>(null);
 
+  // File upload state (images + documents)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const [selectedFileType, setSelectedFileType] = useState<"image" | "pdf" | "text" | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
+
   const {
     chats,
     currentChat,
@@ -1240,18 +1248,127 @@ function HomePage() {
     setShowScrollButton(!isNearBottom);
   }, []);
 
+  const imageAllowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+  const docAllowedExtensions = new Set([
+    "pdf", "txt", "csv", "md", "json", "js", "ts", "py", "html", "css",
+    "jsx", "tsx", "sql", "xml", "yaml", "yml", "sh", "rb", "go", "rs",
+    "java", "cpp", "c", "h",
+  ]);
+
+  const classifyFile = (file: File): "image" | "pdf" | "text" => {
+    if (imageAllowedTypes.includes(file.type)) return "image";
+    if (file.type === "application/pdf") return "pdf";
+    return "text";
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    const isImage = imageAllowedTypes.includes(file.type);
+    const isDoc = file.type === "application/pdf" || docAllowedExtensions.has(ext);
+
+    if (!isImage && !isDoc) {
+      alert("Invalid file type. Allowed: images, PDFs, and common text/code files.");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File too large. Maximum size is 10MB.");
+      return;
+    }
+
+    const fType = classifyFile(file);
+    setSelectedFile(file);
+    setSelectedFileType(fType);
+    setFilePreviewUrl(fType === "image" ? URL.createObjectURL(file) : null);
+
+    // Reset file inputs so same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (docInputRef.current) docInputRef.current.value = "";
+  };
+
+  const handleFileRemove = () => {
+    if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+    setSelectedFile(null);
+    setFilePreviewUrl(null);
+    setSelectedFileType(null);
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || chatLoading || !canSendMessage()) return;
+    if ((!input.trim() && !selectedFile) || chatLoading || !canSendMessage()) return;
 
     const messageToSend = input;
+    const fileToUpload = selectedFile;
+    const fileTypeToUpload = selectedFileType;
     setInput("");
+    setSelectedFile(null);
+    const previewToRevoke = filePreviewUrl;
+    setFilePreviewUrl(null);
+    setSelectedFileType(null);
 
     // Reset textarea height to single row
     if (textareaRef.current) {
       textareaRef.current.style.height = '24px';
     }
 
-    await sendMessage(messageToSend);
+    let uploadResult: { url: string; fileType: string; fileName: string } | undefined;
+
+    // Upload file if selected
+    if (fileToUpload) {
+      setIsUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", fileToUpload);
+        formData.append("chatId", currentChatId || "00000000-0000-0000-0000-000000000000");
+
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!uploadRes.ok) {
+          const err = await uploadRes.json();
+          alert(err.error || "Failed to upload file.");
+          setInput(messageToSend);
+          setSelectedFile(fileToUpload);
+          setSelectedFileType(fileTypeToUpload);
+          if (previewToRevoke) setFilePreviewUrl(previewToRevoke);
+          setIsUploading(false);
+          return;
+        }
+
+        const uploadData = await uploadRes.json();
+        uploadResult = {
+          url: uploadData.url,
+          fileType: uploadData.fileType || "image",
+          fileName: uploadData.fileName || fileToUpload.name,
+        };
+      } catch {
+        alert("Failed to upload file. Please try again.");
+        setInput(messageToSend);
+        setSelectedFile(fileToUpload);
+        setSelectedFileType(fileTypeToUpload);
+        if (previewToRevoke) setFilePreviewUrl(previewToRevoke);
+        setIsUploading(false);
+        return;
+      }
+      setIsUploading(false);
+    }
+
+    // Clean up preview URL
+    if (previewToRevoke) URL.revokeObjectURL(previewToRevoke);
+
+    const defaultMsg = uploadResult && uploadResult.fileType !== "image"
+      ? "Analyze this file"
+      : "What's in this image?";
+
+    await sendMessage(
+      messageToSend || defaultMsg,
+      uploadResult?.fileType === "image" ? uploadResult.url : undefined,
+      uploadResult ? uploadResult : undefined
+    );
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -2626,6 +2743,22 @@ function HomePage() {
                     </div>
                   )}
 
+                  {/* Hidden file inputs for uploads */}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    ref={fileInputRef}
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
+                  />
+                  <input
+                    type="file"
+                    accept=".pdf,.txt,.csv,.md,.json,.js,.ts,.py,.html,.css,.jsx,.tsx,.sql,.xml,.yaml,.yml,.sh,.rb,.go,.rs,.java,.cpp,.c,.h"
+                    ref={docInputRef}
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
+                  />
+
                   {/* Input area centered with greeting */}
                   <div style={{
                     ...currentStyles.inputWrapper,
@@ -2647,6 +2780,76 @@ function HomePage() {
                     )}
 
                     <div style={currentStyles.inputCard}>
+                      {/* File preview strip */}
+                      {(filePreviewUrl || (selectedFile && selectedFileType !== "image")) && (
+                        <div style={{
+                          padding: '8px 12px 0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}>
+                          <div style={{ position: 'relative', display: 'inline-block' }}>
+                            {selectedFileType === "image" && filePreviewUrl ? (
+                              <img
+                                src={filePreviewUrl}
+                                alt="Selected"
+                                style={{
+                                  height: '60px',
+                                  maxWidth: '120px',
+                                  objectFit: 'cover',
+                                  borderRadius: '8px',
+                                  border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
+                                }}
+                              />
+                            ) : selectedFile ? (
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 12px',
+                                background: 'var(--bg-tertiary, #1a1a1e)',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
+                              }}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={selectedFileType === "pdf" ? "#ef4444" : "#E8A04C"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                  <polyline points="14 2 14 8 20 8" />
+                                </svg>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary, #f0ede8)', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedFile.name}</span>
+                                  <span style={{ fontSize: '10px', color: 'var(--text-secondary, #888)' }}>{(selectedFile.size / 1024).toFixed(1)} KB</span>
+                                </div>
+                              </div>
+                            ) : null}
+                            <button
+                              onClick={handleFileRemove}
+                              style={{
+                                position: 'absolute',
+                                top: '-6px',
+                                right: '-6px',
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '50%',
+                                background: '#ef4444',
+                                color: 'white',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '12px',
+                                lineHeight: 1,
+                                padding: 0,
+                              }}
+                            >
+                              &times;
+                            </button>
+                          </div>
+                          {isUploading && (
+                            <span style={{ fontSize: '12px', color: 'var(--text-secondary, #888)' }}>Uploading...</span>
+                          )}
+                        </div>
+                      )}
                       <div style={currentStyles.inputRow}>
                         <textarea
                           ref={textareaRef}
@@ -2680,10 +2883,10 @@ function HomePage() {
                           <button
                             style={{
                               ...currentStyles.sendBtn,
-                              ...(!input.trim() || !canSendMessage() ? currentStyles.sendBtnDisabled : {})
+                              ...((!input.trim() && !selectedFile) || !canSendMessage() ? currentStyles.sendBtnDisabled : {})
                             }}
                             onClick={handleSend}
-                            disabled={!input.trim() || !canSendMessage()}
+                            disabled={(!input.trim() && !selectedFile) || !canSendMessage()}
                           >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <line x1="22" y1="2" x2="11" y2="13" />
@@ -2707,7 +2910,14 @@ function HomePage() {
                           </button>
                           {showPlusMenu && (
                             <div style={currentStyles.plusMenu}>
-                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                              <button style={currentStyles.plusMenuItem} onClick={() => {
+                                setShowPlusMenu(false);
+                                if (session?.user?.plan && session.user.plan !== 'Free') {
+                                  fileInputRef.current?.click();
+                                } else {
+                                  setShowAccountModal(true);
+                                }
+                              }}>
                                 <div style={currentStyles.plusMenuItemContent}>
                                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -2716,9 +2926,18 @@ function HomePage() {
                                   </svg>
                                   <span>Add Photos</span>
                                 </div>
-                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                                {(!session?.user?.plan || session.user.plan === 'Free') && (
+                                  <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                                )}
                               </button>
-                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                              <button style={currentStyles.plusMenuItem} onClick={() => {
+                                setShowPlusMenu(false);
+                                if (session?.user?.plan && session.user.plan !== 'Free') {
+                                  docInputRef.current?.click();
+                                } else {
+                                  setShowAccountModal(true);
+                                }
+                              }}>
                                 <div style={currentStyles.plusMenuItemContent}>
                                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -2726,7 +2945,9 @@ function HomePage() {
                                   </svg>
                                   <span>Add Files</span>
                                 </div>
-                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                                {(!session?.user?.plan || session.user.plan === 'Free') && (
+                                  <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                                )}
                               </button>
                               <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
                                 <div style={currentStyles.plusMenuItemContent}>
@@ -2832,7 +3053,46 @@ function HomePage() {
                             /* Normal display mode */
                             <>
                               <div style={currentStyles.messageBubbleUser}>
-                                <span>{m.content}</span>
+                                {m.image_url && (!m.file_type || m.file_type === "image") && (
+                                  <img
+                                    src={m.image_url}
+                                    alt="Uploaded"
+                                    onClick={() => window.open(m.image_url, '_blank')}
+                                    style={{
+                                      maxWidth: '300px',
+                                      maxHeight: '200px',
+                                      borderRadius: '12px',
+                                      marginBottom: m.content ? '8px' : 0,
+                                      cursor: 'pointer',
+                                      display: 'block',
+                                    }}
+                                  />
+                                )}
+                                {m.image_url && m.file_type && m.file_type !== "image" && (
+                                  <div
+                                    onClick={() => window.open(m.image_url, '_blank')}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      padding: '8px 12px',
+                                      background: 'rgba(255,255,255,0.06)',
+                                      borderRadius: '8px',
+                                      cursor: 'pointer',
+                                      marginBottom: m.content ? '8px' : 0,
+                                      maxWidth: '250px',
+                                    }}
+                                  >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={m.file_type === "pdf" ? "#ef4444" : "#E8A04C"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                      <polyline points="14 2 14 8 20 8" />
+                                    </svg>
+                                    <span style={{ fontSize: '12px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {m.file_name || 'File'}
+                                    </span>
+                                  </div>
+                                )}
+                                {m.content && <span>{m.content}</span>}
                               </div>
                               <div style={currentStyles.messageActionsUser}>
                                 {/* Refresh/retry button */}
@@ -3115,6 +3375,76 @@ function HomePage() {
                   )}
 
                   <div style={currentStyles.inputCard}>
+                    {/* File preview strip */}
+                    {(filePreviewUrl || (selectedFile && selectedFileType !== "image")) && (
+                      <div style={{
+                        padding: '8px 12px 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}>
+                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                          {selectedFileType === "image" && filePreviewUrl ? (
+                            <img
+                              src={filePreviewUrl}
+                              alt="Selected"
+                              style={{
+                                height: '60px',
+                                maxWidth: '120px',
+                                objectFit: 'cover',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
+                              }}
+                            />
+                          ) : selectedFile ? (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              padding: '8px 12px',
+                              background: 'var(--bg-tertiary, #1a1a1e)',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
+                            }}>
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={selectedFileType === "pdf" ? "#ef4444" : "#E8A04C"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                              </svg>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary, #f0ede8)', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedFile.name}</span>
+                                <span style={{ fontSize: '10px', color: 'var(--text-secondary, #888)' }}>{(selectedFile.size / 1024).toFixed(1)} KB</span>
+                              </div>
+                            </div>
+                          ) : null}
+                          <button
+                            onClick={handleFileRemove}
+                            style={{
+                              position: 'absolute',
+                              top: '-6px',
+                              right: '-6px',
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              background: '#ef4444',
+                              color: 'white',
+                              border: 'none',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                              lineHeight: 1,
+                              padding: 0,
+                            }}
+                          >
+                            &times;
+                          </button>
+                        </div>
+                        {isUploading && (
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary, #888)' }}>Uploading...</span>
+                        )}
+                      </div>
+                    )}
                     <div style={currentStyles.inputRow}>
                       <textarea
                         ref={textareaRef}
@@ -3148,10 +3478,10 @@ function HomePage() {
                         <button
                           style={{
                             ...currentStyles.sendBtn,
-                            ...(!input.trim() || !canSendMessage() ? currentStyles.sendBtnDisabled : {})
+                            ...((!input.trim() && !selectedFile) || !canSendMessage() ? currentStyles.sendBtnDisabled : {})
                           }}
                           onClick={handleSend}
-                          disabled={!input.trim() || !canSendMessage()}
+                          disabled={(!input.trim() && !selectedFile) || !canSendMessage()}
                         >
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="22" y1="2" x2="11" y2="13" />
@@ -3175,7 +3505,14 @@ function HomePage() {
                         </button>
                         {showPlusMenu && (
                           <div style={currentStyles.plusMenu}>
-                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                            <button style={currentStyles.plusMenuItem} onClick={() => {
+                              setShowPlusMenu(false);
+                              if (session?.user?.plan && session.user.plan !== 'Free') {
+                                fileInputRef.current?.click();
+                              } else {
+                                setShowAccountModal(true);
+                              }
+                            }}>
                               <div style={currentStyles.plusMenuItemContent}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -3184,9 +3521,18 @@ function HomePage() {
                                 </svg>
                                 <span>Add Photos</span>
                               </div>
-                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                              {(!session?.user?.plan || session.user.plan === 'Free') && (
+                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                              )}
                             </button>
-                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                            <button style={currentStyles.plusMenuItem} onClick={() => {
+                              setShowPlusMenu(false);
+                              if (session?.user?.plan && session.user.plan !== 'Free') {
+                                docInputRef.current?.click();
+                              } else {
+                                setShowAccountModal(true);
+                              }
+                            }}>
                               <div style={currentStyles.plusMenuItemContent}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -3194,7 +3540,9 @@ function HomePage() {
                                 </svg>
                                 <span>Add Files</span>
                               </div>
-                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                              {(!session?.user?.plan || session.user.plan === 'Free') && (
+                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                              )}
                             </button>
                             <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
                               <div style={currentStyles.plusMenuItemContent}>

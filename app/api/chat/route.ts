@@ -51,6 +51,57 @@ const tools: Anthropic.Tool[] = [
   }
 ];
 
+// Build multi-part content for a message that may include an image, PDF, or text file
+async function buildMessageContent(
+  text: string,
+  fileUrl?: string | null,
+  fileType?: string | null,
+  fileName?: string | null
+): Promise<string | Anthropic.ContentBlockParam[]> {
+  if (!fileUrl) return text;
+
+  const type = fileType || "image"; // backward compat: default to image
+
+  if (type === "image") {
+    return [
+      {
+        type: "image" as const,
+        source: { type: "url" as const, url: fileUrl },
+      },
+      { type: "text" as const, text },
+    ];
+  }
+
+  if (type === "pdf") {
+    return [
+      {
+        type: "document" as const,
+        source: { type: "url" as const, url: fileUrl },
+      } as Anthropic.DocumentBlockParam,
+      { type: "text" as const, text },
+    ];
+  }
+
+  // text/code files — fetch content and send inline
+  try {
+    const res = await fetch(fileUrl);
+    const fileContent = await res.text();
+    const label = fileName ? `[File: ${fileName}]\n` : "";
+    return [
+      {
+        type: "text" as const,
+        text: `${label}\`\`\`\n${fileContent}\n\`\`\``,
+      },
+      { type: "text" as const, text },
+    ];
+  } catch {
+    // Fallback: just mention the file
+    return [
+      { type: "text" as const, text: `[Attached file: ${fileName || "file"}]\n${text}` },
+    ];
+  }
+}
+
 // System prompt loaded from environment variable for security
 const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT || "You are a helpful AI assistant.";
 
@@ -119,6 +170,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const userMessage: string = body.message || "";
     const chatId: string = body.chatId;
+    const imageUrl: string | undefined = body.imageUrl;
+    const fileUrl: string | undefined = body.fileUrl || body.imageUrl;
+    const fileType: string | undefined = body.fileType || (body.imageUrl ? "image" : undefined);
+    const fileName: string | undefined = body.fileName;
     const isRegenerate: boolean = body.regenerate || false;
     const regenerateFromIndex: number | undefined = body.regenerateFromIndex;
     const editFromMessageIndex: number | undefined = body.editFromMessageIndex;
@@ -154,7 +209,7 @@ export async function POST(req: NextRequest) {
       .select(`
         id,
         user_id,
-        messages (id, role, content, created_at)
+        messages (id, role, content, created_at, image_url, file_type, file_name)
       `)
       .eq("id", chatId)
       .order("created_at", { referencedTable: "messages", ascending: true })
@@ -167,7 +222,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let allMessages = (chat.messages as Array<{ id: string; role: "user" | "assistant"; content: string; created_at: string }>) || [];
+    let allMessages = (chat.messages as Array<{ id: string; role: "user" | "assistant"; content: string; created_at: string; image_url?: string; file_type?: string; file_name?: string }>) || [];
 
     // Handle regenerate: delete messages from the specified index onwards
     // SECURITY: Only delete messages that belong to this chat (verified by chat ownership above)
@@ -203,6 +258,9 @@ export async function POST(req: NextRequest) {
         chat_id: chatId,
         role: "user",
         content: userMessage,
+        image_url: fileUrl || null,
+        file_type: fileType || null,
+        file_name: fileName || null,
         user_email: dbUser.email,
       });
       if (msgError) {
@@ -251,10 +309,10 @@ export async function POST(req: NextRequest) {
       }
 
       // Build API messages: [summary context] + [recent raw] + [new message]
-      const rawRecent = recentMessages.map((m) => ({
+      const rawRecent = await Promise.all(recentMessages.map(async (m) => ({
         role: m.role as "user" | "assistant",
-        content: m.content,
-      }));
+        content: m.role === "user" ? await buildMessageContent(m.content, m.image_url, m.file_type, m.file_name) : m.content,
+      })));
 
       if (contextSummary) {
         apiMessages = [
@@ -268,15 +326,19 @@ export async function POST(req: NextRequest) {
 
       // Add new user message for non-regenerate
       if (!isRegenerate) {
-        apiMessages.push({ role: "user" as const, content: userMessage });
+        apiMessages.push({ role: "user" as const, content: await buildMessageContent(userMessage, fileUrl, fileType, fileName) });
       }
     } else {
       // Short conversation — send all messages raw
+      const builtHistory = await Promise.all(historyMessages.map(async (m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.role === "user" ? await buildMessageContent(m.content, m.image_url, m.file_type, m.file_name) : m.content,
+      })));
       apiMessages = isRegenerate
-        ? historyMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content }))
+        ? builtHistory
         : [
-            ...historyMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-            { role: "user" as const, content: userMessage }
+            ...builtHistory,
+            { role: "user" as const, content: await buildMessageContent(userMessage, fileUrl, fileType, fileName) }
           ];
     }
 

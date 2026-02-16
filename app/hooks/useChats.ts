@@ -7,6 +7,9 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  image_url?: string;
+  file_type?: string;
+  file_name?: string;
   isFinalized?: boolean; // True for messages that shouldn't show action buttons (e.g., pre-search messages)
   isError?: boolean; // True if this message failed to load - shows error state with retry
 };
@@ -197,7 +200,7 @@ export function useChats() {
     }
   };
 
-  const sendMessage = async (input: string) => {
+  const sendMessage = async (input: string, imageUrl?: string, fileData?: { url: string; fileType: string; fileName: string }) => {
     if (!input.trim() || isLoading || !canSendMessage()) return;
 
     setIsLoading(true);
@@ -218,6 +221,9 @@ export function useChats() {
       role: 'user',
       content: input,
       created_at: new Date().toISOString(),
+      image_url: fileData?.url || imageUrl,
+      file_type: fileData?.fileType,
+      file_name: fileData?.fileName,
     };
 
     // Create assistant message placeholder for streaming
@@ -290,7 +296,11 @@ export function useChats() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chatId: realChatId,
-          message: input
+          message: input,
+          imageUrl: imageUrl || undefined,
+          fileUrl: fileData?.url || undefined,
+          fileType: fileData?.fileType || undefined,
+          fileName: fileData?.fileName || undefined,
         }),
         signal: abortControllerRef.current.signal,
       });
