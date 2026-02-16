@@ -3093,11 +3093,7 @@ function HomePage() {
                             <div style={currentStyles.plusMenu}>
                               <button style={currentStyles.plusMenuItem} onClick={() => {
                                 setShowPlusMenu(false);
-                                if (session?.user?.plan && session.user.plan !== 'Free') {
-                                  fileInputRef.current?.click();
-                                } else {
-                                  setShowAccountModal(true);
-                                }
+                                fileInputRef.current?.click();
                               }}>
                                 <div style={currentStyles.plusMenuItemContent}>
                                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3107,17 +3103,10 @@ function HomePage() {
                                   </svg>
                                   <span>Add Photos</span>
                                 </div>
-                                {(!session?.user?.plan || session.user.plan === 'Free') && (
-                                  <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                                )}
                               </button>
                               <button style={currentStyles.plusMenuItem} onClick={() => {
                                 setShowPlusMenu(false);
-                                if (session?.user?.plan && session.user.plan !== 'Free') {
-                                  docInputRef.current?.click();
-                                } else {
-                                  setShowAccountModal(true);
-                                }
+                                docInputRef.current?.click();
                               }}>
                                 <div style={currentStyles.plusMenuItemContent}>
                                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3126,9 +3115,6 @@ function HomePage() {
                                   </svg>
                                   <span>Add Files</span>
                                 </div>
-                                {(!session?.user?.plan || session.user.plan === 'Free') && (
-                                  <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                                )}
                               </button>
                               <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
                                 <div style={currentStyles.plusMenuItemContent}>
@@ -3142,11 +3128,7 @@ function HomePage() {
                               </button>
                               <button style={currentStyles.plusMenuItem} onClick={() => {
                                 setShowPlusMenu(false);
-                                if (session?.user?.plan && session.user.plan !== 'Free') {
-                                  setShowCharacterModal(true);
-                                } else {
-                                  setShowAccountModal(true);
-                                }
+                                setShowCharacterModal(true);
                               }}>
                                 <div style={currentStyles.plusMenuItemContent}>
                                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3155,9 +3137,6 @@ function HomePage() {
                                   </svg>
                                   <span>Add Chat Character</span>
                                 </div>
-                                {(!session?.user?.plan || session.user.plan === 'Free') && (
-                                  <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                                )}
                               </button>
                             </div>
                           )}
@@ -3754,11 +3733,7 @@ function HomePage() {
                           <div style={currentStyles.plusMenu}>
                             <button style={currentStyles.plusMenuItem} onClick={() => {
                               setShowPlusMenu(false);
-                              if (session?.user?.plan && session.user.plan !== 'Free') {
-                                fileInputRef.current?.click();
-                              } else {
-                                setShowAccountModal(true);
-                              }
+                              fileInputRef.current?.click();
                             }}>
                               <div style={currentStyles.plusMenuItemContent}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3768,17 +3743,10 @@ function HomePage() {
                                 </svg>
                                 <span>Add Photos</span>
                               </div>
-                              {(!session?.user?.plan || session.user.plan === 'Free') && (
-                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                              )}
                             </button>
                             <button style={currentStyles.plusMenuItem} onClick={() => {
                               setShowPlusMenu(false);
-                              if (session?.user?.plan && session.user.plan !== 'Free') {
-                                docInputRef.current?.click();
-                              } else {
-                                setShowAccountModal(true);
-                              }
+                              docInputRef.current?.click();
                             }}>
                               <div style={currentStyles.plusMenuItemContent}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3787,9 +3755,6 @@ function HomePage() {
                                 </svg>
                                 <span>Add Files</span>
                               </div>
-                              {(!session?.user?.plan || session.user.plan === 'Free') && (
-                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                              )}
                             </button>
                             <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
                               <div style={currentStyles.plusMenuItemContent}>
@@ -3803,11 +3768,7 @@ function HomePage() {
                             </button>
                             <button style={currentStyles.plusMenuItem} onClick={() => {
                               setShowPlusMenu(false);
-                              if (session?.user?.plan && session.user.plan !== 'Free') {
-                                setShowCharacterModal(true);
-                              } else {
-                                setShowAccountModal(true);
-                              }
+                              setShowCharacterModal(true);
                             }}>
                               <div style={currentStyles.plusMenuItemContent}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3816,9 +3777,6 @@ function HomePage() {
                                 </svg>
                                 <span>Add Chat Character</span>
                               </div>
-                              {(!session?.user?.plan || session.user.plan === 'Free') && (
-                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                              )}
                             </button>
                           </div>
                         )}
