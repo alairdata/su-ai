@@ -230,7 +230,11 @@ export function useChats() {
         created_at: data.chat.created_at || new Date().toISOString(),
         messages: [],
       };
-      setChats(prev => [newChat, ...prev]);
+      setChats(prev => {
+        // Prevent duplicates if chat already exists from a concurrent fetch
+        if (prev.some(c => c.id === data.chat.id)) return prev;
+        return [newChat, ...prev];
+      });
       setCurrentChatId(data.chat.id);
       return data.chat.id;
     } catch (error) {
