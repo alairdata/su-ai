@@ -692,6 +692,7 @@ function HomePage() {
   // Chat characters state
   const [chatCharacters, setChatCharacters] = useState<ChatCharacter[]>([]);
   const [showCharacterModal, setShowCharacterModal] = useState(false);
+  const [isAddingCharacter, setIsAddingCharacter] = useState(false);
   const [newCharName, setNewCharName] = useState('');
   const [newCharPersonality, setNewCharPersonality] = useState('');
   const [selectedColorIndex, setSelectedColorIndex] = useState(0);
@@ -1350,27 +1351,24 @@ function HomePage() {
   // Character CRUD
   const addChatCharacter = async () => {
     const name = newCharName.trim();
-    if (!name || chatCharacters.length >= 5) {
-      console.log('Validation failed:', { name, count: chatCharacters.length });
-      return;
-    }
+    if (!name || chatCharacters.length >= 5 || isAddingCharacter) return;
 
-    // If no chat exists yet, create one (adds to chats list to avoid loading screen)
-    let chatId = currentChatId;
-    if (!chatId) {
-      console.log('No current chat, creating one for character...');
-      const newChatId = await createChatWithEntry();
-      if (!newChatId) {
-        console.error('Failed to create chat for character');
-        return;
-      }
-      chatId = newChatId;
-    }
-
-    const color = CHARACTER_COLORS[selectedColorIndex];
-    console.log('Adding character:', { chatId, name, color: color.name });
+    setIsAddingCharacter(true);
 
     try {
+      // If no chat exists yet, create one (adds to chats list to avoid loading screen)
+      let chatId = currentChatId;
+      if (!chatId) {
+        const newChatId = await createChatWithEntry();
+        if (!newChatId) {
+          console.error('Failed to create chat for character');
+          return;
+        }
+        chatId = newChatId;
+      }
+
+      const color = CHARACTER_COLORS[selectedColorIndex];
+
       const res = await fetch('/api/characters', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1393,7 +1391,6 @@ function HomePage() {
       }
 
       const data = await res.json();
-      console.log('Character added:', data.character);
       setChatCharacters(prev => [...prev, data.character]);
       setNewCharName('');
       setNewCharPersonality('');
@@ -1401,6 +1398,8 @@ function HomePage() {
       setShowCharacterModal(false);
     } catch (err) {
       console.error('Failed to add character:', err);
+    } finally {
+      setIsAddingCharacter(false);
     }
   };
 
@@ -4657,18 +4656,29 @@ function HomePage() {
               >Cancel</button>
               <button
                 onClick={addChatCharacter}
-                disabled={!newCharName.trim() || chatCharacters.length >= 5}
+                disabled={!newCharName.trim() || chatCharacters.length >= 5 || isAddingCharacter}
                 style={{
                   padding: '10px 24px', borderRadius: 10, border: 'none',
                   background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
                   color: '#0C0C0E',
                   fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                  opacity: (!newCharName.trim() || chatCharacters.length >= 5) ? 0.4 : 1,
+                  opacity: (!newCharName.trim() || chatCharacters.length >= 5 || isAddingCharacter) ? 0.4 : 1,
                   display: 'flex', alignItems: 'center', gap: 6,
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Add Character
+                {isAddingCharacter ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation: 'spin 1s linear infinite' }}>
+                      <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                    </svg>
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add Character
+                  </>
+                )}
               </button>
             </div>
           </div>
