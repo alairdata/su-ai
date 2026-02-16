@@ -196,7 +196,7 @@ export const authOptions: NextAuthOptions = {
       if (token.id) {
         const { data: freshUser } = await supabase
           .from('users')
-          .select('plan, messages_used_today, is_new_user')
+          .select('plan, messages_used_today, is_new_user, onboarding_complete')
           .eq('id', token.id)
           .single();
 
@@ -204,6 +204,7 @@ export const authOptions: NextAuthOptions = {
           token.plan = freshUser.plan;
           token.messagesUsedToday = freshUser.messages_used_today;
           token.isNewUser = freshUser.is_new_user || false;
+          token.onboardingComplete = freshUser.onboarding_complete ?? false;
         }
       }
 
@@ -215,6 +216,7 @@ export const authOptions: NextAuthOptions = {
         session.user.plan = token.plan as "Free" | "Pro" | "Plus";
         session.user.messagesUsedToday = token.messagesUsedToday as number;
         session.user.isNewUser = token.isNewUser as boolean;
+        session.user.onboardingComplete = token.onboardingComplete as boolean;
 
         // Force logout check — separate query so it always works
         try {
@@ -246,13 +248,14 @@ export const authOptions: NextAuthOptions = {
           timezone: string | null;
           reset_timezone?: string | null;
           is_new_user?: boolean;
+          onboarding_complete?: boolean;
           subscription_status?: string | null;
           current_period_end?: string | null;
         } | null = null;
 
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('name, plan, messages_used_today, total_messages, last_reset_date, timezone, reset_timezone, is_new_user, subscription_status, current_period_end')
+          .select('name, plan, messages_used_today, total_messages, last_reset_date, timezone, reset_timezone, is_new_user, onboarding_complete, subscription_status, current_period_end')
           .eq('id', token.id)
           .single();
 
@@ -260,7 +263,7 @@ export const authOptions: NextAuthOptions = {
           // Try without newer columns that might not exist
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('users')
-            .select('name, plan, messages_used_today, last_reset_date, timezone, is_new_user, subscription_status, current_period_end')
+            .select('name, plan, messages_used_today, last_reset_date, timezone, is_new_user, onboarding_complete, subscription_status, current_period_end')
             .eq('id', token.id)
             .single();
 
@@ -284,6 +287,7 @@ export const authOptions: NextAuthOptions = {
           session.user.plan = user.plan;
           session.user.timezone = user.timezone || 'UTC';
           session.user.isNewUser = user.is_new_user || false;
+          session.user.onboardingComplete = user.onboarding_complete ?? false;
           session.user.subscriptionStatus = user.subscription_status || undefined;
           session.user.currentPeriodEnd = user.current_period_end || undefined;
           session.user.totalMessages = user.total_messages || 0;

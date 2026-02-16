@@ -12,6 +12,7 @@ declare module "next-auth" {
       totalMessages: number;
       isNewUser?: boolean;
       isDeleted?: boolean;
+      onboardingComplete?: boolean;
       timezone?: string;
       subscriptionStatus?: string;
       currentPeriodEnd?: string;
@@ -27,6 +28,7 @@ declare module "next-auth" {
     totalMessages: number;
     isNewUser?: boolean;
     isDeleted?: boolean;
+    onboardingComplete?: boolean;
     timezone?: string;
     subscriptionStatus?: string;
     currentPeriodEnd?: string;
@@ -39,6 +41,7 @@ declare module "next-auth/jwt" {
     plan?: string;
     messagesUsedToday?: number;
     isNewUser?: boolean;
+    onboardingComplete?: boolean;
     timezone?: string;
   }
 }

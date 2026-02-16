@@ -10,6 +10,594 @@ import ReactMarkdown from "react-markdown";
 type View = "auth" | "chat";
 type AuthMode = "signin" | "signup";
 
+const BoltLogo = ({ size = 40 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 60 60" fill="none">
+    <defs>
+      <linearGradient id="boltGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#E8A04C" />
+        <stop offset="100%" stopColor="#E8624C" />
+      </linearGradient>
+    </defs>
+    <path d="M35 4L12 34h14l-4 22L48 26H34l4-22z" fill="url(#boltGrad)" />
+  </svg>
+);
+
+// ═══════════════════════════════════════════
+// ONBOARDING SCREEN COMPONENTS
+// ═══════════════════════════════════════════
+
+const OnboardingScreen1 = ({ onNext, onSkip }: { onNext: () => void; onSkip: () => void }) => {
+  const [demoMessages, setDemoMessages] = useState<{text: string; type: 'user' | 'ai' | 'typing'}[]>([]);
+  const [currentConvo, setCurrentConvo] = useState(0);
+
+  const conversations = [
+    {
+      user: "Am I overthinking this?",
+      ai: "Probably. You're here asking an AI at 2am instead of sleeping. That's textbook overthinking. What's eating at you?"
+    },
+    {
+      user: "How do I get my ex back?",
+      ai: "Short answer? You probably shouldn't. But I know you don't want to hear that, so let's talk about why you're really asking."
+    },
+    {
+      user: "Give me honest feedback on my business idea",
+      ai: "Sure — but fair warning, I don't do the 'everything is great!' thing. Drop your idea and I'll tell you exactly what I think."
+    }
+  ];
+
+  useEffect(() => {
+    const timeouts: NodeJS.Timeout[] = [];
+
+    const playConvo = (index: number) => {
+      setDemoMessages([]);
+      const convo = conversations[index];
+
+      timeouts.push(setTimeout(() => {
+        setDemoMessages([{ text: convo.user, type: 'user' }]);
+      }, 300));
+
+      timeouts.push(setTimeout(() => {
+        setDemoMessages(prev => [...prev, { text: '', type: 'typing' }]);
+      }, 1200));
+
+      timeouts.push(setTimeout(() => {
+        setDemoMessages([
+          { text: convo.user, type: 'user' },
+          { text: convo.ai, type: 'ai' }
+        ]);
+      }, 2800));
+    };
+
+    playConvo(0);
+
+    const interval = setInterval(() => {
+      setCurrentConvo(prev => {
+        const next = (prev + 1) % conversations.length;
+        playConvo(next);
+        return next;
+      });
+    }, 5500);
+
+    return () => {
+      clearInterval(interval);
+      timeouts.forEach(t => clearTimeout(t));
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '40px 24px',
+      zIndex: 1,
+      animation: 'onboardFadeDown 0.6s ease forwards',
+      width: '100%',
+    }}>
+      <div style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '6px 14px',
+        borderRadius: '100px',
+        background: 'rgba(232,160,76,0.12)',
+        border: '1px solid rgba(232,160,76,0.2)',
+        color: '#E8A04C',
+        fontSize: '12px',
+        fontWeight: 600,
+        marginBottom: '28px',
+      }}>
+        <BoltLogo size={14} />
+        Not your average AI
+      </div>
+
+      <h1 style={{
+        fontSize: 'clamp(28px, 5vw, 42px)',
+        fontWeight: 800,
+        letterSpacing: '-0.04em',
+        textAlign: 'center',
+        lineHeight: 1.15,
+        marginBottom: '12px',
+        color: '#F0EDE8',
+      }}>
+        This ain&apos;t your<br />regular{' '}
+        <span style={{
+          background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}>AI chat</span>
+      </h1>
+
+      <p style={{ fontSize: '15px', color: '#8A8690', textAlign: 'center', marginBottom: '40px' }}>
+        No sugar-coating. No corporate talk. Just real.
+      </p>
+
+      <div style={{
+        width: '100%',
+        maxWidth: '420px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        marginBottom: '48px',
+        minHeight: '150px',
+      }}>
+        {demoMessages.map((msg, i) => (
+          msg.type === 'typing' ? (
+            <div key={i} style={{
+              display: 'flex',
+              gap: '4px',
+              padding: '14px 18px',
+              background: '#141416',
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: '18px 18px 18px 4px',
+              alignSelf: 'flex-start',
+              animation: 'onboardMsgAppear 0.3s ease forwards',
+            }}>
+              {[0, 1, 2].map(d => (
+                <span key={d} style={{
+                  width: '6px', height: '6px',
+                  borderRadius: '50%',
+                  background: '#5A5660',
+                  animation: `onboardBounce 1.4s ${d * 0.2}s infinite`,
+                  display: 'block',
+                }} />
+              ))}
+            </div>
+          ) : (
+            <div key={i} style={{
+              padding: '14px 18px',
+              borderRadius: msg.type === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+              fontSize: '14px',
+              lineHeight: 1.5,
+              maxWidth: '85%',
+              alignSelf: msg.type === 'user' ? 'flex-end' : 'flex-start',
+              background: msg.type === 'user' ? '#1A1A1E' : '#141416',
+              color: '#F0EDE8',
+              border: msg.type === 'ai' ? '1px solid rgba(255,255,255,0.06)' : 'none',
+              animation: 'onboardMsgAppear 0.4s ease forwards',
+            }}>
+              {msg.text}
+            </div>
+          )
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
+        {[0, 1, 2].map(i => (
+          <div key={i} style={{
+            width: currentConvo === i ? '20px' : '6px',
+            height: '6px',
+            borderRadius: currentConvo === i ? '3px' : '50%',
+            background: currentConvo === i ? '#E8A04C' : '#5A5660',
+            transition: 'all 0.3s ease',
+          }} />
+        ))}
+      </div>
+
+      <button onClick={onNext} style={{
+        padding: '14px 32px',
+        borderRadius: '14px',
+        border: 'none',
+        background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+        color: '#0C0C0E',
+        fontSize: '15px',
+        fontWeight: 700,
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        transition: 'all 0.25s ease',
+      }}>
+        I&apos;m ready
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="13 17 18 12 13 7"/><line x1="6" y1="12" x2="18" y2="12"/></svg>
+      </button>
+      <div onClick={onSkip} style={{ fontSize: '12px', color: '#5A5660', cursor: 'pointer', marginTop: '16px' }}>
+        Skip intro
+      </div>
+    </div>
+  );
+};
+
+const OnboardingScreen2 = ({ onNext, onSkip }: { onNext: () => void; onSkip: () => void }) => {
+  const [count, setCount] = useState(0);
+  const [filledPills, setFilledPills] = useState<number[]>([]);
+  const [showRefill, setShowRefill] = useState(false);
+  const [refillAnimate, setRefillAnimate] = useState(false);
+  const [showDaily, setShowDaily] = useState(false);
+  const [showButton, setShowButton] = useState(false);
+
+  useEffect(() => {
+    let c = 0;
+    const interval = setInterval(() => {
+      c++;
+      setCount(c);
+      setFilledPills(prev => [...prev, c]);
+      if (c >= 10) {
+        clearInterval(interval);
+        setTimeout(() => setRefillAnimate(true), 400);
+        setTimeout(() => setShowRefill(true), 800);
+        setTimeout(() => setShowDaily(true), 1800);
+        setTimeout(() => setShowButton(true), 2500);
+      }
+    }, 150);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '40px 24px',
+      zIndex: 1,
+      animation: 'onboardFadeDown 0.6s ease forwards',
+      width: '100%',
+    }}>
+      <BoltLogo size={48} />
+
+      <h1 style={{
+        fontSize: 'clamp(24px, 4.5vw, 36px)',
+        fontWeight: 800,
+        letterSpacing: '-0.04em',
+        textAlign: 'center',
+        marginBottom: '8px',
+        marginTop: '24px',
+        color: '#F0EDE8',
+      }}>
+        Just so you know...
+      </h1>
+
+      <p style={{
+        fontSize: '15px',
+        color: '#8A8690',
+        textAlign: 'center',
+        marginBottom: '40px',
+        maxWidth: '340px',
+      }}>
+        You get free messages every day. Use them wisely — or don&apos;t. We don&apos;t judge.
+      </p>
+
+      <div style={{
+        width: '100%',
+        maxWidth: '320px',
+        background: '#141416',
+        border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: '20px',
+        padding: '32px 28px',
+        textAlign: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        marginBottom: '20px',
+      }}>
+        <div style={{
+          fontSize: '12px',
+          fontWeight: 600,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase' as const,
+          color: '#5A5660',
+          marginBottom: '16px',
+        }}>YOUR DAILY MESSAGES</div>
+
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '4px', marginBottom: '20px' }}>
+          <span style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: '72px',
+            fontWeight: 700,
+            background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            lineHeight: 1,
+          }}>{count}</span>
+          <span style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: '18px',
+            color: '#5A5660',
+            fontWeight: 500,
+          }}>free</span>
+        </div>
+
+        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '16px', maxWidth: '240px', margin: '0 auto 16px' }}>
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} style={{
+              width: '18px', height: '18px',
+              borderRadius: '5px',
+              background: filledPills.includes(i + 1)
+                ? 'linear-gradient(135deg, #E8A04C, #E8624C)'
+                : '#1A1A1E',
+              border: filledPills.includes(i + 1) ? 'none' : '1px solid rgba(255,255,255,0.06)',
+              opacity: filledPills.includes(i + 1) ? 1 : 0.3,
+              boxShadow: filledPills.includes(i + 1) ? '0 0 8px rgba(232,160,76,0.3)' : 'none',
+              animation: filledPills.includes(i + 1) ? 'onboardPillPop 0.3s ease forwards' : 'none',
+              transition: 'all 0.3s ease',
+            }} />
+          ))}
+        </div>
+
+        <div style={{ width: '100%', height: '6px', background: '#1A1A1E', borderRadius: '3px', overflow: 'hidden', marginTop: '4px' }}>
+          <div style={{
+            height: '100%',
+            width: refillAnimate ? '100%' : '0%',
+            background: 'linear-gradient(90deg, #E8A04C, #E8624C)',
+            borderRadius: '3px',
+            transition: 'width 2s cubic-bezier(0.4, 0, 0.2, 1)',
+          }} />
+        </div>
+
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '6px',
+          marginTop: '12px',
+          fontSize: '13px',
+          color: '#8A8690',
+          opacity: showRefill ? 1 : 0,
+          transition: 'opacity 0.5s ease',
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#E8A04C" strokeWidth="2" strokeLinecap="round" style={{ animation: 'onboardSpin 2s linear infinite' }}>
+            <path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 11-1.64-8.36L23 10"/>
+          </svg>
+          Refills every midnight
+        </div>
+      </div>
+
+      {showDaily && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '10px 16px',
+          background: 'rgba(232,160,76,0.12)',
+          border: '1px solid rgba(232,160,76,0.15)',
+          borderRadius: '12px',
+          animation: 'onboardFadeDown 0.5s ease forwards',
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8A04C" strokeWidth="2" strokeLinecap="round">
+            <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+          </svg>
+          <span style={{ fontSize: '13px', color: '#8A8690' }}>
+            <strong style={{ color: '#E8A04C' }}>10 messages</strong> reset at midnight in your timezone
+          </span>
+        </div>
+      )}
+
+      <div style={{
+        marginTop: '12px',
+        fontSize: '12px',
+        color: '#5A5660',
+        opacity: showDaily ? 1 : 0,
+        transition: 'opacity 0.5s ease',
+      }}>
+        Want more? <span style={{ color: '#E8A04C', cursor: 'pointer', textDecoration: 'underline' }} onClick={onSkip}>See plans</span> starting at $4.99/mo
+      </div>
+
+      {showButton && (
+        <div style={{ animation: 'onboardFadeDown 0.5s ease forwards', marginTop: '28px' }}>
+          <button onClick={onNext} style={{
+            padding: '14px 32px',
+            borderRadius: '14px',
+            border: 'none',
+            background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+            color: '#0C0C0E',
+            fontSize: '15px',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}>
+            Got it
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="13 17 18 12 13 7"/><line x1="6" y1="12" x2="18" y2="12"/></svg>
+          </button>
+          <div onClick={onSkip} style={{ fontSize: '12px', color: '#5A5660', cursor: 'pointer', marginTop: '16px', textAlign: 'center' }}>
+            Skip
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const OnboardingScreen3 = ({ onComplete }: { onComplete: () => void }) => {
+  const [visibleFeatures, setVisibleFeatures] = useState<number[]>([]);
+  const [showButton, setShowButton] = useState(false);
+
+  const features = [
+    {
+      name: 'Brutally honest advice',
+      desc: 'No sugar-coating. Just straight-up real talk.',
+      tag: 'Tip: You can ask it to tone down anytime',
+      tagType: 'tip' as const,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+      ),
+    },
+    {
+      name: 'Chat characters',
+      desc: 'Add different AI personalities to spice up your conversations.',
+      tag: 'Coming for Pro+',
+      tagType: 'coming' as const,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+        </svg>
+      ),
+    },
+    {
+      name: 'No topic off limits',
+      desc: 'Relationships, money, embarrassing questions — ask anything.',
+      tag: null,
+      tagType: null,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+        </svg>
+      ),
+    },
+    {
+      name: 'It remembers you',
+      desc: 'Come back tomorrow and it picks up where you left off.',
+      tag: null,
+      tagType: null,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>
+        </svg>
+      ),
+    },
+  ];
+
+  useEffect(() => {
+    features.forEach((_, i) => {
+      setTimeout(() => {
+        setVisibleFeatures(prev => [...prev, i]);
+      }, 700 + (i * 200));
+    });
+
+    setTimeout(() => setShowButton(true), 700 + (features.length * 200) + 300);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '40px 24px',
+      zIndex: 1,
+      animation: 'onboardFadeDown 0.6s ease forwards',
+      width: '100%',
+    }}>
+      <BoltLogo size={40} />
+
+      <h1 style={{
+        fontSize: 'clamp(22px, 4vw, 32px)',
+        fontWeight: 800,
+        letterSpacing: '-0.04em',
+        textAlign: 'center',
+        marginBottom: '6px',
+        marginTop: '16px',
+        color: '#F0EDE8',
+      }}>
+        Here&apos;s what you can do
+      </h1>
+
+      <p style={{
+        fontSize: '14px',
+        color: '#8A8690',
+        textAlign: 'center',
+        marginBottom: '28px',
+        maxWidth: '340px',
+      }}>
+        A few things that make this different from anything you&apos;ve used before.
+      </p>
+
+      <div style={{ width: '100%', maxWidth: '400px' }}>
+        {features.map((f, i) => (
+          <div key={i} style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '14px',
+            padding: '12px 0',
+            borderBottom: i < features.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+            opacity: visibleFeatures.includes(i) ? 1 : 0,
+            transform: visibleFeatures.includes(i) ? 'translateX(0)' : 'translateX(-20px)',
+            transition: 'opacity 0.5s ease, transform 0.5s ease',
+          }}>
+            <div style={{
+              width: '34px',
+              height: '34px',
+              borderRadius: '8px',
+              background: visibleFeatures.includes(i) ? 'rgba(232,160,76,0.12)' : '#141416',
+              border: `1px solid ${visibleFeatures.includes(i) ? 'rgba(232,160,76,0.2)' : 'rgba(255,255,255,0.06)'}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              color: '#E8A04C',
+              transition: 'all 0.3s ease',
+            }}>
+              {f.icon}
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#F0EDE8', marginBottom: '2px' }}>{f.name}</div>
+              <div style={{ fontSize: '12px', color: '#8A8690', lineHeight: 1.45 }}>{f.desc}</div>
+              {f.tag && (
+                <div style={{
+                  display: 'inline-flex',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  letterSpacing: '0.05em',
+                  marginTop: '6px',
+                  textTransform: 'uppercase' as const,
+                  background: f.tagType === 'tip' ? 'rgba(232,160,76,0.1)' : 'rgba(138,134,144,0.1)',
+                  color: f.tagType === 'tip' ? '#E8A04C' : '#8A8690',
+                  border: `1px solid ${f.tagType === 'tip' ? 'rgba(232,160,76,0.15)' : 'rgba(138,134,144,0.15)'}`,
+                }}>
+                  {f.tag}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {showButton && (
+        <div style={{ animation: 'onboardFadeDown 0.5s ease forwards', marginTop: '28px' }}>
+          <button onClick={onComplete} style={{
+            padding: '14px 32px',
+            borderRadius: '14px',
+            border: 'none',
+            background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+            color: '#0C0C0E',
+            fontSize: '15px',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}>
+            Let&apos;s go
+            <BoltLogo size={16} />
+          </button>
+          <div onClick={onComplete} style={{ fontSize: '12px', color: '#5A5660', cursor: 'pointer', marginTop: '16px', textAlign: 'center' }}>
+            Skip
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 function HomePage() {
   const { data: session, status, update: updateSession } = useSession();
   const { theme, toggleTheme } = useTheme();
@@ -26,6 +614,8 @@ function HomePage() {
   const [resetEmail, setResetEmail] = useState("");
   const [showWelcome, setShowWelcome] = useState(false);
   const [showStillThere, setShowStillThere] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingScreen, setOnboardingScreen] = useState(1);
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [selectedTimezone, setSelectedTimezone] = useState("");
@@ -130,6 +720,13 @@ function HomePage() {
     }
   }, [session]);
 
+  // Trigger onboarding for users who haven't completed it
+  useEffect(() => {
+    if (session?.user && session.user.onboardingComplete === false) {
+      setShowOnboarding(true);
+    }
+  }, [session]);
+
   // Auto-logout if user was deleted from database
   useEffect(() => {
     if (session?.user?.isDeleted) {
@@ -206,16 +803,9 @@ function HomePage() {
     };
   }, []);
 
-  // Force refresh: show "Still there?" on every new browser session.
-  // sessionStorage is cleared when the tab/browser closes, so next visit = fresh reload.
+  // Mark this browser session as active (used by 24-hour away check)
   useEffect(() => {
-    if (!sessionStorage.getItem('session_active')) {
-      const timeout = setTimeout(() => {
-        sessionStorage.setItem('session_active', '1');
-        setShowStillThere(true);
-      }, 1000);
-      return () => clearTimeout(timeout);
-    }
+    sessionStorage.setItem('session_active', '1');
   }, []);
 
   // Detect mobile and handle orientation changes
@@ -273,40 +863,35 @@ function HomePage() {
     const userName = session?.user?.name?.split(' ')[0] || '';
 
     const morningGreetings = [
-      "Top of the morning to ya",
-      "Fresh start, fresh ideas",
-      "Morning mode activated",
-      "Let's get this day going",
-      "Early bird energy right here",
-      "New day, new conversations",
+      "Rise and shine",
+      "Morning vibes",
+      "Fresh start today",
+      "Good morning",
+      "New day ahead",
     ];
 
     const afternoonGreetings = [
-      "Afternoon vibes, let's chat",
-      "Midday check-in, what's on your mind",
-      "The day's rolling, so are we",
-      "Afternoon fuel for your thoughts",
-      "Right in the middle of it all",
-      "PM hours hitting different",
+      "Good afternoon",
+      "Afternoon vibes",
+      "What's good",
+      "Let's get it",
+      "Hey there",
     ];
 
     const eveningGreetings = [
-      "Evening wind-down mode",
-      "Golden hour thoughts welcome",
-      "Wrapping up or just getting started",
-      "Evening edition, let's go",
-      "Day's almost done, but we're not",
-      "Sunset vibes, what's up",
+      "Good evening",
+      "Evening vibes",
+      "Wind down time",
+      "Hey there",
+      "What's good",
     ];
 
     const nightGreetings = [
-      "Night owl hours, respect",
-      "Burning the midnight oil together",
-      "Late night creativity unlocked",
-      "The world's quiet, let's talk",
-      "After hours, no limits",
-      "Night shift energy activated",
-      "When the stars are out, so are we",
+      "Night owl mode",
+      "Still up huh",
+      "Late night vibes",
+      "Can't sleep either",
+      "After hours",
     ];
 
     let greetings;
@@ -321,10 +906,10 @@ function HomePage() {
     }
 
     const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
-    return userName ? `${userName}! ${randomGreeting}` : randomGreeting;
+    return { text: randomGreeting, name: userName };
   };
 
-  const [greeting, setGreeting] = useState("");
+  const [greeting, setGreeting] = useState<{ text: string; name: string }>({ text: '', name: '' });
 
   const suggestedPrompts = [
     "Roast my business idea",
@@ -534,6 +1119,16 @@ function HomePage() {
     } catch (error) {
       console.error('Failed to dismiss welcome:', error);
       setShowWelcome(false);
+    }
+  };
+
+  const completeOnboarding = async () => {
+    setShowOnboarding(false);
+    setOnboardingScreen(1);
+    try {
+      await fetch('/api/user/complete-onboarding', { method: 'POST' });
+    } catch (error) {
+      console.error('Failed to update onboarding status:', error);
     }
   };
 
@@ -961,6 +1556,49 @@ function HomePage() {
 
   const currentStyles = theme === 'dark' ? darkStyles : lightStyles;
 
+  const getChatGroups = () => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayStart = new Date(todayStart.getTime() - 86400000);
+    const weekStart = new Date(todayStart.getTime() - 7 * 86400000);
+
+    const groups: { label: string; chats: typeof chats }[] = [
+      { label: 'TODAY', chats: [] },
+      { label: 'YESTERDAY', chats: [] },
+      { label: 'OLDER', chats: [] },
+    ];
+
+    chats.forEach((chat) => {
+      const chatDate = new Date(chat.created_at || Date.now());
+      if (chatDate >= todayStart) {
+        groups[0].chats.push(chat);
+      } else if (chatDate >= yesterdayStart) {
+        groups[1].chats.push(chat);
+      } else {
+        groups[2].chats.push(chat);
+      }
+    });
+
+    return groups.filter(g => g.chats.length > 0);
+  };
+
+  const getRelativeTime = (date: Date | string) => {
+    const now = new Date();
+    const d = new Date(date);
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    const diffWeeks = Math.floor(diffDays / 7);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffWeeks < 4) return `${diffWeeks}w ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   // Show loading while auth state is being determined
   if (isAuthLoading || (!isAuthenticated && !isUnauthenticated)) {
     return (
@@ -968,7 +1606,7 @@ function HomePage() {
         <div style={currentStyles.loadingContent}>
           {/* Logo */}
           <div style={currentStyles.loadingLogo} className="loading-logo-pulse">
-            <img src="/logo.png" alt="So UnFiltered AI" style={currentStyles.loadingLogoImg} />
+            <BoltLogo size={56} />
           </div>
           {/* Brand Name */}
           <div style={currentStyles.loadingBrand}>So UnFiltered AI</div>
@@ -1005,7 +1643,7 @@ function HomePage() {
           {/* Logo with Glow */}
           <div style={currentStyles.authLogo}>
             <div style={currentStyles.logoIcon} className="auth-logo-glow">
-              <img src="/logo.png" alt="So UnFiltered AI" style={currentStyles.logoIconImg} />
+              <BoltLogo size={44} />
             </div>
             <h1 style={currentStyles.authTitle}>So UnFiltered AI</h1>
             <p style={currentStyles.authSubtitle}>
@@ -1465,10 +2103,71 @@ function HomePage() {
 
   return (
     <>
+      {showOnboarding && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 9999,
+          background: '#0C0C0E',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'radial-gradient(ellipse 60% 40% at 50% 20%, rgba(232,160,76,0.08), transparent 70%), radial-gradient(circle at 70% 80%, rgba(232,98,76,0.04), transparent 50%)',
+            pointerEvents: 'none',
+          }} />
+
+          <div style={{
+            position: 'fixed',
+            bottom: '32px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            gap: '8px',
+            zIndex: 10,
+          }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{
+                width: onboardingScreen === i ? '24px' : '8px',
+                height: '8px',
+                borderRadius: onboardingScreen === i ? '4px' : '50%',
+                background: onboardingScreen === i ? '#E8A04C' : (i < onboardingScreen ? '#E8A04C' : '#5A5660'),
+                opacity: onboardingScreen === i ? 1 : (i < onboardingScreen ? 0.5 : 0.3),
+                transition: 'all 0.3s ease',
+              }} />
+            ))}
+          </div>
+
+          {onboardingScreen === 1 && (
+            <OnboardingScreen1
+              onNext={() => setOnboardingScreen(2)}
+              onSkip={completeOnboarding}
+            />
+          )}
+
+          {onboardingScreen === 2 && (
+            <OnboardingScreen2
+              onNext={() => setOnboardingScreen(3)}
+              onSkip={completeOnboarding}
+            />
+          )}
+
+          {onboardingScreen === 3 && (
+            <OnboardingScreen3
+              onComplete={completeOnboarding}
+            />
+          )}
+        </div>
+      )}
+
       <div style={currentStyles.app}>
         {isMobile && sidebarOpen && (
-          <div 
-            style={currentStyles.mobileOverlay} 
+          <div
+            style={currentStyles.mobileOverlay}
             onClick={() => setSidebarOpen(false)}
           />
         )}
@@ -1478,142 +2177,142 @@ function HomePage() {
           ...(sidebarCollapsed && !isMobile ? currentStyles.sidebarCollapsed : {}),
           ...(isMobile ? {
             position: 'fixed' as const,
-            left: sidebarOpen ? 0 : '-260px',
+            left: sidebarOpen ? 0 : '-280px',
             top: 0,
             bottom: 0,
             zIndex: 1000,
-            width: '260px',
+            width: '280px',
+            opacity: 1,
+            pointerEvents: 'auto' as const,
           } : {})
         }}>
           <div style={currentStyles.sidebarTop}>
             <div style={currentStyles.sidebarHeader}>
+              <div style={currentStyles.brandContainer}>
+                <BoltLogo size={28} />
+                <span style={currentStyles.brand}>
+                  <span style={{
+                    background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}>So-UnFiltered</span><span style={{ marginLeft: '4px' }}> AI</span>
+                </span>
+              </div>
               <button
-                style={currentStyles.sidebarToggle}
+                style={currentStyles.collapseBtn}
                 onClick={toggleSidebar}
-                aria-label="Toggle sidebar"
+                aria-label="Collapse sidebar"
               >
-                ☰
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <polyline points="11 17 6 12 11 7" />
+                  <line x1="18" y1="12" x2="6" y2="12" />
+                </svg>
               </button>
-              <div style={{...currentStyles.brandContainer, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
-                <img src="/logo.png" alt="Logo" style={currentStyles.brandLogo} />
-                <span style={currentStyles.brand}>So UnFiltered AI</span>
-              </div>
             </div>
 
-            <div style={currentStyles.section}>
-              <div style={currentStyles.navItem} onClick={() => {
-                startNewChat();
-                if (isMobile) setSidebarOpen(false);
-              }}>
-                <div style={currentStyles.navIcon}>+</div>
-                <div style={{...currentStyles.navText, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
-                  New chat
-                </div>
-              </div>
+            <div style={{ padding: '12px 16px 8px' }}>
+              <button
+                style={currentStyles.newChatBtn}
+                onClick={() => {
+                  startNewChat();
+                  if (isMobile) setSidebarOpen(false);
+                }}
+                onMouseEnter={(e) => {
+                  Object.assign(e.currentTarget.style, currentStyles.newChatBtnHover);
+                }}
+                onMouseLeave={(e) => {
+                  Object.assign(e.currentTarget.style, currentStyles.newChatBtn);
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ opacity: 0.6 }}>
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                New conversation
+              </button>
             </div>
 
-            <div style={{...currentStyles.sectionLabel, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
-              Recent chats
-            </div>
-            <div style={{...currentStyles.recentsList, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
+            {/* Chat groups */}
+            <div style={currentStyles.recentsList}>
               {chats.length === 0 && (
-                <div style={{...currentStyles.recentItem, opacity: 0.6}}>
+                <div style={{...currentStyles.recentItem, opacity: 0.6, padding: '12px 16px'}}>
                   No chats yet
                 </div>
               )}
-              {chats.map((chat) => (
-                <div
-                  key={chat.id}
-                  style={currentStyles.chatItemWrapper}
-                  onMouseEnter={() => !isMobile && setHoveredChatId(chat.id)}
-                  onMouseLeave={() => !isMobile && setHoveredChatId(null)}
-                >
-                  {renamingChatId === chat.id ? (
-                    <div style={currentStyles.renameWrapper}>
-                      <input
-                        type="text"
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleRenameSubmit(chat.id);
-                          } else if (e.key === 'Escape') {
-                            handleRenameCancel();
-                          }
-                        }}
-                        style={currentStyles.renameInput}
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => handleRenameSubmit(chat.id)}
-                        style={currentStyles.renameIconBtn}
-                        title="Save"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={handleRenameCancel}
-                        style={currentStyles.cancelIconBtn}
-                        title="Cancel"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="18" y1="6" x2="6" y2="18" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <div
-                        style={{
-                          ...currentStyles.recentItem,
-                          ...(chat.id === currentChatId ? currentStyles.recentItemActive : {}),
-                          ...(isMobile ? { paddingRight: '48px' } : {})
-                        }}
-                        onClick={() => handleSelectChat(chat.id)}
-                      >
-                        {chat.title}
-                        {isMobile && (
-                          <span 
-                            style={currentStyles.mobileMenuDots}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedChatForActions({id: chat.id, title: chat.title});
-                              setShowChatActionsModal(true);
+              {getChatGroups().map((group) => (
+                <div key={group.label}>
+                  <div style={currentStyles.sectionLabel}>{group.label}</div>
+                  {group.chats.map((chat) => (
+                    <div
+                      key={chat.id}
+                      style={currentStyles.chatItemWrapper}
+                      onMouseEnter={() => !isMobile && setHoveredChatId(chat.id)}
+                      onMouseLeave={() => !isMobile && setHoveredChatId(null)}
+                    >
+                      {renamingChatId === chat.id ? (
+                        <div style={currentStyles.renameWrapper}>
+                          <input
+                            type="text"
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleRenameSubmit(chat.id);
+                              else if (e.key === 'Escape') handleRenameCancel();
                             }}
-                          >
-                            ⋮
-                          </span>
-                        )}
-                      </div>
-                      {hoveredChatId === chat.id && !isMobile && (
-                        <div style={currentStyles.chatActions}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRenameStart(chat.id, chat.title);
-                            }}
-                            style={currentStyles.actionBtn}
-                            title="Rename"
-                          >
-                            ✏️
+                            style={currentStyles.renameInput}
+                            autoFocus
+                          />
+                          <button onClick={() => handleRenameSubmit(chat.id)} style={currentStyles.renameIconBtn} title="Save">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                           </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteClick(chat.id);
-                            }}
-                            style={currentStyles.actionBtn}
-                            title="Delete"
-                          >
-                            🗑️
+                          <button onClick={handleRenameCancel} style={currentStyles.cancelIconBtn} title="Cancel">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                           </button>
                         </div>
+                      ) : (
+                        <>
+                          <div
+                            style={{
+                              ...currentStyles.recentItem,
+                              ...(chat.id === currentChatId ? currentStyles.recentItemActive : {}),
+                              ...(isMobile ? { paddingRight: '48px' } : {}),
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: '8px',
+                            }}
+                            onClick={() => handleSelectChat(chat.id)}
+                          >
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, flex: 1 }}>
+                              {chat.title}
+                            </span>
+                            <span style={{ fontSize: '11px', color: theme === 'dark' ? '#5A5660' : '#9A9590', flexShrink: 0, whiteSpace: 'nowrap' as const }}>
+                              {getRelativeTime(chat.created_at || new Date().toISOString())}
+                            </span>
+                            {isMobile && (
+                              <span
+                                style={currentStyles.mobileMenuDots}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedChatForActions({id: chat.id, title: chat.title});
+                                  setShowChatActionsModal(true);
+                                }}
+                              >
+                                ⋮
+                              </span>
+                            )}
+                          </div>
+                          {hoveredChatId === chat.id && !isMobile && (
+                            <div style={currentStyles.chatActions}>
+                              <button onClick={(e) => { e.stopPropagation(); handleRenameStart(chat.id, chat.title); }} style={currentStyles.actionBtn} title="Rename">✏️</button>
+                              <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(chat.id); }} style={currentStyles.actionBtn} title="Delete">🗑️</button>
+                            </div>
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -1623,11 +2322,42 @@ function HomePage() {
             <div style={currentStyles.avatar}>
               {session?.user?.name?.substring(0, 2).toUpperCase()}
             </div>
-            <div style={{...currentStyles.userInfo, ...(sidebarCollapsed && !isMobile ? {display: 'none'} : {})}}>
-              <div style={{ fontSize: 13, color: theme === 'dark' ? '#fff' : '#1a1a1a' }}>{session?.user?.name}</div>
-              <div style={{ fontSize: 11, color: theme === 'dark' ? '#999' : '#666' }}>
-                {session?.user?.plan} plan • {messagesUsed}/{session?.user?.plan === 'Free' ? 10 : session?.user?.plan === 'Pro' ? 100 : 300} msgs
+            <div style={currentStyles.userInfo}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: theme === 'dark' ? '#F0EDE8' : '#1A1918' }}>
+                {session?.user?.name}
               </div>
+              {session?.user?.plan !== 'Free' && (
+                <span style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: '0.05em',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+                  color: '#0C0C0E',
+                  textTransform: 'uppercase' as const,
+                  display: 'inline-block',
+                  marginTop: '2px',
+                }}>
+                  {session?.user?.plan}
+                </span>
+              )}
+            </div>
+            <div style={{
+              fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+              fontSize: 11,
+              color: theme === 'dark' ? '#5A5660' : '#9A9590',
+              background: theme === 'dark' ? '#1A1A1E' : '#E4E3DF',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              marginLeft: 'auto',
+              whiteSpace: 'nowrap' as const,
+              flexShrink: 0,
+            }}>
+              <span style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30', fontWeight: 500 }}>
+                {messagesUsed}
+              </span>
+              /{session?.user?.plan === 'Free' ? 10 : session?.user?.plan === 'Pro' ? 100 : 300}
             </div>
           </div>
         </aside>
@@ -1635,20 +2365,74 @@ function HomePage() {
         <main style={currentStyles.main}>
           <div style={currentStyles.topBar}>
             <div style={currentStyles.topBarLeft}>
-              {isMobile && (
+              {(isMobile || sidebarCollapsed) && (
                 <button
-                  style={currentStyles.mobileMenuBtn}
-                  onClick={() => setSidebarOpen(true)}
+                  style={currentStyles.expandBtn}
+                  onClick={() => {
+                    if (isMobile) {
+                      setSidebarOpen(true);
+                    } else {
+                      setSidebarCollapsed(false);
+                    }
+                  }}
+                  title="Open sidebar"
                 >
-                  ☰
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="18" x2="21" y2="18" />
+                  </svg>
                 </button>
               )}
-              <div style={currentStyles.modelBadge}>So UnFiltered AI</div>
+              <div style={currentStyles.modelBadge}>
+                {currentChat && messages.length > 0 ? currentChat.title : 'New conversation'}
+              </div>
             </div>
             <div style={currentStyles.topBarRight}>
-              <button style={currentStyles.iconBtn} onClick={toggleTheme} title="Toggle theme">
-                {theme === "light" ? "🌙" : "☀️"}
-              </button>
+              <div style={{ display: 'flex', gap: '4px', background: theme === 'dark' ? '#1A1A1E' : '#E4E3DF', borderRadius: '999px', padding: '3px' }}>
+                <button
+                  onClick={() => theme !== 'light' && toggleTheme()}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '999px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
+                    background: theme === 'light' ? '#fff' : 'transparent',
+                    color: theme === 'light' ? '#D08A30' : (theme === 'dark' ? '#5A5660' : '#9A9590'),
+                    transition: 'all 0.2s ease',
+                    boxShadow: theme === 'light' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  }}
+                  title="Light mode"
+                >
+                  ☀️
+                </button>
+                <button
+                  onClick={() => theme !== 'dark' && toggleTheme()}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '999px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
+                    background: theme === 'dark' ? '#2A2A2E' : 'transparent',
+                    color: theme === 'dark' ? '#E8A04C' : '#9A9590',
+                    transition: 'all 0.2s ease',
+                    boxShadow: theme === 'dark' ? '0 1px 3px rgba(0,0,0,0.3)' : 'none',
+                  }}
+                  title="Dark mode"
+                >
+                  🌙
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1717,40 +2501,128 @@ function HomePage() {
 
               {showGreeting && (
                 <div style={currentStyles.emptyState}>
-                  <div style={currentStyles.greetingLogo}>
-                    <img src="/logo.png" alt="So UnFiltered AI" style={currentStyles.greetingLogoImg} />
+                  <div style={currentStyles.greetingText}>
+                    <BoltLogo size={36} />
+                    <span style={{ marginLeft: '8px' }}>
+                      {greeting.text || getGreeting().text}{greeting.name ? ', ' : ''}
+                      {greeting.name && (
+                        <span style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30' }}>
+                          {greeting.name}
+                        </span>
+                      )}
+                    </span>
                   </div>
-                  <div style={currentStyles.greetingText}>{greeting}</div>
-                  {remainingMessages !== Infinity && (
-                    <div style={currentStyles.messageLimitInfo}>
-                      {remainingMessages} messages remaining today
-                    </div>
-                  )}
-
-                  {/* Suggested prompt chips */}
-                  {displayedPrompts.length > 0 && canSendMessage() && (
-                    <div style={{
-                      ...currentStyles.promptGrid,
-                      ...(isMobile ? currentStyles.promptGridMobile : {}),
-                    }}>
-                      {displayedPrompts.map((prompt) => (
+                  <div style={{
+                    fontSize: '16px',
+                    color: theme === 'dark' ? '#5A5660' : '#9A9590',
+                    marginBottom: '24px',
+                    marginTop: '-16px',
+                  }}>
+                    Time to spill.
+                  </div>
+                  {/* Scrolling prompt chips carousel */}
+                  {canSendMessage() && (
+                    <div className="quick-actions-wrapper" style={{ marginBottom: '48px' }}>
+                      <div className="quick-actions-carousel">
+                        {/* First set */}
                         <button
-                          key={prompt}
-                          style={currentStyles.promptChip}
-                          onClick={async () => {
-                            setInput(prompt);
-                            await sendMessage(prompt);
-                          }}
-                          onMouseEnter={(e) => {
-                            Object.assign(e.currentTarget.style, currentStyles.promptChipHover);
-                          }}
-                          onMouseLeave={(e) => {
-                            Object.assign(e.currentTarget.style, currentStyles.promptChip);
-                          }}
+                          style={currentStyles.quickChip}
+                          onClick={() => sendMessage('Roast my business idea brutally')}
+                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
+                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
                         >
-                          {prompt}
+                          <span style={currentStyles.chipIcon}>&#128293;</span> Roast my idea
                         </button>
-                      ))}
+                        <button
+                          style={currentStyles.quickChip}
+                          onClick={() => sendMessage('Give me brutally honest life advice')}
+                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
+                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
+                        >
+                          <span style={currentStyles.chipIcon}>&#128172;</span> Real talk
+                        </button>
+                        <button
+                          style={currentStyles.quickChip}
+                          onClick={() => sendMessage('Write something unhinged and creative')}
+                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
+                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
+                        >
+                          <span style={currentStyles.chipIcon}>&#9997;&#65039;</span> Write unhinged
+                        </button>
+                        <button
+                          style={currentStyles.quickChip}
+                          onClick={() => sendMessage('Settle this debate for me once and for all')}
+                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
+                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
+                        >
+                          <span style={currentStyles.chipIcon}>&#9878;&#65039;</span> Settle a debate
+                        </button>
+                        <button
+                          style={currentStyles.quickChip}
+                          onClick={() => sendMessage('Help me cook up a savage comeback')}
+                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
+                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
+                        >
+                          <span style={currentStyles.chipIcon}>&#128165;</span> Savage comeback
+                        </button>
+                        <button
+                          style={currentStyles.quickChip}
+                          onClick={() => sendMessage('Tell me what I need to hear not what I want to hear')}
+                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
+                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
+                        >
+                          <span style={currentStyles.chipIcon}>&#128142;</span> Hard truth
+                        </button>
+                        {/* Duplicate set for seamless loop */}
+                        <button
+                          style={currentStyles.quickChip}
+                          onClick={() => sendMessage('Roast my business idea brutally')}
+                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
+                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
+                        >
+                          <span style={currentStyles.chipIcon}>&#128293;</span> Roast my idea
+                        </button>
+                        <button
+                          style={currentStyles.quickChip}
+                          onClick={() => sendMessage('Give me brutally honest life advice')}
+                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
+                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
+                        >
+                          <span style={currentStyles.chipIcon}>&#128172;</span> Real talk
+                        </button>
+                        <button
+                          style={currentStyles.quickChip}
+                          onClick={() => sendMessage('Write something unhinged and creative')}
+                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
+                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
+                        >
+                          <span style={currentStyles.chipIcon}>&#9997;&#65039;</span> Write unhinged
+                        </button>
+                        <button
+                          style={currentStyles.quickChip}
+                          onClick={() => sendMessage('Settle this debate for me once and for all')}
+                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
+                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
+                        >
+                          <span style={currentStyles.chipIcon}>&#9878;&#65039;</span> Settle a debate
+                        </button>
+                        <button
+                          style={currentStyles.quickChip}
+                          onClick={() => sendMessage('Help me cook up a savage comeback')}
+                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
+                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
+                        >
+                          <span style={currentStyles.chipIcon}>&#128165;</span> Savage comeback
+                        </button>
+                        <button
+                          style={currentStyles.quickChip}
+                          onClick={() => sendMessage('Tell me what I need to hear not what I want to hear')}
+                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
+                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
+                        >
+                          <span style={currentStyles.chipIcon}>&#128142;</span> Hard truth
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -1776,68 +2648,10 @@ function HomePage() {
 
                     <div style={currentStyles.inputCard}>
                       <div style={currentStyles.inputRow}>
-                        {/* Plus button with dropdown menu */}
-                        <div ref={showGreeting ? plusMenuRef : undefined} style={{ position: 'relative' }}>
-                          <button
-                            onClick={() => setShowPlusMenu(!showPlusMenu)}
-                            style={currentStyles.plusBtn}
-                            title="More options"
-                          >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="12" y1="5" x2="12" y2="19" />
-                              <line x1="5" y1="12" x2="19" y2="12" />
-                            </svg>
-                          </button>
-                          {showPlusMenu && (
-                            <div style={currentStyles.plusMenu}>
-                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
-                                <div style={currentStyles.plusMenuItemContent}>
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                    <circle cx="8.5" cy="8.5" r="1.5" />
-                                    <polyline points="21 15 16 10 5 21" />
-                                  </svg>
-                                  <span>Add Photos</span>
-                                </div>
-                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                              </button>
-                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
-                                <div style={currentStyles.plusMenuItemContent}>
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                    <polyline points="14 2 14 8 20 8" />
-                                  </svg>
-                                  <span>Add Files</span>
-                                </div>
-                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                              </button>
-                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
-                                <div style={currentStyles.plusMenuItemContent}>
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
-                                    <circle cx="12" cy="12" r="4" />
-                                  </svg>
-                                  <span>Generate Image</span>
-                                </div>
-                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                              </button>
-                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
-                                <div style={currentStyles.plusMenuItemContent}>
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                    <circle cx="12" cy="7" r="4" />
-                                  </svg>
-                                  <span>Add Chat Character</span>
-                                </div>
-                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
                         <textarea
                           ref={textareaRef}
                           rows={1}
-                          placeholder={canSendMessage() ? "What's up? Time to spill it..." : "Daily limit reached. Upgrade to continue."}
+                          placeholder={canSendMessage() ? "Ask anything — no filters, no limits..." : "Daily limit reached. Upgrade to continue."}
                           value={input}
                           onChange={(e) => setInput(e.target.value)}
                           onKeyDown={handleKeyDown}
@@ -1871,18 +2685,82 @@ function HomePage() {
                             onClick={handleSend}
                             disabled={!input.trim() || !canSendMessage()}
                           >
-                            ↑
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="22" y1="2" x2="11" y2="13" />
+                              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                            </svg>
                           </button>
                         )}
                       </div>
                     </div>
-                    <div style={currentStyles.modelSelect}>
-                      <span>So UnFiltered AI can make mistakes.</span>
-                      {remainingMessages !== Infinity && canSendMessage() && (
-                        <span style={currentStyles.remainingMessages}>
-                          {" "}· {remainingMessages} messages left today
-                        </span>
-                      )}
+                    <div style={currentStyles.inputFooter}>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <div ref={showGreeting ? plusMenuRef : undefined} style={{ position: 'relative' }}>
+                          <button
+                            style={currentStyles.attachBtn}
+                            title="Attach file"
+                            onClick={() => setShowPlusMenu(!showPlusMenu)}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                            </svg>
+                          </button>
+                          {showPlusMenu && (
+                            <div style={currentStyles.plusMenu}>
+                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                                <div style={currentStyles.plusMenuItemContent}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                    <circle cx="8.5" cy="8.5" r="1.5" />
+                                    <polyline points="21 15 16 10 5 21" />
+                                  </svg>
+                                  <span>Add Photos</span>
+                                </div>
+                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                              </button>
+                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                                <div style={currentStyles.plusMenuItemContent}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                    <polyline points="14 2 14 8 20 8" />
+                                  </svg>
+                                  <span>Add Files</span>
+                                </div>
+                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                              </button>
+                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                                <div style={currentStyles.plusMenuItemContent}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="4" />
+                                    <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
+                                  </svg>
+                                  <span>Generate Image</span>
+                                </div>
+                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                              </button>
+                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                                <div style={currentStyles.plusMenuItemContent}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                    <circle cx="12" cy="7" r="4" />
+                                  </svg>
+                                  <span>Add Chat Character</span>
+                                </div>
+                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <button style={currentStyles.attachBtn} title="Voice input" onClick={() => setShowAccountModal(true)}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                            <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                            <line x1="12" y1="19" x2="12" y2="23"/>
+                            <line x1="8" y1="23" x2="16" y2="23"/>
+                          </svg>
+                        </button>
+                      </div>
+                      <span style={currentStyles.inputHint}>So-UnFiltered AI may produce inaccurate responses</span>
                     </div>
                   </div>
                 </div>
@@ -2238,68 +3116,10 @@ function HomePage() {
 
                   <div style={currentStyles.inputCard}>
                     <div style={currentStyles.inputRow}>
-                      {/* Plus button with dropdown menu */}
-                      <div ref={!showGreeting ? plusMenuRef : undefined} style={{ position: 'relative' }}>
-                        <button
-                          onClick={() => setShowPlusMenu(!showPlusMenu)}
-                          style={currentStyles.plusBtn}
-                          title="More options"
-                        >
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="12" y1="5" x2="12" y2="19" />
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                          </svg>
-                        </button>
-                        {showPlusMenu && (
-                          <div style={currentStyles.plusMenu}>
-                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
-                              <div style={currentStyles.plusMenuItemContent}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                  <circle cx="8.5" cy="8.5" r="1.5" />
-                                  <polyline points="21 15 16 10 5 21" />
-                                </svg>
-                                <span>Add Photos</span>
-                              </div>
-                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                            </button>
-                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
-                              <div style={currentStyles.plusMenuItemContent}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                  <polyline points="14 2 14 8 20 8" />
-                                </svg>
-                                <span>Add Files</span>
-                              </div>
-                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                            </button>
-                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
-                              <div style={currentStyles.plusMenuItemContent}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
-                                  <circle cx="12" cy="12" r="4" />
-                                </svg>
-                                <span>Generate Image</span>
-                              </div>
-                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                            </button>
-                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
-                              <div style={currentStyles.plusMenuItemContent}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                  <circle cx="12" cy="7" r="4" />
-                                </svg>
-                                <span>Add Chat Character</span>
-                              </div>
-                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
                       <textarea
                         ref={textareaRef}
                         rows={1}
-                        placeholder={canSendMessage() ? "What's up? Time to spill it..." : "Daily limit reached. Upgrade to continue."}
+                        placeholder={canSendMessage() ? "Ask anything — no filters, no limits..." : "Daily limit reached. Upgrade to continue."}
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
@@ -2333,18 +3153,82 @@ function HomePage() {
                           onClick={handleSend}
                           disabled={!input.trim() || !canSendMessage()}
                         >
-                          ↑
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13" />
+                            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                          </svg>
                         </button>
                       )}
                     </div>
                   </div>
-                  <div style={currentStyles.modelSelect}>
-                    <span>So UnFiltered AI can make mistakes.</span>
-                    {remainingMessages !== Infinity && canSendMessage() && (
-                      <span style={currentStyles.remainingMessages}>
-                        {" "}· {remainingMessages} messages left today
-                      </span>
-                    )}
+                  <div style={currentStyles.inputFooter}>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <div ref={!showGreeting ? plusMenuRef : undefined} style={{ position: 'relative' }}>
+                        <button
+                          style={currentStyles.attachBtn}
+                          title="Attach file"
+                          onClick={() => setShowPlusMenu(!showPlusMenu)}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                          </svg>
+                        </button>
+                        {showPlusMenu && (
+                          <div style={currentStyles.plusMenu}>
+                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                              <div style={currentStyles.plusMenuItemContent}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                  <circle cx="8.5" cy="8.5" r="1.5" />
+                                  <polyline points="21 15 16 10 5 21" />
+                                </svg>
+                                <span>Add Photos</span>
+                              </div>
+                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                            </button>
+                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                              <div style={currentStyles.plusMenuItemContent}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                  <polyline points="14 2 14 8 20 8" />
+                                </svg>
+                                <span>Add Files</span>
+                              </div>
+                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                            </button>
+                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                              <div style={currentStyles.plusMenuItemContent}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <circle cx="12" cy="12" r="4" />
+                                  <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
+                                </svg>
+                                <span>Generate Image</span>
+                              </div>
+                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                            </button>
+                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                              <div style={currentStyles.plusMenuItemContent}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                  <circle cx="12" cy="7" r="4" />
+                                </svg>
+                                <span>Add Chat Character</span>
+                              </div>
+                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <button style={currentStyles.attachBtn} title="Voice input" onClick={() => setShowAccountModal(true)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                          <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                          <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                          <line x1="12" y1="19" x2="12" y2="23"/>
+                          <line x1="8" y1="23" x2="16" y2="23"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <span style={currentStyles.inputHint}>So-UnFiltered AI may produce inaccurate responses</span>
                   </div>
                 </div>
               </div>
@@ -2518,16 +3402,18 @@ function HomePage() {
                 <div style={currentStyles.modalSection}>
                   <h3 style={currentStyles.modalSectionTitle}>Current Plan</h3>
                   <div style={currentStyles.planCurrentBadge}>
-                    <div style={currentStyles.planBadgeLarge}>{session?.user?.plan}</div>
-                    <div style={currentStyles.planDescription}>
-                      {session?.user?.plan === "Free" && `${messagesUsed}/10 messages used today`}
-                      {session?.user?.plan === "Pro" && `${messagesUsed}/100 messages used today`}
-                      {session?.user?.plan === "Plus" && `${messagesUsed}/300 messages used today`}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                      <div style={currentStyles.planBadgeLarge}>{session?.user?.plan}</div>
+                      <div style={currentStyles.planDescription}>
+                        {session?.user?.plan === "Free" && `${messagesUsed}/10 messages used today`}
+                        {session?.user?.plan === "Pro" && `${messagesUsed}/100 messages used today`}
+                        {session?.user?.plan === "Plus" && `${messagesUsed}/300 messages used today`}
+                      </div>
                     </div>
                     {/* Cancellation Status Indicator */}
                     {session?.user?.subscriptionStatus === 'canceling' && session?.user?.currentPeriodEnd && (
                       <div style={{
-                        marginTop: '12px',
+                        marginBottom: '12px',
                         padding: '10px 14px',
                         background: theme === 'dark' ? 'rgba(251, 191, 36, 0.15)' : '#fffbeb',
                         border: `1px solid ${theme === 'dark' ? 'rgba(251, 191, 36, 0.3)' : '#fcd34d'}`,
@@ -2550,7 +3436,7 @@ function HomePage() {
                     {/* Downgrading Status Indicator */}
                     {session?.user?.subscriptionStatus === 'downgrading' && session?.user?.currentPeriodEnd && (
                       <div style={{
-                        marginTop: '12px',
+                        marginBottom: '12px',
                         padding: '10px 14px',
                         background: theme === 'dark' ? 'rgba(59, 130, 246, 0.15)' : '#eff6ff',
                         border: `1px solid ${theme === 'dark' ? 'rgba(59, 130, 246, 0.3)' : '#93c5fd'}`,
@@ -2584,16 +3470,53 @@ function HomePage() {
                   </div>
 
                   <h4 style={currentStyles.modalSubsectionTitle}>Upgrade Your Plan</h4>
-                  <div style={currentStyles.plansGrid}>
+                  <div style={{ position: 'relative' as const }}>
+                    <div
+                      id="planScrollHint"
+                      style={{
+                        position: 'absolute' as const,
+                        right: 0,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        background: theme === 'dark' ? '#141416' : '#EDECE8',
+                        border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: theme === 'dark' ? '#E8A04C' : '#D08A30',
+                        zIndex: 2,
+                        animation: 'nudgeRight 1.5s ease-in-out infinite',
+                        pointerEvents: 'none' as const,
+                        boxShadow: theme === 'dark' ? '-8px 0 16px #141416' : '-8px 0 16px #EDECE8',
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <polyline points="9 6 15 12 9 18" />
+                      </svg>
+                    </div>
+                    <div
+                      style={currentStyles.plansGrid}
+                      onScroll={(e) => {
+                        const hint = document.getElementById('planScrollHint');
+                        if (hint) {
+                          const target = e.target as HTMLElement;
+                          hint.style.opacity = target.scrollLeft > 20 ? '0' : '1';
+                          hint.style.transition = 'opacity 0.3s ease';
+                        }
+                      }}
+                    >
                     <div style={{...currentStyles.planCard, ...(session?.user?.plan === "Free" ? currentStyles.planCardActive : {})}}>
                       <h5 style={currentStyles.planCardTitle}>Free</h5>
                       <div style={currentStyles.planPrice}>$0<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
-                        <li style={currentStyles.planFeature}>10 messages per day</li>
-                        <li style={currentStyles.planFeature}>Basic support</li>
-                        <li style={currentStyles.planFeature}>Chat on web</li>
-                        <li style={currentStyles.planFeature}>Limited uploads</li>
-                        <li style={currentStyles.planFeature}>Limited memory and context</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> 10 messages per day</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Basic support</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Chat on web</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Limited uploads</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Limited memory and context</li>
                       </ul>
                       {session?.user?.plan !== "Free" && (
                         <button
@@ -2604,7 +3527,17 @@ function HomePage() {
                         </button>
                       )}
                       {session?.user?.plan === "Free" && (
-                        <div style={currentStyles.planBtnSpacer} />
+                        <button
+                          style={{
+                            ...currentStyles.planBtn,
+                            background: theme === 'dark' ? '#E8A04C' : '#D08A30',
+                            color: theme === 'dark' ? '#0C0C0E' : '#fff',
+                            borderColor: theme === 'dark' ? '#E8A04C' : '#D08A30',
+                          }}
+                          disabled
+                        >
+                          Current Plan
+                        </button>
                       )}
                     </div>
 
@@ -2612,12 +3545,12 @@ function HomePage() {
                       <h5 style={currentStyles.planCardTitle}>Pro</h5>
                       <div style={currentStyles.planPrice}>$4.99<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
-                        <li style={currentStyles.planFeature}>100 messages per day</li>
-                        <li style={currentStyles.planFeature}>10x more than Free</li>
-                        <li style={currentStyles.planFeature}>Expanded memory and context</li>
-                        <li style={currentStyles.planFeature}>Early access to new features</li>
-                        <li style={currentStyles.planFeature}>Advanced reasoning models</li>
-                        <li style={currentStyles.planFeature}>Memory across conversations</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> 100 messages per day</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> 10x more than Free</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Expanded memory and context</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Early access to new features</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Advanced reasoning models</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Memory across conversations</li>
                       </ul>
                       {/* Show downgrading indicator */}
                       {session?.user?.subscriptionStatus === 'downgrading' && session?.user?.currentPeriodEnd && (
@@ -2643,7 +3576,17 @@ function HomePage() {
                         </button>
                       )}
                       {(session?.user?.plan === "Pro" || session?.user?.subscriptionStatus === 'downgrading') && (
-                        <div style={currentStyles.planBtnSpacer} />
+                        <button
+                          style={{
+                            ...currentStyles.planBtn,
+                            background: theme === 'dark' ? '#E8A04C' : '#D08A30',
+                            color: theme === 'dark' ? '#0C0C0E' : '#fff',
+                            borderColor: theme === 'dark' ? '#E8A04C' : '#D08A30',
+                          }}
+                          disabled
+                        >
+                          Current Plan
+                        </button>
                       )}
                     </div>
 
@@ -2651,12 +3594,12 @@ function HomePage() {
                       <h5 style={currentStyles.planCardTitle}>Plus</h5>
                       <div style={currentStyles.planPrice}>$9.99<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
-                        <li style={currentStyles.planFeature}>Everything in Pro</li>
-                        <li style={currentStyles.planFeature}>300 messages per day</li>
-                        <li style={currentStyles.planFeature}>30x more than Free, 3x more than Pro</li>
-                        <li style={currentStyles.planFeature}>Higher outputs for more tasks</li>
-                        <li style={currentStyles.planFeature}>Priority access at high traffic</li>
-                        <li style={currentStyles.planFeature}>Early access to advanced features</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Everything in Pro</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> 300 messages per day</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> 30x more than Free, 3x more than Pro</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Higher outputs for more tasks</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Priority access at high traffic</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Early access to advanced features</li>
                       </ul>
                       {session?.user?.plan !== "Plus" && (
                         <button
@@ -2667,9 +3610,20 @@ function HomePage() {
                         </button>
                       )}
                       {session?.user?.plan === "Plus" && (
-                        <div style={currentStyles.planBtnSpacer} />
+                        <button
+                          style={{
+                            ...currentStyles.planBtn,
+                            background: theme === 'dark' ? '#E8A04C' : '#D08A30',
+                            color: theme === 'dark' ? '#0C0C0E' : '#fff',
+                            borderColor: theme === 'dark' ? '#E8A04C' : '#D08A30',
+                          }}
+                          disabled
+                        >
+                          Current Plan
+                        </button>
                       )}
                     </div>
+                  </div>
                   </div>
 
                 </div>
@@ -2897,7 +3851,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'linear-gradient(135deg, #f8f5ef 0%, #f0ebe3 100%)',
+    background: 'linear-gradient(135deg, #F5F4F0 0%, #EDECE8 100%)',
   },
   loadingContent: {
     display: 'flex',
@@ -2920,7 +3874,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   loadingBrand: {
     fontSize: '20px',
     fontWeight: 600,
-    color: '#1a1a1a',
+    color: '#1A1918',
     letterSpacing: '-0.02em',
   },
   loadingDots: {
@@ -2929,26 +3883,26 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     marginTop: '8px',
   },
   loadingDot: {
-    background: '#a0a0a0',
+    background: '#D08A30',
   },
   limitWarning: {
     padding: '12px 16px',
-    background: 'rgba(245, 158, 11, 0.1)',
-    border: '1px solid rgba(245, 158, 11, 0.3)',
+    background: 'rgba(208, 138, 48, 0.1)',
+    border: '1px solid rgba(208, 138, 48, 0.3)',
     borderRadius: '8px',
     marginBottom: '12px',
     fontSize: '14px',
-    color: '#f59e0b',
+    color: '#D08A30',
   },
   upgradeLink: {
-    color: '#1a1a1a',
+    color: '#D08A30',
     cursor: 'pointer',
     fontWeight: 600,
     textDecoration: 'underline',
   },
   messageLimitInfo: {
     fontSize: '14px',
-    color: '#666',
+    color: '#9A9590',
     marginTop: '16px',
   },
   promptGrid: {
@@ -2964,10 +3918,10 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   promptChip: {
     padding: '10px 16px',
-    borderRadius: '20px',
-    border: '1px solid #e0e0e0',
-    background: '#f5f5f5',
-    color: '#333',
+    borderRadius: '999px',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
+    background: '#EDECE8',
+    color: '#6B6660',
     fontSize: '13px',
     fontWeight: 500,
     cursor: 'pointer',
@@ -2977,10 +3931,10 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   promptChipHover: {
     padding: '10px 16px',
-    borderRadius: '20px',
-    border: '1px solid #ccc',
-    background: '#ebebeb',
-    color: '#333',
+    borderRadius: '999px',
+    border: '1px solid #D08A30',
+    background: 'rgba(208, 138, 48, 0.1)',
+    color: '#D08A30',
     fontSize: '13px',
     fontWeight: 500,
     cursor: 'pointer',
@@ -2988,8 +3942,53 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     transition: 'background 0.15s, border-color 0.15s',
     lineHeight: 1.4,
   },
+  quickChip: {
+    padding: '10px 18px',
+    borderRadius: '100px',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
+    background: '#EDECE8',
+    color: '#6B6660',
+    fontFamily: 'Inter, sans-serif',
+    fontSize: '13px',
+    cursor: 'pointer',
+    transition: 'all 0.25s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    whiteSpace: 'nowrap' as const,
+    flexShrink: 0,
+  },
+  quickChipHover: {
+    padding: '10px 18px',
+    borderRadius: '100px',
+    border: '1px solid #D08A30',
+    background: 'rgba(208, 138, 48, 0.1)',
+    color: '#D08A30',
+    fontFamily: 'Inter, sans-serif',
+    fontSize: '13px',
+    cursor: 'pointer',
+    transition: 'all 0.25s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    whiteSpace: 'nowrap' as const,
+    flexShrink: 0,
+    transform: 'translateY(-2px)',
+    boxShadow: '0 4px 16px rgba(208, 138, 48, 0.1)',
+  },
+  chipIcon: {
+    width: '20px',
+    height: '20px',
+    borderRadius: '6px',
+    background: '#E4E3DF',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '11px',
+    flexShrink: 0,
+  },
   remainingMessages: {
-    color: '#999',
+    color: '#9A9590',
     fontSize: '11px',
   },
   authContainer: {
@@ -2999,7 +3998,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     alignItems: 'center',
     justifyContent: 'center',
     padding: '20px',
-    background: '#f8f9fa',
+    background: '#F5F4F0',
     position: 'fixed' as const,
     top: 0,
     left: 0,
@@ -3011,8 +4010,8 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     position: 'absolute' as const,
     top: '24px',
     right: '24px',
-    background: '#fafafa',
-    border: '1px solid #e0e0e0',
+    background: '#EDECE8',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
     borderRadius: '10px',
     padding: '10px 14px',
     fontSize: '18px',
@@ -3027,7 +4026,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     margin: 'auto',
     background: 'rgba(255, 255, 255, 0.65)',
     borderRadius: '24px',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
     backdropFilter: 'blur(20px)',
     WebkitBackdropFilter: 'blur(20px)',
     border: '1px solid rgba(255, 255, 255, 0.4)',
@@ -3055,19 +4054,19 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     fontSize: '26px',
     fontWeight: 600,
     marginBottom: '6px',
-    color: '#1a1a1a',
+    color: '#1A1918',
     letterSpacing: '-0.02em',
   },
   authSubtitle: {
     fontSize: '14px',
-    color: '#666',
+    color: '#9A9590',
   },
   authError: {
     padding: '12px 16px',
-    background: 'rgba(239, 68, 68, 0.1)',
-    borderLeft: '4px solid #ef4444',
+    background: 'rgba(232, 90, 90, 0.1)',
+    borderLeft: '4px solid #E85A5A',
     borderRadius: '8px',
-    color: '#ef4444',
+    color: '#E85A5A',
     fontSize: '14px',
     marginBottom: '20px',
   },
@@ -3084,7 +4083,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     gap: '8px',
     marginBottom: '24px',
-    background: '#f5f5f5',
+    background: '#E4E3DF',
     padding: '4px',
     borderRadius: '12px',
   },
@@ -3097,13 +4096,13 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     fontWeight: 600,
     cursor: 'pointer',
     background: 'transparent',
-    color: '#666',
+    color: '#9A9590',
     transition: 'all 0.3s ease',
   },
   tabActive: {
-    background: '#fff',
-    color: '#1a1a1a',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+    background: 'rgba(208, 138, 48, 0.1)',
+    color: '#D08A30',
+    boxShadow: 'none',
   },
   formGroup: {
     marginBottom: '16px',
@@ -3119,11 +4118,11 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     marginBottom: '8px',
     fontSize: '13px',
     fontWeight: 500,
-    color: '#444',
+    color: '#6B6660',
   },
   forgotLink: {
     fontSize: '12px',
-    color: '#666',
+    color: '#6B6660',
     cursor: 'pointer',
     fontWeight: 400,
     transition: 'color 0.3s ease',
@@ -3131,12 +4130,12 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   input: {
     width: '100%',
     padding: '12px 16px',
-    border: '1px solid #e0e0e0',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
     borderRadius: '10px',
     fontSize: '16px',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
-    background: '#fafafa',
-    color: '#1a1a1a',
+    background: '#EDECE8',
+    color: '#1A1918',
     boxSizing: 'border-box' as const,
     transition: 'all 0.3s ease',
     outline: 'none',
@@ -3144,13 +4143,13 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   authBtn: {
     width: '100%',
     padding: '13px 24px',
-    border: '1px solid #d0d0d0',
+    border: 'none',
     borderRadius: '10px',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-    background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%)',
-    color: '#1a1a1a',
+    background: 'linear-gradient(135deg, #D08A30, #C05A30)',
+    color: '#fff',
     transition: 'all 0.3s ease',
     marginTop: '20px',
   },
@@ -3158,18 +4157,18 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     alignItems: 'center',
     margin: '20px 0',
-    color: '#999',
+    color: '#9A9590',
     fontSize: '12px',
   },
   dividerLine: {
     flex: 1,
     height: '1px',
-    background: '#e0e0e0',
+    background: 'rgba(0, 0, 0, 0.07)',
   },
   dividerText: {
     padding: '0 16px',
     fontSize: '12px',
-    color: '#999',
+    color: '#9A9590',
     fontWeight: 400,
   },
   socialButtons: {
@@ -3181,10 +4180,10 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     textAlign: 'center' as const,
     marginTop: '24px',
     fontSize: '14px',
-    color: '#666',
+    color: '#6B6660',
   },
   authLink: {
-    color: '#1a1a1a',
+    color: '#D08A30',
     cursor: 'pointer',
     fontWeight: 600,
   },
@@ -3205,12 +4204,12 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     width: '80px',
     height: '80px',
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%)',
-    border: '2px solid #d0d0d0',
+    background: 'rgba(208, 138, 48, 0.1)',
+    border: '2px solid rgba(208, 138, 48, 0.3)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#666',
+    color: '#D08A30',
     zIndex: 2,
     position: 'relative' as const,
   },
@@ -3222,29 +4221,29 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     width: '80px',
     height: '80px',
     borderRadius: '50%',
-    border: '2px solid #d0d0d0',
+    border: '2px solid rgba(208, 138, 48, 0.2)',
     zIndex: 1,
   },
   checkEmailTitle: {
     fontSize: '24px',
     fontWeight: 600,
-    color: '#1a1a1a',
+    color: '#1A1918',
     marginBottom: '12px',
   },
   checkEmailText: {
     fontSize: '14px',
-    color: '#666',
+    color: '#6B6660',
     marginBottom: '4px',
   },
   checkEmailAddress: {
     fontSize: '15px',
     fontWeight: 600,
-    color: '#1a1a1a',
+    color: '#D08A30',
     marginBottom: '16px',
   },
   checkEmailSubtext: {
     fontSize: '13px',
-    color: '#888',
+    color: '#9A9590',
     marginBottom: '24px',
     lineHeight: 1.5,
   },
@@ -3264,6 +4263,8 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     bottom: 0,
     background: 'rgba(0, 0, 0, 0.5)',
     zIndex: 999,
+    backdropFilter: 'blur(4px)',
+    WebkitBackdropFilter: 'blur(4px)',
   },
   mobileMenuBtn: {
     background: 'none',
@@ -3271,7 +4272,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     fontSize: '20px',
     cursor: 'pointer',
     padding: '4px 8px',
-    color: '#000',
+    color: '#1A1918',
     marginRight: '12px',
   },
   mobileMenuDots: {
@@ -3289,15 +4290,24 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     color: '#666',
   },
   sidebar: {
-    width: '260px',
-    background: '#f2f2f7',
-    borderRight: '1px solid rgba(0, 0, 0, 0.06)',
+    width: '280px',
+    background: '#EDECE8',
+    borderRight: '1px solid rgba(0, 0, 0, 0.07)',
     display: 'flex',
     flexDirection: 'column' as const,
-    transition: 'all 0.25s ease',
+    transition: 'width 0.3s ease, opacity 0.3s ease',
+    overflow: 'hidden',
+    flexShrink: 0,
+    position: 'relative' as const,
+    height: '100dvh',
   },
   sidebarCollapsed: {
-    width: '70px',
+    width: '0px',
+    opacity: 0,
+    overflow: 'hidden',
+    pointerEvents: 'none' as const,
+    padding: 0,
+    borderRight: 'none',
   },
   sidebarTop: {
     flex: 1,
@@ -3310,20 +4320,29 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.07)',
   },
   sidebarToggle: {
     background: 'none',
     border: 'none',
     fontSize: '18px',
     cursor: 'pointer',
-    padding: '4px',
-    color: '#000',
+    padding: '6px',
+    color: '#6B6660',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'background 0.15s ease',
+    flexShrink: 0,
   },
   brandContainer: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
+    transition: 'opacity 0.2s ease, width 0.2s ease',
+    overflow: 'hidden',
+    whiteSpace: 'nowrap' as const,
   },
   brandLogo: {
     width: '24px',
@@ -3332,13 +4351,77 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   brand: {
     fontWeight: 600,
-    fontSize: '16px',
-    color: '#000',
+    fontSize: '15px',
+    letterSpacing: '-0.03em',
+    color: '#1A1918',
     whiteSpace: 'nowrap' as const,
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'opacity 0.2s ease, width 0.2s ease',
   },
   section: {
-    padding: '12px',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+    padding: '12px 16px 8px',
+    borderBottom: 'none',
+  },
+  newChatBtn: {
+    width: '100%',
+    padding: '10px 16px',
+    borderRadius: '10px',
+    border: '1px dashed rgba(0, 0, 0, 0.13)',
+    background: 'transparent',
+    color: '#6B6660',
+    fontFamily: 'Inter, sans-serif',
+    fontSize: '13px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'all 0.25s ease',
+  },
+  newChatBtnHover: {
+    width: '100%',
+    padding: '10px 16px',
+    borderRadius: '10px',
+    border: '1px dashed #D08A30',
+    background: 'rgba(208, 138, 48, 0.1)',
+    color: '#D08A30',
+    fontFamily: 'Inter, sans-serif',
+    fontSize: '13px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'all 0.25s ease',
+  },
+  collapseBtn: {
+    width: '28px',
+    height: '28px',
+    borderRadius: '6px',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
+    background: 'transparent',
+    color: '#9A9590',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 'auto',
+    flexShrink: 0,
+    transition: 'all 0.2s ease',
+  },
+  expandBtn: {
+    width: '36px',
+    height: '36px',
+    borderRadius: '8px',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
+    background: 'transparent',
+    color: '#6B6660',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+    flexShrink: 0,
+    marginRight: '12px',
   },
   navItem: {
     display: 'flex',
@@ -3348,7 +4431,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     borderRadius: '12px',
     cursor: 'pointer',
     marginBottom: '4px',
-    transition: 'background 0.15s ease',
+    transition: 'all 0.2s ease',
   },
   navIcon: {
     fontSize: '18px',
@@ -3359,13 +4442,17 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   navText: {
     fontSize: '15px',
-    color: '#1c1c1e',
+    color: '#1A1918',
+    transition: 'opacity 0.2s ease, width 0.2s ease',
+    whiteSpace: 'nowrap' as const,
+    overflow: 'hidden' as const,
   },
   sectionLabel: {
     padding: '12px 16px 8px',
     fontSize: '12px',
     fontWeight: 600,
-    color: '#8e8e93',
+    color: '#9A9590',
+    transition: 'opacity 0.2s ease',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.3px',
   },
@@ -3383,10 +4470,11 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   recentItem: {
     flex: 1,
     padding: '10px 12px',
-    borderRadius: '12px',
+    borderRadius: '10px',
     cursor: 'pointer',
-    fontSize: '15px',
-    color: '#1c1c1e',
+    fontSize: '12px',
+    fontWeight: 500,
+    color: '#1A1918',
     whiteSpace: 'nowrap' as const,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -3394,9 +4482,11 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     transition: 'background 0.15s ease',
   },
   recentItemActive: {
-    background: 'rgba(60, 60, 67, 0.12)',
+    background: 'rgba(208, 138, 48, 0.08)',
+    boxShadow: 'inset 3px 0 0 #D08A30',
+    borderRadius: '0 10px 10px 0',
     fontWeight: 500,
-    color: '#1c1c1e',
+    color: '#1A1918',
   },
   chatActions: {
     display: 'flex',
@@ -3424,12 +4514,12 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     flex: 1,
     minWidth: 0,
     padding: '6px 10px',
-    border: '1px solid #d0d0d0',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
     borderRadius: '6px',
     fontSize: '16px', // 16px prevents iOS auto-zoom
     outline: 'none',
     fontFamily: 'inherit',
-    background: '#fff',
+    background: '#F5F4F0',
   },
   renameIconBtn: {
     display: 'flex',
@@ -3477,18 +4567,19 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   sidebarFooter: {
     padding: '16px',
-    borderTop: '1px solid #e0e0e0',
+    borderTop: '1px solid rgba(0, 0, 0, 0.07)',
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
     cursor: 'pointer',
+    transition: 'all 0.2s ease',
   },
   avatar: {
     width: '36px',
     height: '36px',
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #1a1a1a 0%, #3d3d3d 100%)',
-    color: 'white',
+    background: 'linear-gradient(135deg, #D08A30, #C05A30)',
+    color: '#fff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -3499,18 +4590,22 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   userInfo: {
     flex: 1,
     overflow: 'hidden',
+    transition: 'opacity 0.2s ease, width 0.2s ease',
+    whiteSpace: 'nowrap' as const,
   },
   main: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column' as const,
-    background: 'white',
+    background: '#F5F4F0',
     overflow: 'hidden',
     maxWidth: '100%',
+    position: 'relative' as const,
+    backgroundImage: 'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(208, 138, 48, 0.05), transparent), radial-gradient(circle at 80% 90%, rgba(192, 90, 48, 0.02), transparent)',
   },
   topBar: {
     padding: '12px 16px',
-    borderBottom: '1px solid #e0e0e0',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.07)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -3522,10 +4617,14 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     overflow: 'hidden',
   },
   modelBadge: {
-    fontSize: '14px',
-    fontWeight: 600,
-    color: '#000',
+    fontSize: '15px',
+    fontWeight: 500,
+    color: '#6B6660',
     whiteSpace: 'nowrap' as const,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '400px',
+    flex: 1,
   },
   topBarRight: {
     display: 'flex',
@@ -3564,14 +4663,14 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     width: '36px',
     height: '36px',
     borderRadius: '50%',
-    background: 'rgba(255, 255, 255, 0.95)',
-    border: 'none',
+    background: 'rgba(237, 236, 232, 0.95)',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
     cursor: 'pointer',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#666',
+    color: '#6B6660',
     zIndex: 10,
     transition: 'all 0.2s ease',
   },
@@ -3597,13 +4696,16 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     objectFit: 'contain' as const,
   },
   greetingText: {
-    fontSize: '24px',
-    fontWeight: 600,
-    color: '#1a1a1a',
+    fontSize: '28px',
+    fontWeight: 700,
+    color: '#1A1918',
     marginBottom: '24px',
     textAlign: 'center' as const,
     maxWidth: '500px',
     lineHeight: 1.4,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chatMessages: {
     maxWidth: '768px',
@@ -3638,28 +4740,28 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   messageBubbleUser: {
     padding: '12px 16px',
-    borderRadius: '20px 20px 6px 20px',
+    borderRadius: '14px 14px 4px 14px',
     fontSize: '15px',
     lineHeight: 1.5,
     whiteSpace: 'pre-wrap' as const,
     overflowWrap: 'break-word' as const,
-    background: '#3a3a3c',
-    color: '#fff',
+    background: 'rgba(208, 138, 48, 0.12)',
+    color: '#1A1918',
     boxSizing: 'border-box' as const,
-    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.15)',
+    boxShadow: 'none',
   },
   messageBubbleAssistant: {
     maxWidth: '90%',
     padding: '12px 16px',
-    borderRadius: '20px 20px 20px 6px',
+    borderRadius: '14px 14px 14px 4px',
     fontSize: '15px',
     lineHeight: 1.5,
     wordWrap: 'break-word' as const,
     wordBreak: 'break-word' as const,
     overflowWrap: 'break-word' as const,
-    background: '#E9E9EB',
-    border: 'none',
-    color: '#1c1c1e',
+    background: '#EDECE8',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
+    color: '#1A1918',
     boxSizing: 'border-box' as const,
     boxShadow: 'none',
   },
@@ -3713,12 +4815,12 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     padding: '14px 16px',
     fontSize: '16px',
     fontFamily: 'inherit',
-    border: 'none',
-    borderRadius: '16px',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
+    borderRadius: '12px',
     resize: 'vertical' as const,
     outline: 'none',
-    background: '#f2f2f7',
-    color: '#1c1c1e',
+    background: '#EDECE8',
+    color: '#1A1918',
     lineHeight: 1.5,
   },
   editWarning: {
@@ -3739,9 +4841,9 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     fontSize: '15px',
     fontWeight: 500,
     border: 'none',
-    borderRadius: '12px',
-    background: '#e5e5ea',
-    color: '#1c1c1e',
+    borderRadius: '10px',
+    background: '#E4E3DF',
+    color: '#1A1918',
     cursor: 'pointer',
     transition: 'background 0.15s ease',
   },
@@ -3750,15 +4852,15 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     fontSize: '15px',
     fontWeight: 600,
     border: 'none',
-    borderRadius: '12px',
-    background: '#3a3a3c',
+    borderRadius: '10px',
+    background: 'linear-gradient(135deg, #D08A30, #C05A30)',
     color: '#fff',
     cursor: 'pointer',
     transition: 'background 0.15s ease',
   },
   messageTimestamp: {
     fontSize: '11px',
-    color: '#888',
+    color: '#9A9590',
   },
   actionButton: {
     background: 'none',
@@ -3766,7 +4868,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     cursor: 'pointer',
     padding: '6px',
     borderRadius: '8px',
-    color: '#8e8e93',
+    color: '#9A9590',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -3783,11 +4885,11 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     width: '10px',
     height: '10px',
     borderRadius: '50%',
-    background: '#666',
+    background: '#D08A30',
   },
   inputArea: {
-    borderTop: '1px solid rgba(0, 0, 0, 0.08)',
-    background: '#f2f2f7',
+    borderTop: '1px solid rgba(0, 0, 0, 0.07)',
+    background: '#F5F4F0',
     padding: '0',
     maxWidth: '100%',
   },
@@ -3805,12 +4907,37 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   inputCard: {
     width: '100%',
-    background: '#ffffff',
-    border: 'none',
-    borderRadius: '22px',
+    background: '#EDECE8',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
+    borderRadius: '16px',
     padding: '4px 6px',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+    boxShadow: 'none',
     boxSizing: 'border-box' as const,
+  },
+  inputFooter: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '8px 4px 0',
+    maxWidth: '100%',
+  },
+  attachBtn: {
+    width: '30px',
+    height: '30px',
+    borderRadius: '8px',
+    border: 'none',
+    background: 'transparent',
+    color: '#9A9590',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s',
+  },
+  inputHint: {
+    fontSize: '11px',
+    color: '#9A9590',
+    fontFamily: "'JetBrains Mono', 'SF Mono', 'Courier New', monospace",
   },
   inputRow: {
     display: 'flex',
@@ -3826,7 +4953,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     fontFamily: 'inherit',
     resize: 'none' as const,
     outline: 'none',
-    color: '#000',
+    color: '#1A1918',
     padding: '8px 8px',
     maxHeight: '150px',
     minHeight: '36px',
@@ -3837,13 +4964,13 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     verticalAlign: 'middle' as const,
   },
   sendBtn: {
-    width: '30px',
-    height: '30px',
-    minWidth: '30px',
-    minHeight: '30px',
+    width: '36px',
+    height: '36px',
+    minWidth: '36px',
+    minHeight: '36px',
     border: 'none',
     borderRadius: '50%',
-    background: '#3a3a3c',
+    background: 'linear-gradient(135deg, #D08A30, #C05A30)',
     color: 'white',
     fontSize: '15px',
     cursor: 'pointer',
@@ -3854,9 +4981,9 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     transition: 'transform 0.15s ease, opacity 0.15s ease',
   },
   sendBtnDisabled: {
-    opacity: 0.4,
+    opacity: 0.3,
     cursor: 'not-allowed',
-    background: '#c7c7cc',
+    background: '#C4C0B8',
   },
   plusBtn: {
     width: '30px',
@@ -3866,7 +4993,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     border: 'none',
     borderRadius: '50%',
     background: 'transparent',
-    color: '#8e8e93',
+    color: '#9A9590',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -3879,9 +5006,9 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     bottom: '100%',
     left: 0,
     marginBottom: '8px',
-    background: '#ffffff',
+    background: '#EDECE8',
     borderRadius: '12px',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
     padding: '8px 0',
     minWidth: '260px',
     zIndex: 1000,
@@ -3894,7 +5021,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     padding: '12px 16px',
     border: 'none',
     background: 'transparent',
-    color: '#1c1c1e',
+    color: '#1A1918',
     fontSize: '14px',
     cursor: 'pointer',
     textAlign: 'left' as const,
@@ -3910,8 +5037,8 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   upgradeBadge: {
     fontSize: '11px',
     fontWeight: 500,
-    color: '#636366',
-    background: '#f2f2f7',
+    color: '#D08A30',
+    background: 'rgba(208, 138, 48, 0.1)',
     padding: '3px 10px',
     borderRadius: '10px',
     marginLeft: 'auto',
@@ -3920,7 +5047,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     padding: '6px 0 0',
     textAlign: 'center' as const,
     fontSize: '11px',
-    color: '#8e8e93',
+    color: '#9A9590',
     maxWidth: '100%',
     overflow: 'hidden',
   },
@@ -3947,16 +5074,16 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     overflowY: 'auto' as const,
   },
   modalContent: {
-    background: 'rgba(255, 255, 255, 0.92)',
+    background: 'rgba(245, 244, 240, 0.95)',
     borderRadius: '20px',
-    boxShadow: '0 12px 40px rgba(0, 0, 0, 0.15)',
+    boxShadow: '0 12px 40px rgba(0, 0, 0, 0.1)',
     backdropFilter: 'blur(30px)',
     WebkitBackdropFilter: 'blur(30px)',
-    border: 'none',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
   },
   modalHeader: {
     padding: '20px 24px 16px',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.07)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -3964,11 +5091,11 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   modalTitle: {
     fontSize: '17px',
     fontWeight: 600,
-    color: '#1c1c1e',
+    color: '#1A1918',
     margin: 0,
   },
   modalCloseBtn: {
-    background: 'rgba(142, 142, 147, 0.12)',
+    background: 'rgba(0, 0, 0, 0.06)',
     border: 'none',
     borderRadius: '50%',
     width: '30px',
@@ -3977,67 +5104,71 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    color: '#666',
+    color: '#6B6660',
     transition: 'all 0.2s ease',
   },
   modalBody: {
     padding: '20px 28px 28px',
   },
   modalSection: {
-    marginBottom: '24px',
+    padding: '20px 24px',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.07)',
   },
   modalSectionTitle: {
-    fontSize: '16px',
+    fontSize: '11px',
     fontWeight: 600,
-    marginBottom: '12px',
-    color: '#000',
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase' as const,
+    color: '#9A9590',
+    marginBottom: '14px',
   },
   modalSubsectionTitle: {
-    fontSize: '14px',
+    fontSize: '11px',
     fontWeight: 600,
-    marginBottom: '12px',
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase' as const,
+    color: '#9A9590',
+    marginBottom: '14px',
     marginTop: '16px',
-    color: '#000',
   },
   modalInfoRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '10px 0',
-    borderBottom: '1px solid #e0e0e0',
-    fontSize: '14px',
+    alignItems: 'center',
+    padding: '8px 0',
+    fontSize: '13px',
   },
   modalLabel: {
-    fontWeight: 600,
-    color: '#000',
+    fontSize: '13px',
+    color: '#6B6660',
   },
   modalValue: {
-    color: '#666',
+    fontSize: '13px',
+    color: '#1A1918',
+    fontWeight: 500,
   },
   planCurrentBadge: {
-    padding: '20px',
+    padding: '16px 20px',
     background: '#f9f9f9',
     borderRadius: '12px',
-    textAlign: 'center' as const,
     marginBottom: '16px',
   },
   planBadgeLarge: {
-    display: 'inline-block',
-    padding: '6px 16px',
-    background: 'linear-gradient(135deg, #1a1a1a 0%, #3d3d3d 100%)',
-    color: 'white',
-    borderRadius: '24px',
-    fontWeight: 600,
-    fontSize: '14px',
-    marginBottom: '8px',
+    display: 'inline-flex',
+    padding: '4px 14px',
+    borderRadius: '100px',
+    fontWeight: 700,
+    fontSize: '12px',
+    background: 'linear-gradient(135deg, #D08A30, #C05A30)',
+    color: '#fff',
   },
   planDescription: {
-    color: '#666',
-    fontSize: '13px',
-    marginBottom: '12px',
+    color: '#9A9590',
+    fontSize: '12px',
   },
   progressBarContainer: {
     width: '100%',
-    height: '8px',
+    height: '4px',
     background: '#e0e0e0',
     borderRadius: '4px',
     overflow: 'hidden',
@@ -4045,42 +5176,45 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   progressBar: {
     height: '100%',
-    background: 'linear-gradient(135deg, #1a1a1a 0%, #3d3d3d 100%)',
+    background: 'linear-gradient(90deg, #D08A30, #C05A30)',
     borderRadius: '4px',
-    transition: 'width 0.3s ease',
+    transition: 'width 0.5s ease',
   },
   plansGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '12px',
+    display: 'flex',
+    gap: '10px',
+    overflowX: 'auto' as const,
+    paddingBottom: '8px',
   },
   planCard: {
     padding: '16px',
-    background: '#f9f9f9',
-    border: '2px solid #e0e0e0',
     borderRadius: '12px',
-    minHeight: '220px',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
+    background: '#F5F4F0',
+    transition: 'all 0.2s',
+    minWidth: '180px',
+    flexShrink: 0,
   },
   planCardActive: {
-    border: '2px solid #1a1a1a',
-    background: 'rgba(26, 26, 26, 0.05)',
+    border: '2px solid #D08A30',
+    background: 'rgba(208, 138, 48, 0.08)',
   },
   planCardTitle: {
     fontSize: '15px',
     fontWeight: 700,
     marginBottom: '6px',
-    color: '#000',
+    color: '#1A1918',
   },
   planPrice: {
     fontSize: '22px',
     fontWeight: 700,
     margin: '8px 0 12px',
-    color: '#000',
+    color: '#1A1918',
   },
   planPricePeriod: {
     fontSize: '13px',
     fontWeight: 400,
-    color: '#666',
+    color: '#6B6660',
   },
   planFeatures: {
     listStyle: 'none',
@@ -4088,22 +5222,34 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     padding: 0,
   },
   planFeature: {
-    padding: '4px 0',
-    fontSize: '12px',
-    color: '#666',
+    padding: '3px 0',
+    fontSize: '11px',
+    color: '#6B6660',
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '4px',
+  },
+  checkMark: {
+    color: '#D08A30',
+    fontSize: '10px',
+    fontWeight: 700,
+    flexShrink: 0,
+    marginRight: '2px',
   },
   planBtn: {
     width: '100%',
-    padding: '10px 14px',
-    background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '10px',
-    fontSize: '12px',
+    marginTop: '12px',
+    padding: '8px',
+    borderRadius: '8px',
+    border: '1px solid rgba(0, 0, 0, 0.13)',
+    background: 'transparent',
+    color: '#6B6660',
+    fontFamily: 'Inter, sans-serif',
+    fontSize: '11px',
     fontWeight: 600,
     cursor: 'pointer',
+    transition: 'all 0.2s',
     whiteSpace: 'nowrap' as const,
-    transition: 'all 0.2s ease',
   },
   planBtnSpacer: {
     width: '100%',
@@ -4112,10 +5258,10 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   logoutBtn: {
     width: '100%',
     padding: '13px 24px',
-    background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
-    color: '#dc2626',
-    border: '1px solid #fca5a5',
-    borderRadius: '12px',
+    background: 'rgba(232, 90, 90, 0.1)',
+    color: '#E85A5A',
+    border: '1px solid rgba(232, 90, 90, 0.3)',
+    borderRadius: '10px',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
@@ -4126,8 +5272,8 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     padding: '10px 16px',
     marginTop: '16px',
     background: 'transparent',
-    color: '#888',
-    border: '1px solid #ddd',
+    color: '#9A9590',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
     borderRadius: '8px',
     fontSize: '13px',
     fontWeight: 500,
@@ -4144,22 +5290,22 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     maxWidth: '340px',
   },
   actionsModalContent: {
-    background: 'rgba(255, 255, 255, 0.85)',
+    background: 'rgba(245, 244, 240, 0.95)',
     borderRadius: '24px',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
     backdropFilter: 'blur(20px)',
     WebkitBackdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255, 255, 255, 0.4)',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
     overflow: 'hidden',
   },
   actionsModalHeader: {
     padding: '20px 24px 16px',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.07)',
   },
   actionsModalTitle: {
     fontSize: '16px',
     fontWeight: 600,
-    color: '#1a1a1a',
+    color: '#1A1918',
     margin: 0,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -4175,9 +5321,9 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   actionMenuItem: {
     width: '100%',
     padding: '13px 24px',
-    background: 'linear-gradient(135deg, #f0f0f0 0%, #fafafa 100%)',
-    border: '1px solid #e0e0e0',
-    borderRadius: '12px',
+    background: '#EDECE8',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
+    borderRadius: '10px',
     fontSize: '14px',
     fontWeight: 500,
     cursor: 'pointer',
@@ -4187,12 +5333,12 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     justifyContent: 'center',
     gap: '8px',
     transition: 'all 0.2s ease',
-    color: '#1a1a1a',
+    color: '#1A1918',
   },
   actionMenuItemDanger: {
-    background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
-    border: '1px solid #fca5a5',
-    color: '#dc2626',
+    background: 'rgba(232, 90, 90, 0.1)',
+    border: '1px solid rgba(232, 90, 90, 0.3)',
+    color: '#E85A5A',
   },
   actionMenuIcon: {
     fontSize: '16px',
@@ -4207,18 +5353,18 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     maxWidth: '400px',
   },
   deleteModalContent: {
-    background: 'white',
+    background: '#F5F4F0',
     borderRadius: '12px',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
   },
   deleteModalHeader: {
     padding: '20px 24px',
-    borderBottom: '1px solid #e0e0e0',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.07)',
   },
   deleteModalTitle: {
     fontSize: '20px',
     fontWeight: 700,
-    color: '#000',
+    color: '#1A1918',
     margin: 0,
   },
   deleteModalBody: {
@@ -4226,7 +5372,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   deleteModalText: {
     fontSize: '15px',
-    color: '#666',
+    color: '#6B6660',
     lineHeight: 1.5,
     margin: 0,
   },
@@ -4239,16 +5385,16 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   deleteCancelBtn: {
     padding: '10px 20px',
     background: 'transparent',
-    border: '1px solid #e0e0e0',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
     borderRadius: '8px',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-    color: '#000',
+    color: '#1A1918',
   },
   deleteConfirmBtn: {
     padding: '10px 20px',
-    background: '#ef4444',
+    background: '#E85A5A',
     border: 'none',
     borderRadius: '8px',
     fontSize: '14px',
@@ -4258,374 +5404,585 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
 };
 
-// Dark Mode Styles
+// Dark Mode Styles (PRIMARY theme)
 const darkStyles: { [key: string]: React.CSSProperties } = {
   ...lightStyles,
   loadingContainer: {
     ...lightStyles.loadingContainer,
-    background: 'linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%)',
+    background: 'linear-gradient(135deg, #0C0C0E 0%, #141416 100%)',
   },
   loadingLogo: {
     ...lightStyles.loadingLogo,
   },
   loadingLogoImg: {
     ...lightStyles.loadingLogoImg,
-    filter: 'invert(1)',
   },
   loadingBrand: {
     ...lightStyles.loadingBrand,
-    color: '#fff',
+    color: '#E8E6E1',
   },
   loadingDot: {
     ...lightStyles.loadingDot,
-    background: '#666',
+    background: '#E8A04C',
+  },
+  limitWarning: {
+    ...lightStyles.limitWarning,
+    background: 'rgba(232, 160, 76, 0.1)',
+    border: '1px solid rgba(232, 160, 76, 0.3)',
+    color: '#E8A04C',
+  },
+  upgradeLink: {
+    ...lightStyles.upgradeLink,
+    color: '#E8A04C',
+  },
+  messageLimitInfo: {
+    ...lightStyles.messageLimitInfo,
+    color: '#6B6660',
+  },
+  remainingMessages: {
+    ...lightStyles.remainingMessages,
+    color: '#6B6660',
   },
   authContainer: {
     ...lightStyles.authContainer,
-    background: '#0a0a0a',
+    background: '#0C0C0E',
   },
   authThemeToggle: {
     ...lightStyles.authThemeToggle,
-    background: 'rgba(30, 30, 40, 0.8)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    color: '#fff',
+    background: '#1E1E20',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    color: '#E8E6E1',
   },
   authCard: {
     ...lightStyles.authCard,
-    background: 'rgba(20, 20, 30, 0.7)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+    background: 'rgba(20, 20, 22, 0.9)',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
   },
   authTitle: {
     ...lightStyles.authTitle,
-    color: '#fff',
+    color: '#E8E6E1',
   },
   authSubtitle: {
     ...lightStyles.authSubtitle,
-    color: '#999',
+    color: '#6B6660',
   },
   logoIconImg: {
     ...lightStyles.logoIconImg,
-    filter: 'invert(1)',
+  },
+  authError: {
+    ...lightStyles.authError,
+    background: 'rgba(232, 90, 90, 0.1)',
+    borderLeft: '4px solid #E85A5A',
+    color: '#E85A5A',
+  },
+  authSuccess: {
+    ...lightStyles.authSuccess,
+    background: 'rgba(16, 185, 129, 0.15)',
   },
   tabContainer: {
     ...lightStyles.tabContainer,
-    background: 'rgba(255, 255, 255, 0.05)',
+    background: 'rgba(255, 255, 255, 0.04)',
   },
   tab: {
     ...lightStyles.tab,
-    color: '#999',
+    color: '#6B6660',
   },
   tabActive: {
     ...lightStyles.tabActive,
-    background: 'rgba(255, 255, 255, 0.1)',
-    color: '#fff',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+    background: 'rgba(232, 160, 76, 0.1)',
+    color: '#E8A04C',
+    boxShadow: 'none',
   },
   labelRow: {
     ...lightStyles.labelRow,
   },
   label: {
     ...lightStyles.label,
-    color: '#fff',
+    color: '#E8E6E1',
   },
   forgotLink: {
     ...lightStyles.forgotLink,
-    color: '#8e8e93',
+    color: '#6B6660',
   },
   input: {
     ...lightStyles.input,
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    color: '#E8E6E1',
+  },
+  authBtn: {
+    ...lightStyles.authBtn,
+    background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
     color: '#fff',
+    border: 'none',
   },
   divider: {
     ...lightStyles.divider,
+    color: '#6B6660',
   },
   dividerLine: {
     ...lightStyles.dividerLine,
-    background: 'rgba(255, 255, 255, 0.1)',
+    background: 'rgba(255, 255, 255, 0.06)',
   },
   dividerText: {
     ...lightStyles.dividerText,
-    color: '#666',
+    color: '#6B6660',
   },
   socialButtons: {
     ...lightStyles.socialButtons,
   },
   authSwitch: {
     ...lightStyles.authSwitch,
-    color: '#999',
+    color: '#6B6660',
   },
   authLink: {
     ...lightStyles.authLink,
-    color: '#e5e5e7',
-  },
-  authSuccess: {
-    ...lightStyles.authSuccess,
-    background: 'rgba(16, 185, 129, 0.2)',
+    color: '#E8A04C',
   },
   emailIcon: {
     ...lightStyles.emailIcon,
-    background: 'rgba(255, 255, 255, 0.1)',
-    border: '2px solid rgba(255, 255, 255, 0.2)',
-    color: '#999',
+    background: 'rgba(232, 160, 76, 0.1)',
+    border: '2px solid rgba(232, 160, 76, 0.3)',
+    color: '#E8A04C',
   },
   emailIconRing: {
     ...lightStyles.emailIconRing,
-    border: '2px solid rgba(255, 255, 255, 0.15)',
+    border: '2px solid rgba(232, 160, 76, 0.15)',
   },
   checkEmailTitle: {
     ...lightStyles.checkEmailTitle,
-    color: '#fff',
+    color: '#E8E6E1',
   },
   checkEmailText: {
     ...lightStyles.checkEmailText,
-    color: '#999',
+    color: '#6B6660',
   },
   checkEmailAddress: {
     ...lightStyles.checkEmailAddress,
-    color: '#fff',
+    color: '#E8A04C',
   },
   checkEmailSubtext: {
     ...lightStyles.checkEmailSubtext,
-    color: '#777',
+    color: '#6B6660',
+  },
+  mobileOverlay: {
+    ...lightStyles.mobileOverlay,
+    background: 'rgba(0, 0, 0, 0.6)',
   },
   mobileMenuBtn: {
     ...lightStyles.mobileMenuBtn,
-    color: '#fff',
+    color: '#E8E6E1',
   },
   mobileMenuDots: {
     ...lightStyles.mobileMenuDots,
-    color: '#999',
+    color: '#6B6660',
   },
   sidebar: {
     ...lightStyles.sidebar,
-    background: '#1c1c1e',
-    borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+    background: '#141416',
+    borderRight: '1px solid rgba(255, 255, 255, 0.06)',
+  },
+  sidebarCollapsed: {
+    ...lightStyles.sidebarCollapsed,
+  },
+  expandBtn: {
+    ...lightStyles.expandBtn,
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    color: '#8A8690',
   },
   sidebarHeader: {
     ...lightStyles.sidebarHeader,
-    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
   },
   sidebarToggle: {
     ...lightStyles.sidebarToggle,
-    color: '#fff',
+    color: '#E8E6E1',
   },
   brand: {
     ...lightStyles.brand,
-    color: '#fff',
+    color: '#E8E6E1',
   },
   brandLogo: {
     ...lightStyles.brandLogo,
-    filter: 'invert(1)',
   },
   section: {
     ...lightStyles.section,
-    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+    borderBottom: 'none',
+  },
+  newChatBtn: {
+    ...lightStyles.newChatBtn,
+    border: '1px dashed rgba(255, 255, 255, 0.12)',
+    color: '#8A8690',
+  },
+  newChatBtnHover: {
+    ...lightStyles.newChatBtnHover,
+    border: '1px dashed #E8A04C',
+    background: 'rgba(232, 160, 76, 0.12)',
+    color: '#E8A04C',
+  },
+  collapseBtn: {
+    ...lightStyles.collapseBtn,
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    color: '#5A5660',
   },
   navText: {
     ...lightStyles.navText,
-    color: '#e5e5e7',
+    color: '#E8E6E1',
   },
   sectionLabel: {
     ...lightStyles.sectionLabel,
-    color: '#8e8e93',
+    color: '#6B6660',
   },
   greetingLogoImg: {
     ...lightStyles.greetingLogoImg,
-    filter: 'invert(1)',
   },
   greetingText: {
     ...lightStyles.greetingText,
-    color: '#fff',
+    color: '#F0EDE8',
   },
   promptChip: {
     ...lightStyles.promptChip,
-    background: '#2c2c2e',
-    border: '1px solid #3a3a3c',
-    color: '#e5e5e7',
+    background: '#1E1E20',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    color: '#9A9590',
   },
   promptChipHover: {
     ...lightStyles.promptChipHover,
-    background: '#3a3a3c',
-    border: '1px solid #48484a',
-    color: '#e5e5e7',
+    background: 'rgba(232, 160, 76, 0.1)',
+    border: '1px solid #E8A04C',
+    color: '#E8A04C',
+  },
+  quickChip: {
+    ...lightStyles.quickChip,
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    background: '#141416',
+    color: '#8A8690',
+  },
+  quickChipHover: {
+    ...lightStyles.quickChipHover,
+    border: '1px solid #E8A04C',
+    background: 'rgba(232, 160, 76, 0.12)',
+    color: '#E8A04C',
+    boxShadow: '0 4px 16px rgba(232, 160, 76, 0.1)',
+  },
+  chipIcon: {
+    ...lightStyles.chipIcon,
+    background: '#1A1A1E',
   },
   recentItem: {
     ...lightStyles.recentItem,
-    color: '#e5e5e7',
+    color: '#E8E6E1',
   },
   recentItemActive: {
     ...lightStyles.recentItemActive,
-    background: 'rgba(142, 142, 147, 0.2)',
-    color: '#e5e5e7',
+    background: 'rgba(232, 160, 76, 0.08)',
+    boxShadow: 'inset 3px 0 0 #E8A04C',
+    color: '#F0EDE8',
   },
   renameInput: {
     ...lightStyles.renameInput,
-    background: '#2c2c2e',
-    color: '#fff',
-    border: 'none',
+    background: '#1E1E20',
+    color: '#E8E6E1',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
   },
   sidebarFooter: {
     ...lightStyles.sidebarFooter,
-    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+    borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+  },
+  avatar: {
+    ...lightStyles.avatar,
+    background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
   },
   main: {
     ...lightStyles.main,
-    background: '#1c1c1e',
+    background: '#0C0C0E',
+    backgroundImage: 'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(232, 160, 76, 0.06), transparent), radial-gradient(circle at 80% 90%, rgba(232, 98, 76, 0.03), transparent)',
   },
   topBar: {
     ...lightStyles.topBar,
-    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
   },
   modelBadge: {
     ...lightStyles.modelBadge,
-    color: '#fff',
+    color: '#8A8690',
   },
   scrollToBottomBtn: {
     ...lightStyles.scrollToBottomBtn,
-    background: 'rgba(44, 44, 46, 0.95)',
-    border: 'none',
-    color: '#fff',
+    background: 'rgba(30, 30, 32, 0.95)',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    color: '#E8E6E1',
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+  },
+  messageBubbleUser: {
+    ...lightStyles.messageBubbleUser,
+    background: 'rgba(232, 160, 76, 0.15)',
+    color: '#E8E6E1',
   },
   messageBubbleAssistant: {
     ...lightStyles.messageBubbleAssistant,
-    background: '#2c2c2e',
-    border: 'none',
-    color: '#e5e5e7',
-    boxShadow: 'none',
+    background: '#141416',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    color: '#E8E6E1',
+  },
+  messageTimestamp: {
+    ...lightStyles.messageTimestamp,
+    color: '#6B6660',
+  },
+  actionButton: {
+    ...lightStyles.actionButton,
+    color: '#6B6660',
+  },
+  typingDot: {
+    ...lightStyles.typingDot,
+    background: '#E8A04C',
   },
   editTextarea: {
     ...lightStyles.editTextarea,
-    background: '#2c2c2e',
-    color: '#e5e5e7',
-    border: 'none',
+    background: '#1E1E20',
+    color: '#E8E6E1',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
   },
   editWarning: {
     ...lightStyles.editWarning,
-    color: '#8e8e93',
+    color: '#6B6660',
   },
   editCancelBtn: {
     ...lightStyles.editCancelBtn,
-    background: '#3a3a3a',
-    border: '1px solid #555',
-    color: '#e0e0e0',
+    background: '#1E1E20',
+    border: 'none',
+    color: '#E8E6E1',
   },
   editSaveBtn: {
     ...lightStyles.editSaveBtn,
-    background: '#e0e0e0',
-    color: '#1a1a1a',
+    background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+    color: '#fff',
   },
   inputArea: {
     ...lightStyles.inputArea,
-    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-    background: '#1c1c1e',
+    borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+    background: '#0C0C0E',
   },
   inputCard: {
     ...lightStyles.inputCard,
-    background: '#2c2c2e',
-    border: 'none',
+    background: '#141416',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
     boxShadow: 'none',
+  },
+  inputFooter: {
+    ...lightStyles.inputFooter,
+  },
+  attachBtn: {
+    ...lightStyles.attachBtn,
+    color: '#5A5660',
+  },
+  inputHint: {
+    ...lightStyles.inputHint,
+    color: '#5A5660',
   },
   textarea: {
     ...lightStyles.textarea,
-    color: '#fff',
+    color: '#E8E6E1',
+  },
+  sendBtn: {
+    ...lightStyles.sendBtn,
+    background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+  },
+  sendBtnDisabled: {
+    ...lightStyles.sendBtnDisabled,
+    opacity: 0.3,
+    background: '#2A2A2C',
   },
   plusBtn: {
     ...lightStyles.plusBtn,
-    color: '#8e8e93',
+    color: '#6B6660',
   },
   plusMenu: {
     ...lightStyles.plusMenu,
-    background: '#2c2c2e',
+    background: '#141416',
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
   },
   plusMenuItem: {
     ...lightStyles.plusMenuItem,
-    color: '#e5e5e7',
+    color: '#E8E6E1',
   },
   plusMenuItemContent: {
     ...lightStyles.plusMenuItemContent,
   },
   upgradeBadge: {
     ...lightStyles.upgradeBadge,
-    color: '#8e8e93',
-    background: '#3a3a3c',
+    color: '#E8A04C',
+    background: 'rgba(232, 160, 76, 0.1)',
   },
-  upgradeLink: {
-    ...lightStyles.upgradeLink,
-    color: '#fff',
+  modelSelect: {
+    ...lightStyles.modelSelect,
+    color: '#6B6660',
   },
-  actionsModalContent: {
-    ...lightStyles.actionsModalContent,
-    background: 'rgba(30, 30, 40, 0.9)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+  modalOverlay: {
+    ...lightStyles.modalOverlay,
+    background: 'rgba(0, 0, 0, 0.6)',
   },
-  actionsModalHeader: {
-    ...lightStyles.actionsModalHeader,
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+  modalContent: {
+    ...lightStyles.modalContent,
+    background: 'rgba(20, 20, 22, 0.95)',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    boxShadow: '0 12px 40px rgba(0, 0, 0, 0.5)',
   },
-  actionsModalTitle: {
-    ...lightStyles.actionsModalTitle,
-    color: '#fff',
+  modalHeader: {
+    ...lightStyles.modalHeader,
+    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
   },
-  modalValue: {
-    ...lightStyles.modalValue,
-    color: '#333',
+  modalTitle: {
+    ...lightStyles.modalTitle,
+    color: '#E8E6E1',
   },
-  modalLabel: {
-    ...lightStyles.modalLabel,
-    color: '#555',
+  modalCloseBtn: {
+    ...lightStyles.modalCloseBtn,
+    background: 'rgba(255, 255, 255, 0.06)',
+    color: '#6B6660',
+  },
+  modalSection: {
+    ...lightStyles.modalSection,
+    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
   },
   modalSectionTitle: {
     ...lightStyles.modalSectionTitle,
-    color: '#1a1a1a',
+    color: '#5A5660',
   },
-  actionMenuItem: {
-    ...lightStyles.actionMenuItem,
-    background: 'linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%)',
-    border: '1px solid #4a4a4a',
-    color: '#fff',
+  modalSubsectionTitle: {
+    ...lightStyles.modalSubsectionTitle,
+    color: '#5A5660',
   },
-  actionMenuItemDanger: {
-    ...lightStyles.actionMenuItemDanger,
-    background: 'linear-gradient(135deg, #4a1c1c 0%, #3a1515 100%)',
-    border: '1px solid #7f1d1d',
-    color: '#fca5a5',
+  modalInfoRow: {
+    ...lightStyles.modalInfoRow,
+  },
+  modalLabel: {
+    ...lightStyles.modalLabel,
+    color: '#8A8690',
+  },
+  modalValue: {
+    ...lightStyles.modalValue,
+    color: '#F0EDE8',
+  },
+  planCurrentBadge: {
+    ...lightStyles.planCurrentBadge,
+    background: '#1A1A1E',
+  },
+  planBadgeLarge: {
+    ...lightStyles.planBadgeLarge,
+    background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+    color: '#0C0C0E',
+  },
+  planDescription: {
+    ...lightStyles.planDescription,
+    color: '#5A5660',
+  },
+  progressBarContainer: {
+    ...lightStyles.progressBarContainer,
+    background: '#1A1A1E',
+  },
+  progressBar: {
+    ...lightStyles.progressBar,
+    background: 'linear-gradient(90deg, #E8A04C, #E8624C)',
+  },
+  planCard: {
+    ...lightStyles.planCard,
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    background: '#0C0C0E',
+  },
+  planCardActive: {
+    ...lightStyles.planCardActive,
+    border: '2px solid #E8A04C',
+    background: 'rgba(232, 160, 76, 0.08)',
+  },
+  planCardTitle: {
+    ...lightStyles.planCardTitle,
+    color: '#E8E6E1',
+  },
+  planPrice: {
+    ...lightStyles.planPrice,
+    color: '#E8E6E1',
+  },
+  planPricePeriod: {
+    ...lightStyles.planPricePeriod,
+    color: '#6B6660',
+  },
+  planFeature: {
+    ...lightStyles.planFeature,
+    color: '#8A8690',
+  },
+  checkMark: {
+    ...lightStyles.checkMark,
+    color: '#E8A04C',
+  },
+  planBtn: {
+    ...lightStyles.planBtn,
+    border: '1px solid rgba(255, 255, 255, 0.12)',
+    background: 'transparent',
+    color: '#8A8690',
   },
   logoutBtn: {
     ...lightStyles.logoutBtn,
-    background: 'linear-gradient(135deg, #4a1c1c 0%, #3a1515 100%)',
-    border: '1px solid #7f1d1d',
-    color: '#fca5a5',
+    background: 'rgba(232, 90, 90, 0.1)',
+    border: '1px solid rgba(232, 90, 90, 0.3)',
+    color: '#E85A5A',
   },
   cancelSubscriptionBtn: {
     ...lightStyles.cancelSubscriptionBtn,
-    color: '#777',
-    border: '1px solid #444',
+    color: '#6B6660',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+  },
+  actionsModalContent: {
+    ...lightStyles.actionsModalContent,
+    background: 'rgba(20, 20, 22, 0.95)',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+  },
+  actionsModalHeader: {
+    ...lightStyles.actionsModalHeader,
+    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+  },
+  actionsModalTitle: {
+    ...lightStyles.actionsModalTitle,
+    color: '#E8E6E1',
+  },
+  actionMenuItem: {
+    ...lightStyles.actionMenuItem,
+    background: '#1E1E20',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    color: '#E8E6E1',
+  },
+  actionMenuItemDanger: {
+    ...lightStyles.actionMenuItemDanger,
+    background: 'rgba(232, 90, 90, 0.1)',
+    border: '1px solid rgba(232, 90, 90, 0.3)',
+    color: '#E85A5A',
   },
   deleteModalContent: {
     ...lightStyles.deleteModalContent,
-    background: '#2a2a2a',
+    background: '#141416',
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
   },
   deleteModalHeader: {
     ...lightStyles.deleteModalHeader,
-    borderBottom: '1px solid #3a3a3a',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
   },
   deleteModalTitle: {
     ...lightStyles.deleteModalTitle,
-    color: '#fff',
+    color: '#E8E6E1',
   },
   deleteModalText: {
     ...lightStyles.deleteModalText,
-    color: '#999',
+    color: '#6B6660',
   },
   deleteCancelBtn: {
     ...lightStyles.deleteCancelBtn,
-    border: '1px solid #3a3a3a',
-    color: '#fff',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    color: '#E8E6E1',
+  },
+  deleteConfirmBtn: {
+    ...lightStyles.deleteConfirmBtn,
+    background: '#E85A5A',
   },
 };
 

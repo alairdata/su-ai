@@ -4,6 +4,18 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
+const BoltLogo = ({ size = 40 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 60 60" fill="none">
+    <defs>
+      <linearGradient id="boltGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#E8A04C" />
+        <stop offset="100%" stopColor="#E8624C" />
+      </linearGradient>
+    </defs>
+    <path d="M35 4L12 34h14l-4 22L48 26H34l4-22z" fill="url(#boltGrad)" />
+  </svg>
+);
+
 function ResetPasswordPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -66,7 +78,6 @@ function ResetPasswordPage() {
         setSuccess(data.message);
         setPassword("");
         setConfirmPassword("");
-        // Redirect to login after 3 seconds
         setTimeout(() => {
           router.push("/?reset=success");
         }, 3000);
@@ -84,7 +95,7 @@ function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div style={currentStyles.container}>
+      <div style={currentStyles.container} data-theme={theme}>
         <div className="auth-orb auth-orb-1" />
         <div className="auth-orb auth-orb-2" />
         <div className="auth-orb auth-orb-3" />
@@ -93,14 +104,17 @@ function ResetPasswordPage() {
         </button>
         <div style={currentStyles.card}>
           <div style={currentStyles.logoContainer}>
-            <div style={currentStyles.logo} className="auth-logo-glow" />
+            <BoltLogo size={48} />
             <h1 style={currentStyles.title}>Invalid Link</h1>
+            <p style={currentStyles.subtitle}>
+              This reset link is invalid or has expired.
+            </p>
           </div>
           <div style={currentStyles.error}>
-            This reset link is invalid or has expired. Please request a new password reset.
+            Please request a new password reset from the login page.
           </div>
-          <Link href="/" style={currentStyles.link}>
-            ← Back to login
+          <Link href="/" style={currentStyles.backLink}>
+            <span style={{ marginRight: '6px' }}>&larr;</span> Back to login
           </Link>
         </div>
       </div>
@@ -108,7 +122,7 @@ function ResetPasswordPage() {
   }
 
   return (
-    <div style={currentStyles.container}>
+    <div style={currentStyles.container} data-theme={theme}>
       <div className="auth-orb auth-orb-1" />
       <div className="auth-orb auth-orb-2" />
       <div className="auth-orb auth-orb-3" />
@@ -117,7 +131,7 @@ function ResetPasswordPage() {
       </button>
       <div style={currentStyles.card}>
         <div style={currentStyles.logoContainer}>
-          <div style={currentStyles.logo} className="auth-logo-glow" />
+          <BoltLogo size={48} />
           <h1 style={currentStyles.title}>Reset Password</h1>
           <p style={currentStyles.subtitle}>Enter your new password below</p>
         </div>
@@ -155,7 +169,10 @@ function ResetPasswordPage() {
             </div>
             <button
               type="submit"
-              style={currentStyles.button}
+              style={{
+                ...currentStyles.button,
+                opacity: loading ? 0.7 : 1,
+              }}
               disabled={loading}
               className="auth-btn-ripple"
             >
@@ -165,8 +182,8 @@ function ResetPasswordPage() {
         )}
 
         <div style={currentStyles.footer}>
-          <Link href="/" style={currentStyles.link}>
-            ← Back to login
+          <Link href="/" style={currentStyles.backLink}>
+            <span style={{ marginRight: '6px' }}>&larr;</span> Back to login
           </Link>
         </div>
       </div>
@@ -176,132 +193,129 @@ function ResetPasswordPage() {
 
 const lightStyles: { [key: string]: React.CSSProperties } = {
   container: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "24px",
-    background: "#f8f9fa",
-    position: "relative" as const,
-    overflow: "hidden",
+    height: '100dvh',
+    width: '100vw',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+    background: '#F5F4F0',
+    position: 'fixed' as const,
+    top: 0,
+    left: 0,
+    overflow: 'hidden' as const,
   },
   themeToggle: {
-    position: "absolute" as const,
-    top: "24px",
-    right: "24px",
-    background: "#fafafa",
-    border: "1px solid #e0e0e0",
-    borderRadius: "10px",
-    padding: "10px 14px",
-    fontSize: "18px",
-    cursor: "pointer",
-    transition: "all 0.3s ease",
+    position: 'absolute' as const,
+    top: '24px',
+    right: '24px',
+    background: '#EDECE8',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
+    borderRadius: '10px',
+    padding: '10px 14px',
+    fontSize: '18px',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
     zIndex: 10,
   },
   card: {
-    width: "100%",
-    maxWidth: "400px",
-    padding: "36px 32px",
-    background: "rgba(255, 255, 255, 0.65)",
-    borderRadius: "24px",
-    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
-    border: "1px solid rgba(255, 255, 255, 0.4)",
-    position: "relative" as const,
+    width: '100%',
+    maxWidth: '400px',
+    padding: '36px 32px',
+    margin: 'auto',
+    background: 'rgba(255, 255, 255, 0.65)',
+    borderRadius: '24px',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    border: '1px solid rgba(255, 255, 255, 0.4)',
+    position: 'relative' as const,
     zIndex: 1,
   },
   logoContainer: {
-    textAlign: "center" as const,
-    marginBottom: "20px",
-  },
-  logo: {
-    width: "48px",
-    height: "48px",
-    background: "linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%)",
-    border: "2px solid #d0d0d0",
-    borderRadius: "14px",
-    margin: "0 auto 20px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "24px",
-    color: "#666",
+    textAlign: 'center' as const,
+    marginBottom: '24px',
   },
   title: {
-    fontSize: "26px",
+    fontSize: '26px',
     fontWeight: 600,
-    marginBottom: "6px",
-    color: "#1a1a1a",
-    letterSpacing: "-0.02em",
+    marginBottom: '6px',
+    marginTop: '16px',
+    color: '#1A1918',
+    letterSpacing: '-0.02em',
   },
   subtitle: {
-    fontSize: "14px",
-    color: "#666",
+    fontSize: '14px',
+    color: '#9A9590',
+    margin: 0,
   },
   error: {
-    padding: "12px 16px",
-    background: "rgba(239, 68, 68, 0.1)",
-    borderLeft: "4px solid #ef4444",
-    borderRadius: "8px",
-    color: "#ef4444",
-    fontSize: "14px",
-    marginBottom: "20px",
+    padding: '12px 16px',
+    background: 'rgba(232, 90, 90, 0.1)',
+    borderLeft: '4px solid #E85A5A',
+    borderRadius: '8px',
+    color: '#E85A5A',
+    fontSize: '14px',
+    marginBottom: '20px',
   },
   success: {
-    padding: "12px 16px",
-    background: "rgba(16, 185, 129, 0.1)",
-    borderLeft: "4px solid #10b981",
-    borderRadius: "8px",
-    color: "#10b981",
-    fontSize: "14px",
-    marginBottom: "20px",
+    padding: '12px 16px',
+    background: 'rgba(16, 185, 129, 0.1)',
+    borderLeft: '4px solid #10b981',
+    borderRadius: '8px',
+    color: '#10b981',
+    fontSize: '14px',
+    marginBottom: '20px',
   },
   formGroup: {
-    marginBottom: "16px",
+    marginBottom: '16px',
   },
   label: {
-    display: "block",
-    marginBottom: "8px",
-    fontSize: "13px",
+    display: 'block',
+    marginBottom: '8px',
+    fontSize: '13px',
     fontWeight: 500,
-    color: "#444",
+    color: '#6B6660',
   },
   input: {
-    width: "100%",
-    padding: "12px 16px",
-    border: "1px solid #e0e0e0",
-    borderRadius: "10px",
-    fontSize: "14px",
-    background: "#fafafa",
-    color: "#1a1a1a",
-    boxSizing: "border-box" as const,
-    transition: "all 0.3s ease",
-    outline: "none",
+    width: '100%',
+    padding: '12px 16px',
+    border: '1px solid rgba(0, 0, 0, 0.07)',
+    borderRadius: '10px',
+    fontSize: '16px',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+    background: '#EDECE8',
+    color: '#1A1918',
+    boxSizing: 'border-box' as const,
+    transition: 'all 0.3s ease',
+    outline: 'none',
   },
   button: {
-    width: "100%",
-    padding: "13px 24px",
-    border: "1px solid #d0d0d0",
-    borderRadius: "10px",
-    fontSize: "14px",
+    width: '100%',
+    padding: '13px 24px',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '14px',
     fontWeight: 600,
-    cursor: "pointer",
-    background: "linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 100%)",
-    color: "#1a1a1a",
-    transition: "all 0.3s ease",
-    marginTop: "20px",
+    cursor: 'pointer',
+    background: 'linear-gradient(135deg, #D08A30, #C05A30)',
+    color: '#fff',
+    transition: 'all 0.3s ease',
+    marginTop: '20px',
   },
   footer: {
-    textAlign: "center" as const,
-    marginTop: "24px",
+    textAlign: 'center' as const,
+    marginTop: '24px',
   },
-  link: {
-    color: "#1a1a1a",
-    textDecoration: "none",
-    fontSize: "14px",
-    fontWeight: 600,
-    cursor: "pointer",
+  backLink: {
+    color: '#9A9590',
+    textDecoration: 'none',
+    fontSize: '14px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    transition: 'color 0.2s ease',
   },
 };
 
@@ -309,53 +323,47 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   ...lightStyles,
   container: {
     ...lightStyles.container,
-    background: "#0a0a0a",
+    background: '#0C0C0E',
   },
   themeToggle: {
     ...lightStyles.themeToggle,
-    background: "rgba(30, 30, 40, 0.8)",
-    border: "1px solid rgba(255, 255, 255, 0.1)",
-    color: "#fff",
+    background: '#1E1E20',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    color: '#E8E6E1',
   },
   card: {
     ...lightStyles.card,
-    background: "rgba(20, 20, 30, 0.7)",
-    border: "1px solid rgba(255, 255, 255, 0.1)",
-    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
-  },
-  logo: {
-    ...lightStyles.logo,
-    background: "rgba(255, 255, 255, 0.1)",
-    border: "2px solid rgba(255, 255, 255, 0.2)",
-    color: "#999",
+    background: 'rgba(20, 20, 22, 0.9)',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
   },
   title: {
     ...lightStyles.title,
-    color: "#fff",
+    color: '#E8E6E1',
   },
   subtitle: {
     ...lightStyles.subtitle,
-    color: "#999",
+    color: '#6B6660',
   },
   label: {
     ...lightStyles.label,
-    color: "#fff",
+    color: '#E8E6E1',
   },
   input: {
     ...lightStyles.input,
-    background: "rgba(255, 255, 255, 0.05)",
-    border: "1px solid rgba(255, 255, 255, 0.1)",
-    color: "#fff",
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    color: '#E8E6E1',
   },
   button: {
     ...lightStyles.button,
-    background: "rgba(255, 255, 255, 0.1)",
-    border: "1px solid rgba(255, 255, 255, 0.2)",
-    color: "#fff",
+    background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+    color: '#fff',
+    border: 'none',
   },
-  link: {
-    ...lightStyles.link,
-    color: "#fff",
+  backLink: {
+    ...lightStyles.backLink,
+    color: '#6B6660',
   },
 };
 
@@ -369,10 +377,10 @@ export default function ResetPassword() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "#f5f5f7",
+            background: "#0C0C0E",
           }}
         >
-          <div style={{ fontSize: "18px", color: "#666" }}>Loading...</div>
+          <BoltLogo size={48} />
         </div>
       }
     >
