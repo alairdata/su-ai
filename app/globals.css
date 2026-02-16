@@ -984,3 +984,35 @@ select {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ── CHAT CHARACTERS ── */
+.add-char-btn {
+  transition: all 0.25s ease;
+}
+
+.add-char-btn:hover {
+  border-color: #E8A04C !important;
+  color: #E8A04C !important;
+  background: rgba(232, 160, 76, 0.12) !important;
+}
+
+.char-circle-header {
+  transition: all 0.25s ease;
+}
+
+.char-circle-header:hover {
+  transform: translateY(-2px);
+  z-index: 2;
+}
+
+.char-color-option {
+  transition: all 0.2s ease;
+}
+
+.char-color-option:hover {
+  transform: scale(1.1);
+}
+
+.mention-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}

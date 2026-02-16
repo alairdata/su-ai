@@ -717,6 +717,7 @@ function HomePage() {
     messagesUsed,
     sendMessage,
     startNewChat,
+    createNewChat,
     selectChat,
     renameChat,
     deleteChat,
@@ -1347,16 +1348,34 @@ function HomePage() {
 
   // Character CRUD
   const addChatCharacter = async () => {
-    if (!newCharName.trim() || !currentChatId || chatCharacters.length >= 5) return;
+    const name = newCharName.trim();
+    if (!name || chatCharacters.length >= 5) {
+      console.log('Validation failed:', { name, count: chatCharacters.length });
+      return;
+    }
+
+    // If no chat exists yet, create one first
+    let chatId = currentChatId;
+    if (!chatId) {
+      console.log('No current chat, creating one...');
+      const newChatId = await createNewChat();
+      if (!newChatId) {
+        console.error('Failed to create chat for character');
+        return;
+      }
+      chatId = newChatId;
+    }
 
     const color = CHARACTER_COLORS[selectedColorIndex];
+    console.log('Adding character:', { chatId, name, color: color.name });
+
     try {
       const res = await fetch('/api/characters', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chatId: currentChatId,
-          name: newCharName.trim(),
+          chatId,
+          name,
           personality: newCharPersonality.trim(),
           color_bg: color.bg,
           color_fg: color.fg,
@@ -1365,14 +1384,20 @@ function HomePage() {
           color_tag: color.tag,
         }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        setChatCharacters(prev => [...prev, data.character]);
-        setNewCharName('');
-        setNewCharPersonality('');
-        setSelectedColorIndex(0);
-        setShowCharacterModal(false);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        console.error('Failed to add character:', res.status, errData);
+        return;
       }
+
+      const data = await res.json();
+      console.log('Character added:', data.character);
+      setChatCharacters(prev => [...prev, data.character]);
+      setNewCharName('');
+      setNewCharPersonality('');
+      setSelectedColorIndex(0);
+      setShowCharacterModal(false);
     } catch (err) {
       console.error('Failed to add character:', err);
     }
@@ -2624,6 +2649,7 @@ function HomePage() {
                 {chatCharacters.map((char, i) => (
                   <div
                     key={char.id}
+                    className="char-circle-header"
                     onClick={() => setShowCharacterModal(true)}
                     title={char.name}
                     style={{
@@ -2634,7 +2660,6 @@ function HomePage() {
                       border: `2px solid ${theme === 'dark' ? '#0C0C0E' : '#F5F4F0'}`,
                       marginLeft: i === 0 ? 0 : -6,
                       cursor: 'pointer',
-                      transition: 'all 0.25s',
                     }}
                   >
                     {char.name.substring(0, 2).toUpperCase()}
@@ -2642,6 +2667,7 @@ function HomePage() {
                 ))}
               </div>
               <button
+                className="add-char-btn"
                 onClick={() => setShowCharacterModal(true)}
                 title="Add chat character"
                 style={{
@@ -2652,7 +2678,6 @@ function HomePage() {
                   cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   marginRight: 4,
-                  transition: 'all 0.25s',
                 }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2948,6 +2973,7 @@ function HomePage() {
                           {chatCharacters.map(char => (
                             <div
                               key={char.id}
+                              className="mention-dropdown-item"
                               onClick={() => {
                                 const atIdx = input.lastIndexOf('@');
                                 setInput(input.substring(0, atIdx) + '@' + char.name + ' ');
@@ -4543,6 +4569,7 @@ function HomePage() {
                   {CHARACTER_COLORS.map((color, i) => (
                     <div
                       key={color.name}
+                      className="char-color-option"
                       onClick={() => setSelectedColorIndex(i)}
                       style={{
                         width: 28, height: 28, borderRadius: '50%',
@@ -4554,6 +4581,62 @@ function HomePage() {
                   ))}
                 </div>
               </div>
+
+              {/* Live Preview */}
+              {newCharName.trim() && (
+                <div style={{
+                  background: theme === 'dark' ? '#0C0C0E' : '#F5F4F0',
+                  border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
+                  borderRadius: 12,
+                  padding: 12,
+                  marginTop: 14,
+                }}>
+                  <div style={{
+                    fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
+                    textTransform: 'uppercase' as const,
+                    color: theme === 'dark' ? '#5A5660' : '#9A9590',
+                    marginBottom: 8,
+                  }}>Preview</div>
+
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: '50%',
+                      background: CHARACTER_COLORS[selectedColorIndex].bg,
+                      color: CHARACTER_COLORS[selectedColorIndex].fg,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 10, fontWeight: 700, flexShrink: 0,
+                    }}>
+                      {newCharName.trim().substring(0, 2).toUpperCase()}
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ color: CHARACTER_COLORS[selectedColorIndex].fg }}>
+                          {newCharName.trim()}
+                        </span>
+                        <span style={{
+                          fontSize: 8, padding: '1px 5px', borderRadius: 4,
+                          fontWeight: 600, textTransform: 'uppercase' as const,
+                          background: CHARACTER_COLORS[selectedColorIndex].tag,
+                          color: CHARACTER_COLORS[selectedColorIndex].fg,
+                        }}>Character</span>
+                      </div>
+
+                      <div style={{
+                        padding: '10px 14px',
+                        borderRadius: '14px 14px 14px 4px',
+                        fontSize: 12, lineHeight: 1.5,
+                        color: theme === 'dark' ? '#8A8690' : '#6B6660',
+                        fontStyle: 'italic' as const,
+                        border: `1px solid ${CHARACTER_COLORS[selectedColorIndex].border}`,
+                        background: CHARACTER_COLORS[selectedColorIndex].bgLight,
+                      }}>
+                        This is how {newCharName.trim()}&apos;s messages will look in your chat...
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Footer */}
