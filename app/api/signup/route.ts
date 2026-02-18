@@ -114,7 +114,7 @@ export async function POST(request: Request) {
     }
 
     // Send verification email
-    const emailResult = await sendVerificationEmail(email, name, verificationToken);
+    const emailResult = await sendVerificationEmail(email, name, verificationToken, newPendingUser.id);
 
     if (!emailResult.success) {
       // Delete pending user if email fails

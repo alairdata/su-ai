@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { track, EVENTS } from '@/lib/analytics';
 
 function getInitialTheme(): "light" | "dark" {
   if (typeof window === 'undefined') return 'dark';
@@ -18,7 +19,11 @@ export function useTheme() {
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+    setTheme((prev) => {
+      const next = prev === "light" ? "dark" : "light";
+      track(EVENTS.THEME_CHANGED, { from_theme: prev, to_theme: next });
+      return next;
+    });
   };
 
   return { theme, toggleTheme };

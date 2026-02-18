@@ -3,6 +3,7 @@ import { verifyWebhookSignature, stripe } from '@/lib/stripe';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import { sendSubscriptionEmail } from '@/lib/email';
+import { trackServerEvent, EVENTS } from '@/lib/analytics';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -152,6 +153,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     console.error('Failed to update after checkout completed:', error);
   } else {
     console.log(`User ${userId} upgraded to ${plan}`);
+    trackServerEvent(userId, EVENTS.SUBSCRIPTION_STARTED, { plan, payment_method: 'stripe' });
 
     // Send subscription welcome email
     try {
@@ -166,7 +168,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           userData.email,
           userData.name || 'there',
           plan,
-          'subscribed'
+          'subscribed',
+          undefined,
+          userId
         );
       }
     } catch (emailError) {
@@ -200,6 +204,13 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 async function updateUserSubscription(userId: string, subscription: Stripe.Subscription) {
   const status = mapStripeStatus(subscription.status);
   const currentPeriodEnd = getSubscriptionPeriodEnd(subscription);
+
+  // Fetch current state for renewal/reactivation detection
+  const { data: currentUser } = await supabase
+    .from('users')
+    .select('subscription_status, current_period_end')
+    .eq('id', userId)
+    .single();
 
   const updateData: Record<string, unknown> = {
     subscription_status: status,
@@ -240,6 +251,19 @@ async function updateUserSubscription(userId: string, subscription: Stripe.Subsc
     console.error('Failed to update subscription:', error);
   } else {
     console.log(`User ${userId} subscription updated:`, updateData);
+
+    // Detect subscription_renewed vs subscription_reactivated
+    if (currentUser) {
+      const prevStatus = currentUser.subscription_status;
+      const prevPeriodEnd = currentUser.current_period_end;
+      const newStatus = updateData.subscription_status as string;
+
+      if (newStatus === 'active' && ['canceled', 'past_due', 'canceling'].includes(prevStatus || '')) {
+        trackServerEvent(userId, EVENTS.SUBSCRIPTION_REACTIVATED, { previous_status: prevStatus });
+      } else if (newStatus === 'active' && prevStatus === 'active' && prevPeriodEnd && prevPeriodEnd !== currentPeriodEnd.toISOString()) {
+        trackServerEvent(userId, EVENTS.SUBSCRIPTION_RENEWED);
+      }
+    }
   }
 }
 
@@ -296,7 +320,9 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
           userData.email,
           userData.name || 'there',
           previousPlan,
-          'cancelled'
+          'cancelled',
+          undefined,
+          userIdToUpdate
         );
       } catch (emailError) {
         console.error('Failed to send subscription ended email:', emailError);
@@ -338,6 +364,8 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
 
   if (error) {
     console.error('Failed to update after payment failed:', error);
+  } else {
+    trackServerEvent(user.id, EVENTS.SUBSCRIPTION_PAYMENT_FAILED);
   }
 }
 

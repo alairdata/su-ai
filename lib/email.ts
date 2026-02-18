@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { trackServerEvent, EVENTS } from '@/lib/analytics';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -22,7 +23,8 @@ const EMAIL_FOOTER = `
 export async function sendVerificationEmail(
   email: string,
   name: string,
-  token: string
+  token: string,
+  userId?: string
 ) {
   const verificationUrl = `${process.env.NEXTAUTH_URL}/api/verify-email?token=${token}`;
 
@@ -76,6 +78,7 @@ export async function sendVerificationEmail(
       `,
     });
 
+    if (userId) trackServerEvent(userId, EVENTS.EMAIL_SENT, { email_type: 'verification' });
     return { success: true };
   } catch (error) {
     console.error('Failed to send verification email:', error);
@@ -86,7 +89,8 @@ export async function sendVerificationEmail(
 export async function sendPasswordResetEmail(
   email: string,
   name: string,
-  token: string
+  token: string,
+  userId?: string
 ) {
   const resetUrl = `${process.env.NEXTAUTH_URL}/reset-password?token=${token}`;
 
@@ -146,6 +150,7 @@ export async function sendPasswordResetEmail(
       `,
     });
 
+    if (userId) trackServerEvent(userId, EVENTS.EMAIL_SENT, { email_type: 'password_reset' });
     return { success: true };
   } catch (error) {
     console.error('Failed to send password reset email:', error);
@@ -158,7 +163,8 @@ export async function sendSubscriptionEmail(
   name: string,
   plan: string,
   type: 'subscribed' | 'cancelled' | 'upgraded' | 'downgraded',
-  periodEnd?: string
+  periodEnd?: string,
+  userId?: string
 ) {
   const titles: Record<string, string> = {
     subscribed: 'You just leveled up.',
@@ -270,6 +276,7 @@ export async function sendSubscriptionEmail(
       `,
     });
 
+    if (userId) trackServerEvent(userId, EVENTS.EMAIL_SENT, { email_type: `subscription_${type}` });
     return { success: true };
   } catch (error) {
     console.error('Failed to send subscription email:', error);
@@ -280,7 +287,8 @@ export async function sendSubscriptionEmail(
 export async function sendFollowUpEmail(
   email: string,
   name: string,
-  messagesRemaining: number = 10
+  messagesRemaining: number = 10,
+  userId?: string
 ) {
   try {
     await resend.emails.send({
@@ -346,6 +354,7 @@ export async function sendFollowUpEmail(
       `,
     });
 
+    if (userId) trackServerEvent(userId, EVENTS.EMAIL_SENT, { email_type: 'follow_up' });
     return { success: true };
   } catch (error) {
     console.error('Failed to send follow-up email:', error);

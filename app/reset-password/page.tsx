@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { track, EVENTS } from "@/lib/analytics";
 
 const BoltLogo = ({ size = 40 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 60 60" fill="none">
@@ -75,6 +76,7 @@ function ResetPasswordPage() {
       const data = await res.json();
 
       if (res.ok) {
+        track(EVENTS.PASSWORD_RESET_COMPLETED);
         setSuccess(data.message);
         setPassword("");
         setConfirmPassword("");

@@ -6,6 +6,7 @@ import { useChats } from "./hooks/useChats";
 import { useTheme } from "./hooks/useTheme";
 import { useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
+import { track, EVENTS } from "@/lib/analytics";
 
 type View = "auth" | "chat";
 type AuthMode = "signin" | "signup";
@@ -624,7 +625,6 @@ function HomePage() {
   const { theme, toggleTheme } = useTheme();
   const searchParams = useSearchParams();
   
-  const [currentView, setCurrentView] = useState<View>("auth");
   const [authMode, setAuthMode] = useState<AuthMode>("signin");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showCheckEmail, setShowCheckEmail] = useState(false);
@@ -667,6 +667,12 @@ function HomePage() {
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Analytics refs for typing/focus/abandon/scroll tracking
+  const typingStartedRef = useRef(false);
+  const inputAbandonTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFocusTrackRef = useRef(0);
+  const scrollMilestonesRef = useRef(new Set<number>());
+
   // Auth form states
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -674,6 +680,10 @@ function HomePage() {
   const [honeypot, setHoneypot] = useState(""); // SECURITY: Honeypot for bot detection
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState("");
+  const setAuthErrorTracked = (msg: string) => {
+    setAuthError(msg);
+    if (msg) track(EVENTS.FORM_VALIDATION_ERROR, { error_message: msg.slice(0, 100) });
+  };
   const [authSuccess, setAuthSuccess] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState("");
@@ -741,16 +751,17 @@ function HomePage() {
     const error = searchParams.get('error');
 
     if (verified === 'true') {
+      track(EVENTS.EMAIL_VERIFIED);
       setAuthSuccess('Email verified! You can now log in.');
       setAuthMode('signin');
     } else if (error === 'invalid-token') {
-      setAuthError('Invalid or expired verification link.');
+      setAuthErrorTracked('Invalid or expired verification link.');
     } else if (error === 'token-expired') {
-      setAuthError('Verification link expired. Please sign up again.');
+      setAuthErrorTracked('Verification link expired. Please sign up again.');
     } else if (error === 'verification-failed') {
-      setAuthError('Verification failed. Please try again.');
+      setAuthErrorTracked('Verification failed. Please try again.');
     } else if (error === 'OAuthAccountNotLinked') {
-      setAuthError('This email is already registered with a different sign-in method.');
+      setAuthErrorTracked('This email is already registered with a different sign-in method.');
     }
   }, [searchParams]);
 
@@ -765,6 +776,7 @@ function HomePage() {
   useEffect(() => {
     if (session?.user && session.user.onboardingComplete === false) {
       setShowOnboarding(true);
+      track(EVENTS.ONBOARDING_STARTED);
     }
   }, [session]);
 
@@ -784,6 +796,7 @@ function HomePage() {
     // Check if they've already seen it
     if (session.user.whatsNewSeen === false) {
       setShowWhatsNew(true);
+      track(EVENTS.WHATS_NEW_SHOWN);
     }
   }, [session?.user?.id, session?.user?.whatsNewSeen, showOnboarding]);
 
@@ -794,6 +807,25 @@ function HomePage() {
       signOut({ callbackUrl: '/' });
     }
   }, [session]);
+
+  // External link click tracking (delegation on messages area)
+  useEffect(() => {
+    const area = messagesAreaRef.current;
+    if (!area) return;
+    const handler = (e: MouseEvent) => {
+      const link = (e.target as HTMLElement).closest('a[href^="http"]') as HTMLAnchorElement | null;
+      if (link) {
+        try {
+          const url = new URL(link.href);
+          if (url.origin !== window.location.origin) {
+            track(EVENTS.EXTERNAL_LINK_CLICKED, { domain: url.hostname });
+          }
+        } catch { /* invalid URL, ignore */ }
+      }
+    };
+    area.addEventListener('click', handler);
+    return () => area.removeEventListener('click', handler);
+  }, [currentChatId]);
 
   // Check if user has been away for more than 24 hours
   useEffect(() => {
@@ -873,14 +905,8 @@ function HomePage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showPlusMenu]);
 
-  // Show chat view when authenticated, auth view only when confirmed unauthenticated
-  React.useEffect(() => {
-    if (isAuthenticated) {
-      setCurrentView("chat");
-    } else if (isUnauthenticated) {
-      setCurrentView("auth");
-    }
-  }, [isAuthenticated, isUnauthenticated]);
+  // Derive view from auth state — no useEffect delay
+  const currentView: View = isAuthenticated ? "chat" : "auth";
 
   // Fetch characters when chat changes
   useEffect(() => {
@@ -1073,8 +1099,10 @@ function HomePage() {
 
     if (result?.error) {
       // SECURITY: Show error message directly - no special handling to prevent enumeration
-      setAuthError(result.error);
+      track(EVENTS.LOGIN_FAILED, { method: 'credentials', error_type: result.error });
+      setAuthErrorTracked(result.error);
     } else {
+      track(EVENTS.USER_LOGGED_IN, { method: 'credentials' });
       setAuthEmail("");
       setAuthPassword("");
       // Auto-detect and save timezone on successful login
@@ -1102,11 +1130,12 @@ function HomePage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setAuthError(data.error || "Signup failed");
+        setAuthErrorTracked(data.error || "Signup failed");
         return;
       }
 
       // Show the check email screen
+      track(EVENTS.USER_SIGNED_UP, { method: 'email' });
       setSignupEmail(authEmail);
       setShowCheckEmail(true);
       setAuthEmail("");
@@ -1114,7 +1143,7 @@ function HomePage() {
       setAuthName("");
 
     } catch {
-      setAuthError("Signup failed. Please try again.");
+      setAuthErrorTracked("Signup failed. Please try again.");
     }
   };
 
@@ -1133,15 +1162,16 @@ function HomePage() {
       const data = await res.json();
 
       if (res.ok) {
+        track(EVENTS.PASSWORD_RESET_REQUESTED);
         setResetEmail(forgotEmail);
         setShowResetEmailSent(true);
         setShowForgotPassword(false);
         setForgotEmail("");
       } else {
-        setAuthError(data.error || "Failed to send reset email");
+        setAuthErrorTracked(data.error || "Failed to send reset email");
       }
     } catch {
-      setAuthError("Failed to send reset email. Please try again.");
+      setAuthErrorTracked("Failed to send reset email. Please try again.");
     } finally {
       setForgotLoading(false);
     }
@@ -1175,6 +1205,7 @@ function HomePage() {
   };
 
   const dismissWhatsNew = async () => {
+    track(EVENTS.WHATS_NEW_DISMISSED, { screen: whatsNewScreen });
     setShowWhatsNew(false);
     setWhatsNewScreen(1);
     try {
@@ -1184,7 +1215,12 @@ function HomePage() {
     }
   };
 
-  const completeOnboarding = async () => {
+  const completeOnboarding = async (skippedFromScreen?: number) => {
+    if (skippedFromScreen) {
+      track(EVENTS.ONBOARDING_SKIPPED, { screen: skippedFromScreen });
+    } else {
+      track(EVENTS.ONBOARDING_COMPLETED);
+    }
     setShowOnboarding(false);
     setOnboardingScreen(1);
     try {
@@ -1199,6 +1235,7 @@ function HomePage() {
   const handleCopyMessage = async (content: string, messageId: string) => {
     try {
       await navigator.clipboard.writeText(content);
+      track(EVENTS.MESSAGE_COPIED);
       setCopiedMessageId(messageId);
       setTimeout(() => setCopiedMessageId(null), 2000);
     } catch (error) {
@@ -1244,6 +1281,7 @@ function HomePage() {
 
     // Set new feedback
     setMessageFeedback(prev => ({ ...prev, [messageId]: type }));
+    track(EVENTS.MESSAGE_FEEDBACK, { type });
 
     // Send to backend
     try {
@@ -1294,12 +1332,24 @@ function HomePage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messagesEndRef]);
 
-  // Handle scroll to show/hide scroll button
+  // Handle scroll to show/hide scroll button + scroll depth tracking
   const handleScroll = useCallback(() => {
     if (!messagesAreaRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = messagesAreaRef.current;
     const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
     setShowScrollButton(!isNearBottom);
+
+    // Scroll depth milestones
+    if (scrollHeight > clientHeight) {
+      const scrollPercent = Math.round(((scrollTop + clientHeight) / scrollHeight) * 100);
+      const milestones = [25, 50, 75, 100];
+      for (const m of milestones) {
+        if (scrollPercent >= m && !scrollMilestonesRef.current.has(m)) {
+          scrollMilestonesRef.current.add(m);
+          track(EVENTS.SCROLL_DEPTH, { depth_percent: m });
+        }
+      }
+    }
   }, []);
 
   const imageAllowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -1334,6 +1384,7 @@ function HomePage() {
     }
 
     const fType = classifyFile(file);
+    track(EVENTS.FILE_SELECTED, { file_type: fType, file_size_kb: Math.round(file.size / 1024) });
     setSelectedFile(file);
     setSelectedFileType(fType);
     setFilePreviewUrl(fType === "image" ? URL.createObjectURL(file) : null);
@@ -1344,6 +1395,7 @@ function HomePage() {
   };
 
   const handleFileRemove = () => {
+    track(EVENTS.FILE_UPLOAD_CANCELLED, { file_type: selectedFileType });
     if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
     setSelectedFile(null);
     setFilePreviewUrl(null);
@@ -1353,7 +1405,11 @@ function HomePage() {
   // Character CRUD
   const addChatCharacter = async () => {
     const name = newCharName.trim();
-    if (!name || chatCharacters.length >= 5 || isAddingCharacter) return;
+    if (!name || isAddingCharacter) return;
+    if (chatCharacters.length >= 5) {
+      track(EVENTS.CHARACTER_LIMIT_REACHED);
+      return;
+    }
 
     setIsAddingCharacter(true);
 
@@ -1394,6 +1450,8 @@ function HomePage() {
 
       const data = await res.json();
       setChatCharacters(prev => [...prev, data.character]);
+      track(EVENTS.CHARACTER_CREATED, { name, color: color.name });
+      track(EVENTS.CHARACTER_MODAL_CLOSED, { action: 'added' });
       setNewCharName('');
       setNewCharPersonality('');
       setSelectedColorIndex(0);
@@ -1407,28 +1465,64 @@ function HomePage() {
 
   const removeChatCharacter = async (charId: string) => {
     try {
+      const charToRemove = chatCharacters.find(c => c.id === charId);
       const res = await fetch(`/api/characters?id=${charId}`, { method: 'DELETE' });
       if (res.ok) {
         setChatCharacters(prev => prev.filter(c => c.id !== charId));
+        track(EVENTS.CHARACTER_REMOVED, { character_name: charToRemove?.name });
       }
     } catch (err) {
       console.error('Failed to remove character:', err);
     }
   };
 
-  // Input change handler with @mention detection
+  // Input change handler with @mention detection + typing analytics
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInput(val);
+
+    // Typing started (fire once per composition)
+    if (val.length > 0 && !typingStartedRef.current) {
+      typingStartedRef.current = true;
+      track(EVENTS.TYPING_STARTED);
+    }
+    if (val.length === 0) {
+      typingStartedRef.current = false;
+    }
+
+    // Input abandon timer (30s of no typing after starting)
+    if (inputAbandonTimerRef.current) clearTimeout(inputAbandonTimerRef.current);
+    if (val.length > 0) {
+      inputAbandonTimerRef.current = setTimeout(() => {
+        track(EVENTS.INPUT_ABANDONED, { input_length: val.length });
+      }, 30000);
+    }
+
     if (chatCharacters.length > 0 && (val.endsWith('@') || val.match(/@\w{0,15}$/))) {
+      if (!showMentionDropdown) {
+        track(EVENTS.MENTION_DROPDOWN_SHOWN, { character_count: chatCharacters.length });
+      }
       setShowMentionDropdown(true);
     } else {
       setShowMentionDropdown(false);
     }
   };
 
+  // Input focus handler (debounced to 1 fire per 60s)
+  const handleInputFocus = useCallback(() => {
+    const now = Date.now();
+    if (now - lastFocusTrackRef.current > 60000) {
+      lastFocusTrackRef.current = now;
+      track(EVENTS.INPUT_FOCUSED);
+    }
+  }, []);
+
   const handleSend = async () => {
     if ((!input.trim() && !selectedFile) || chatLoading || !canSendMessage()) return;
+
+    // Clear typing/abandon tracking on send
+    typingStartedRef.current = false;
+    if (inputAbandonTimerRef.current) { clearTimeout(inputAbandonTimerRef.current); inputAbandonTimerRef.current = null; }
 
     const messageToSend = input;
     const fileToUpload = selectedFile;
@@ -1461,6 +1555,7 @@ function HomePage() {
 
         if (!uploadRes.ok) {
           const err = await uploadRes.json();
+          track(EVENTS.FILE_UPLOAD_FAILED, { file_type: fileTypeToUpload, error_type: err.error || 'upload_error' });
           alert(err.error || "Failed to upload file.");
           setInput(messageToSend);
           setSelectedFile(fileToUpload);
@@ -1476,7 +1571,9 @@ function HomePage() {
           fileType: uploadData.fileType || "image",
           fileName: uploadData.fileName || fileToUpload.name,
         };
+        track(EVENTS.FILE_UPLOADED, { file_type: uploadResult.fileType, file_size_kb: Math.round(fileToUpload.size / 1024) });
       } catch {
+        track(EVENTS.FILE_UPLOAD_FAILED, { file_type: fileTypeToUpload, error_type: 'network_error' });
         alert("Failed to upload file. Please try again.");
         setInput(messageToSend);
         setSelectedFile(fileToUpload);
@@ -1569,8 +1666,25 @@ function HomePage() {
     }
   };
 
+  const openCharacterModal = () => {
+    track(EVENTS.CHARACTER_MODAL_OPENED);
+    setShowCharacterModal(true);
+  };
+
+  const openUpgradeModal = () => {
+    track(EVENTS.UPGRADE_MODAL_OPENED);
+    setShowAccountModal(true);
+  };
+
+  const handleChipClick = (chipText: string) => {
+    track(EVENTS.PROMPT_CHIP_CLICKED, { chip_text: chipText });
+    sendMessage(chipText);
+  };
+
   const handleSelectChat = (id: string) => {
+    track(EVENTS.CHAT_SELECTED);
     selectChat(id);
+    scrollMilestonesRef.current.clear();
     if (isMobile) {
       setSidebarOpen(false);
     }
@@ -1596,6 +1710,8 @@ function HomePage() {
 
     // Same plan - nothing to do
     if (currentPlan === newPlan) return;
+
+    track(EVENTS.UPGRADE_INITIATED, { from_plan: currentPlan, to_plan: newPlan });
 
     // DOWNGRADE TO FREE
     if (newPlan === "Free") {
@@ -1760,6 +1876,7 @@ function HomePage() {
       const data = await res.json();
 
       if (res.ok) {
+        track(EVENTS.SUBSCRIPTION_CANCELLED, { from_plan: session.user.plan });
         // Show success modal
         setConfirmModal({
           show: true,
@@ -2243,6 +2360,7 @@ function HomePage() {
                   className="social-btn social-btn-google"
                   onClick={(e) => {
                     handleRipple(e);
+                    track(EVENTS.USER_LOGGED_IN, { method: 'google' });
                     signIn("google");
                   }}
                   type="button"
@@ -2259,6 +2377,7 @@ function HomePage() {
                   className="social-btn social-btn-github"
                   onClick={(e) => {
                     handleRipple(e);
+                    track(EVENTS.USER_LOGGED_IN, { method: 'github' });
                     signIn("github");
                   }}
                   type="button"
@@ -2401,21 +2520,21 @@ function HomePage() {
 
           {onboardingScreen === 1 && (
             <OnboardingScreen1
-              onNext={() => setOnboardingScreen(2)}
-              onSkip={completeOnboarding}
+              onNext={() => { track(EVENTS.ONBOARDING_SCREEN_VIEWED, { screen_number: 2 }); setOnboardingScreen(2); }}
+              onSkip={() => completeOnboarding(1)}
             />
           )}
 
           {onboardingScreen === 2 && (
             <OnboardingScreen2
-              onNext={() => setOnboardingScreen(3)}
-              onSkip={completeOnboarding}
+              onNext={() => { track(EVENTS.ONBOARDING_SCREEN_VIEWED, { screen_number: 3 }); setOnboardingScreen(3); }}
+              onSkip={() => completeOnboarding(2)}
             />
           )}
 
           {onboardingScreen === 3 && (
             <OnboardingScreen3
-              onComplete={completeOnboarding}
+              onComplete={() => completeOnboarding()}
             />
           )}
         </div>
@@ -2652,7 +2771,7 @@ function HomePage() {
                   <div
                     key={char.id}
                     className="char-circle-header"
-                    onClick={() => setShowCharacterModal(true)}
+                    onClick={() => openCharacterModal()}
                     title={char.name}
                     style={{
                       width: 26, height: 26, borderRadius: '50%',
@@ -2670,7 +2789,7 @@ function HomePage() {
               </div>
               <button
                 className="add-char-btn"
-                onClick={() => setShowCharacterModal(true)}
+                onClick={() => openCharacterModal()}
                 title="Add chat character"
                 style={{
                   width: 34, height: 34, borderRadius: 8,
@@ -2785,7 +2904,7 @@ function HomePage() {
                         {/* First set */}
                         <button
                           style={currentStyles.quickChip}
-                          onClick={() => sendMessage('Roast my business idea brutally')}
+                          onClick={() => handleChipClick('Roast my business idea brutally')}
                           onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
                           onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
                         >
@@ -2793,7 +2912,7 @@ function HomePage() {
                         </button>
                         <button
                           style={currentStyles.quickChip}
-                          onClick={() => sendMessage('Give me brutally honest life advice')}
+                          onClick={() => handleChipClick('Give me brutally honest life advice')}
                           onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
                           onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
                         >
@@ -2801,7 +2920,7 @@ function HomePage() {
                         </button>
                         <button
                           style={currentStyles.quickChip}
-                          onClick={() => sendMessage('Write something unhinged and creative')}
+                          onClick={() => handleChipClick('Write something unhinged and creative')}
                           onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
                           onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
                         >
@@ -2809,7 +2928,7 @@ function HomePage() {
                         </button>
                         <button
                           style={currentStyles.quickChip}
-                          onClick={() => sendMessage('Settle this debate for me once and for all')}
+                          onClick={() => handleChipClick('Settle this debate for me once and for all')}
                           onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
                           onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
                         >
@@ -2817,7 +2936,7 @@ function HomePage() {
                         </button>
                         <button
                           style={currentStyles.quickChip}
-                          onClick={() => sendMessage('Help me cook up a savage comeback')}
+                          onClick={() => handleChipClick('Help me cook up a savage comeback')}
                           onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
                           onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
                         >
@@ -2825,7 +2944,7 @@ function HomePage() {
                         </button>
                         <button
                           style={currentStyles.quickChip}
-                          onClick={() => sendMessage('Tell me what I need to hear not what I want to hear')}
+                          onClick={() => handleChipClick('Tell me what I need to hear not what I want to hear')}
                           onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
                           onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
                         >
@@ -2834,7 +2953,7 @@ function HomePage() {
                         {/* Duplicate set for seamless loop */}
                         <button
                           style={currentStyles.quickChip}
-                          onClick={() => sendMessage('Roast my business idea brutally')}
+                          onClick={() => handleChipClick('Roast my business idea brutally')}
                           onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
                           onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
                         >
@@ -2842,7 +2961,7 @@ function HomePage() {
                         </button>
                         <button
                           style={currentStyles.quickChip}
-                          onClick={() => sendMessage('Give me brutally honest life advice')}
+                          onClick={() => handleChipClick('Give me brutally honest life advice')}
                           onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
                           onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
                         >
@@ -2850,7 +2969,7 @@ function HomePage() {
                         </button>
                         <button
                           style={currentStyles.quickChip}
-                          onClick={() => sendMessage('Write something unhinged and creative')}
+                          onClick={() => handleChipClick('Write something unhinged and creative')}
                           onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
                           onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
                         >
@@ -2858,7 +2977,7 @@ function HomePage() {
                         </button>
                         <button
                           style={currentStyles.quickChip}
-                          onClick={() => sendMessage('Settle this debate for me once and for all')}
+                          onClick={() => handleChipClick('Settle this debate for me once and for all')}
                           onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
                           onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
                         >
@@ -2866,7 +2985,7 @@ function HomePage() {
                         </button>
                         <button
                           style={currentStyles.quickChip}
-                          onClick={() => sendMessage('Help me cook up a savage comeback')}
+                          onClick={() => handleChipClick('Help me cook up a savage comeback')}
                           onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
                           onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
                         >
@@ -2874,7 +2993,7 @@ function HomePage() {
                         </button>
                         <button
                           style={currentStyles.quickChip}
-                          onClick={() => sendMessage('Tell me what I need to hear not what I want to hear')}
+                          onClick={() => handleChipClick('Tell me what I need to hear not what I want to hear')}
                           onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
                           onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
                         >
@@ -2913,7 +3032,7 @@ function HomePage() {
                         {" "}
                         <span
                           style={currentStyles.upgradeLink}
-                          onClick={() => setShowAccountModal(true)}
+                          onClick={() => openUpgradeModal()}
                         >
                           Upgrade your plan
                         </span> for more messages.
@@ -2935,6 +3054,7 @@ function HomePage() {
                               key={char.id}
                               className="mention-dropdown-item"
                               onClick={() => {
+                                track(EVENTS.MENTION_DROPDOWN_SELECTED, { character_name: char.name, characters_available: chatCharacters.length });
                                 const atIdx = input.lastIndexOf('@');
                                 setInput(input.substring(0, atIdx) + '@' + char.name + ' ');
                                 setShowMentionDropdown(false);
@@ -3039,6 +3159,7 @@ function HomePage() {
                           value={input}
                           onChange={handleInputChange}
                           onKeyDown={handleKeyDown}
+                          onFocus={handleInputFocus}
                           onInput={(e) => {
                             const el = e.currentTarget;
                             el.style.height = 'auto';
@@ -3116,7 +3237,7 @@ function HomePage() {
                                   <span>Add Files</span>
                                 </div>
                               </button>
-                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); openUpgradeModal(); }}>
                                 <div style={currentStyles.plusMenuItemContent}>
                                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <circle cx="12" cy="12" r="4" />
@@ -3128,7 +3249,7 @@ function HomePage() {
                               </button>
                               <button style={currentStyles.plusMenuItem} onClick={() => {
                                 setShowPlusMenu(false);
-                                setShowCharacterModal(true);
+                                openCharacterModal();
                               }}>
                                 <div style={currentStyles.plusMenuItemContent}>
                                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3141,7 +3262,7 @@ function HomePage() {
                             </div>
                           )}
                         </div>
-                        <button style={currentStyles.attachBtn} title="Voice input" onClick={() => setShowAccountModal(true)}>
+                        <button style={currentStyles.attachBtn} title="Voice input" onClick={() => openUpgradeModal()}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                             <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
                             <path d="M19 10v2a7 7 0 01-14 0v-2"/>
@@ -3679,6 +3800,7 @@ function HomePage() {
                         value={input}
                         onChange={handleInputChange}
                         onKeyDown={handleKeyDown}
+                        onFocus={handleInputFocus}
                         onInput={(e) => {
                           const el = e.currentTarget;
                           el.style.height = 'auto';
@@ -3768,7 +3890,7 @@ function HomePage() {
                             </button>
                             <button style={currentStyles.plusMenuItem} onClick={() => {
                               setShowPlusMenu(false);
-                              setShowCharacterModal(true);
+                              openCharacterModal();
                             }}>
                               <div style={currentStyles.plusMenuItemContent}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3781,7 +3903,7 @@ function HomePage() {
                           </div>
                         )}
                       </div>
-                      <button style={currentStyles.attachBtn} title="Voice input" onClick={() => setShowAccountModal(true)}>
+                      <button style={currentStyles.attachBtn} title="Voice input" onClick={() => openUpgradeModal()}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                           <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
                           <path d="M19 10v2a7 7 0 01-14 0v-2"/>
@@ -4360,7 +4482,7 @@ function HomePage() {
             zIndex: 300,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowCharacterModal(false); }}
+          onClick={(e) => { if (e.target === e.currentTarget) { track(EVENTS.CHARACTER_MODAL_CLOSED, { action: 'clicked_outside' }); setShowCharacterModal(false); } }}
         >
           <div style={{
             background: theme === 'dark' ? '#141416' : '#EDECE8',
@@ -4377,7 +4499,7 @@ function HomePage() {
             }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: theme === 'dark' ? '#F0EDE8' : '#1A1918' }}>Chat Characters</div>
               <button
-                onClick={() => setShowCharacterModal(false)}
+                onClick={() => { track(EVENTS.CHARACTER_MODAL_CLOSED, { action: 'cancelled' }); setShowCharacterModal(false); }}
                 style={{
                   width: 32, height: 32, borderRadius: 8,
                   border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
@@ -4563,7 +4685,7 @@ function HomePage() {
               borderTop: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
             }}>
               <button
-                onClick={() => setShowCharacterModal(false)}
+                onClick={() => { track(EVENTS.CHARACTER_MODAL_CLOSED, { action: 'cancelled' }); setShowCharacterModal(false); }}
                 style={{
                   padding: '10px 20px', borderRadius: 10,
                   border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.13)'}`,
@@ -4692,7 +4814,7 @@ function HomePage() {
                       <span style={{ fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase' as const, background: 'linear-gradient(135deg, #E8A04C, #E8624C)', color: '#0C0C0E' }}>New</span>
                     </div>
                     <div style={{ fontSize: 12, color: '#8A8690', lineHeight: 1.45 }}>Add up to 5 AI characters to any chat. They each have their own personality and can disagree with each other.</div>
-                    <div className="wn-tutorial-link" onClick={() => setWhatsNewScreen(2)}>
+                    <div className="wn-tutorial-link" onClick={() => { track(EVENTS.WHATS_NEW_SCREEN_VIEWED, { screen_number: 2 }); setWhatsNewScreen(2); }}>
                       See how it works
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
@@ -4746,7 +4868,7 @@ function HomePage() {
                   <div className="wn-dot"></div>
                   <div className="wn-dot"></div>
                 </div>
-                <button className="wn-btn-primary" onClick={() => setWhatsNewScreen(2)}>
+                <button className="wn-btn-primary" onClick={() => { track(EVENTS.WHATS_NEW_SCREEN_VIEWED, { screen_number: 2 }); setWhatsNewScreen(2); }}>
                   Show me
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
@@ -4803,7 +4925,7 @@ function HomePage() {
                   <div className="wn-dot"></div>
                   <div className="wn-dot"></div>
                 </div>
-                <button className="wn-btn-primary" onClick={() => setWhatsNewScreen(3)}>
+                <button className="wn-btn-primary" onClick={() => { track(EVENTS.WHATS_NEW_SCREEN_VIEWED, { screen_number: 3 }); setWhatsNewScreen(3); }}>
                   Next
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
@@ -4876,7 +4998,7 @@ function HomePage() {
                   <div className="wn-dot active"></div>
                   <div className="wn-dot"></div>
                 </div>
-                <button className="wn-btn-primary" onClick={() => setWhatsNewScreen(4)}>
+                <button className="wn-btn-primary" onClick={() => { track(EVENTS.WHATS_NEW_SCREEN_VIEWED, { screen_number: 4 }); setWhatsNewScreen(4); }}>
                   Next
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
@@ -4940,7 +5062,7 @@ function HomePage() {
                   <div className="wn-dot done"></div>
                   <div className="wn-dot active"></div>
                 </div>
-                <button className="wn-btn-primary" onClick={dismissWhatsNew}>
+                <button className="wn-btn-primary" onClick={() => { track(EVENTS.WHATS_NEW_COMPLETED); dismissWhatsNew(); }}>
                   <svg width="16" height="16" viewBox="0 0 100 100" fill="none"><path d="M56 4L30 48H50L28 96L74 44H52L72 4Z" fill="#0C0C0E"/></svg>
                   Let&apos;s go
                 </button>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { PLAN_LIMITS } from '@/lib/constants';
+import { track, incrementUserProperty, EVENTS } from '@/lib/analytics';
 
 type Message = {
   id: string;
@@ -67,6 +68,12 @@ export function useChats() {
   const pendingChatIdRef = useRef<string | null>(null);
   // AbortController for canceling ongoing requests
   const abortControllerRef = useRef<AbortController | null>(null);
+  // Fire daily_limit_reached only once per session
+  const dailyLimitFiredRef = useRef(false);
+  // Milestone tracking refs (seeded from session on first render)
+  const firstMessageSentRef = useRef(false);
+  const totalMessageCountRef = useRef(0);
+  const activationMilestonesRef = useRef(new Set<number>());
 
   // Wrapper to persist currentChatId to localStorage
   const setCurrentChatId = (chatId: string | null) => {
@@ -183,6 +190,24 @@ export function useChats() {
     return trimmed.length > 30 ? trimmed.slice(0, 30) + "..." : trimmed;
   };
 
+  // Topic detection for analytics (reuses patterns from generateTitleFromText)
+  const detectTopic = (text: string): string | null => {
+    const t = text.toLowerCase();
+    if (/\b(hi|hello|hey|heyy|hiii|sup|yo)\b/.test(t)) return 'greeting';
+    if (t.includes('help') && t.includes('code')) return 'coding';
+    if (t.includes('sql') || t.includes('query') || t.includes('database')) return 'database';
+    if (t.includes('design') || t.includes('ui') || t.includes('ux')) return 'design';
+    if (t.includes('data') && (t.includes('story') || t.includes('analysis'))) return 'data_analysis';
+    if (t.includes('weight') || t.includes('gym') || t.includes('fitness') || t.includes('workout')) return 'fitness';
+    if (t.includes('recipe') || t.includes('cook') || t.includes('food')) return 'cooking';
+    if (t.includes('advice') || t.includes('should i') || t.includes('what do you think')) return 'advice';
+    if (t.includes('explain') || t.includes('what is') || t.includes('how does')) return 'learning';
+    if (t.includes('debug') || t.includes('error') || t.includes('bug')) return 'debugging';
+    if (t.includes('relationship') || t.includes('boyfriend') || t.includes('girlfriend') || t.includes('partner') || t.includes('mama') || t.includes('dad') || t.includes('family')) return 'relationships';
+    if (t.includes('business') || t.includes('startup') || t.includes('revenue') || t.includes('marketing')) return 'business';
+    return null;
+  };
+
   const createNewChat = async () => {
     try {
       const res = await fetch('/api/chats', {
@@ -200,6 +225,7 @@ export function useChats() {
 
       // DON'T add to chats list yet - wait for first message
       setCurrentChatId(data.chat.id);
+      track(EVENTS.CHAT_CREATED, { source: 'new_chat' });
       return data.chat.id;
     } catch (error) {
       console.error('Failed to create chat:', error);
@@ -236,6 +262,7 @@ export function useChats() {
         return [newChat, ...prev];
       });
       setCurrentChatId(data.chat.id);
+      track(EVENTS.CHAT_CREATED, { source: 'character_flow' });
       return data.chat.id;
     } catch (error) {
       console.error('Failed to create chat:', error);
@@ -244,7 +271,14 @@ export function useChats() {
   };
 
   const sendMessage = async (input: string, imageUrl?: string, fileData?: { url: string; fileType: string; fileName: string }, characterId?: string) => {
-    if (!input.trim() || isLoading || !canSendMessage()) return;
+    if (!input.trim() || isLoading) return;
+    if (!canSendMessage()) {
+      if (!dailyLimitFiredRef.current) {
+        dailyLimitFiredRef.current = true;
+        track(EVENTS.DAILY_LIMIT_REACHED, { plan: session?.user?.plan });
+      }
+      return;
+    }
 
     // Images/files cost 2 messages, text costs 1
     const messageCost = (imageUrl || fileData) ? 2 : 1;
@@ -314,8 +348,43 @@ export function useChats() {
       );
     }
 
+    // Track message sent
+    track(EVENTS.MESSAGE_SENT, {
+      message_length: input.length,
+      has_attachment: !!(imageUrl || fileData),
+      is_first_message: isFirstMessage,
+    });
+    incrementUserProperty('total_messages');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('mp_message_sent'));
+    }
+    if (characterId) {
+      track(EVENTS.CHARACTER_MENTIONED, { character_id: characterId });
+    }
+
+    // Topic detection
+    const topic = detectTopic(input);
+    if (topic) {
+      track(EVENTS.TOPIC_DETECTED, { topic });
+    }
+
+    // First message ever + activation milestones
+    if (!firstMessageSentRef.current) {
+      firstMessageSentRef.current = true;
+      track(EVENTS.FIRST_MESSAGE_SENT);
+    }
+    totalMessageCountRef.current += 1;
+    const milestoneThresholds = [3, 10, 50];
+    for (const threshold of milestoneThresholds) {
+      if (totalMessageCountRef.current === threshold && !activationMilestonesRef.current.has(threshold)) {
+        activationMilestonesRef.current.add(threshold);
+        track(EVENTS.ACTIVATION_MILESTONE, { total_messages: threshold });
+      }
+    }
+
     let realChatId = activeChatId;
     let streamedContent = ''; // Declare here so it's accessible in catch block
+    let responseStartTime = Date.now();
 
     try {
       // Create chat in background if needed, then send message
@@ -336,6 +405,7 @@ export function useChats() {
 
       // Create new AbortController for this request
       abortControllerRef.current = new AbortController();
+      responseStartTime = Date.now();
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -367,6 +437,15 @@ export function useChats() {
 
       streamedContent = ''; // Reset for this request (declared before try block)
       let receivedDone = false;
+      let receivedCharacterInfo: { name?: string } | null = null;
+      let chunkCount = 0;
+      const streamStartTime = Date.now();
+      let streamingStartTracked = false;
+
+      // Timeout check
+      if (Date.now() - responseStartTime > 30000) {
+        track(EVENTS.AI_RESPONSE_TIMEOUT, { wait_ms: Date.now() - responseStartTime });
+      }
 
       while (true) {
         const { done, value } = await reader.read();
@@ -380,6 +459,12 @@ export function useChats() {
             try {
               const data = JSON.parse(line.slice(6));
 
+              // Track streaming_started on first data chunk
+              if (!streamingStartTracked && !data.searching) {
+                streamingStartTracked = true;
+                track(EVENTS.STREAMING_STARTED);
+              }
+
               if (data.searching !== undefined) {
                 setIsSearching(data.searching);
                 setSearchQuery(data.query || null);
@@ -387,6 +472,7 @@ export function useChats() {
 
               // Handle characterInfo - apply character styling to assistant message
               if (data.characterInfo) {
+                receivedCharacterInfo = { name: data.characterInfo.name };
                 const ci = data.characterInfo;
                 setChats(prev =>
                   prev.map(c =>
@@ -453,6 +539,7 @@ export function useChats() {
 
               if (data.text) {
                 streamedContent += data.text;
+                chunkCount++;
                 // Update assistant message content in real-time
                 // Check both activeChatId and realChatId in case ID update hasn't propagated
                 const contentToSet = streamedContent; // Capture in closure to avoid race conditions
@@ -489,6 +576,39 @@ export function useChats() {
                 receivedDone = true;
                 // Update local message count (images/files cost 2)
                 setLocalMessagesUsed(prev => (prev ?? 0) + messageCost);
+                const responseTimeMs = Date.now() - responseStartTime;
+                track(EVENTS.MESSAGE_RECEIVED, {
+                  response_time_ms: responseTimeMs,
+                  response_length: streamedContent.length,
+                  is_character: !!receivedCharacterInfo,
+                  character_name: receivedCharacterInfo?.name,
+                });
+                if (receivedCharacterInfo) {
+                  track(EVENTS.CHARACTER_RESPONSE_RECEIVED, {
+                    character_name: receivedCharacterInfo.name,
+                    response_time_ms: responseTimeMs,
+                    response_length: streamedContent.length,
+                  });
+                }
+
+                // Streaming quality events
+                track(EVENTS.STREAMING_COMPLETED, {
+                  total_chunks: chunkCount,
+                  duration_ms: Date.now() - streamStartTime,
+                });
+                if (streamedContent.trim() === '') {
+                  track(EVENTS.AI_RESPONSE_EMPTY);
+                }
+
+                // Conversation depth milestones
+                const chatForDepth = chats.find(c => c.id === realChatId || c.id === activeChatId);
+                const messageCount = (chatForDepth?.messages.length || 0) + 2; // +2 for current pair
+                const depthMilestones = [5, 10, 20];
+                for (const dm of depthMilestones) {
+                  if (messageCount >= dm && messageCount < dm + 2) {
+                    track(EVENTS.CONVERSATION_DEPTH_MILESTONE, { depth: dm });
+                  }
+                }
               }
 
               if (data.error) {
@@ -538,6 +658,10 @@ export function useChats() {
       // If user stopped the generation, don't show error - keep whatever was streamed
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('Generation stopped by user');
+        track(EVENTS.STREAMING_INTERRUPTED, {
+          streamed_length: streamedContent.length,
+          duration_ms: Date.now() - responseStartTime,
+        });
         // Backend already counted this message, so update frontend count
         setLocalMessagesUsed(prev => (prev ?? 0) + messageCost);
         // Remove empty assistant message if no content was streamed
@@ -552,6 +676,9 @@ export function useChats() {
       }
 
       console.error('Error sending message:', error);
+      track(EVENTS.AI_RESPONSE_ERROR, {
+        error_type: error instanceof Error ? error.message.slice(0, 100) : 'unknown',
+      });
       // Instead of removing messages, show an error state that allows retry
       setChats(prev => {
         return prev.map(c =>
@@ -637,6 +764,8 @@ export function useChats() {
         if (wasCurrentChat) {
           setCurrentChatId(chatId);
         }
+      } else {
+        track(EVENTS.CHAT_DELETED);
       }
     } catch (error) {
       console.error('Failed to delete chat:', error);
@@ -650,6 +779,7 @@ export function useChats() {
   // Edit a user message and resend to get new AI response
   const editMessage = async (messageId: string, newContent: string) => {
     if (!currentChatId || isLoading || !canSendMessage()) return;
+    track(EVENTS.MESSAGE_EDITED);
 
     const chat = chats.find(c => c.id === currentChatId);
     if (!chat) return;
@@ -690,6 +820,7 @@ export function useChats() {
     );
 
     let streamedContent = ''; // Declare here so it's accessible in catch block
+    let editResponseStartTime = Date.now();
 
     try {
       // Create new AbortController for this request
@@ -706,6 +837,8 @@ export function useChats() {
         signal: abortControllerRef.current.signal,
       });
 
+      editResponseStartTime = Date.now();
+
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.error || 'Failed to send message');
@@ -721,6 +854,9 @@ export function useChats() {
 
       streamedContent = ''; // Reset for this request (declared before try block)
       let receivedDone = false;
+      let editChunkCount = 0;
+      const editStreamStart = Date.now();
+      let editStreamingStartTracked = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -733,6 +869,12 @@ export function useChats() {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
+
+              // Track streaming_started on first data chunk
+              if (!editStreamingStartTracked && !data.searching) {
+                editStreamingStartTracked = true;
+                track(EVENTS.STREAMING_STARTED);
+              }
 
               if (data.searching !== undefined) {
                 setIsSearching(data.searching);
@@ -779,6 +921,7 @@ export function useChats() {
 
               if (data.text) {
                 streamedContent += data.text;
+                editChunkCount++;
                 const contentToSet = streamedContent; // Capture in closure to avoid race conditions
                 setChats(prev =>
                   prev.map(c =>
@@ -800,6 +943,13 @@ export function useChats() {
               if (data.done) {
                 receivedDone = true;
                 setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+                track(EVENTS.STREAMING_COMPLETED, {
+                  total_chunks: editChunkCount,
+                  duration_ms: Date.now() - editStreamStart,
+                });
+                if (streamedContent.trim() === '') {
+                  track(EVENTS.AI_RESPONSE_EMPTY);
+                }
               }
 
               if (data.error) {
@@ -821,6 +971,10 @@ export function useChats() {
       // If user stopped the generation, don't show error - keep whatever was streamed
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('Generation stopped by user');
+        track(EVENTS.STREAMING_INTERRUPTED, {
+          streamed_length: streamedContent.length,
+          duration_ms: Date.now() - editResponseStartTime,
+        });
         // Backend already counted this message, so update frontend count
         setLocalMessagesUsed(prev => (prev ?? 0) + 1);
         if (!streamedContent) {
@@ -834,6 +988,9 @@ export function useChats() {
       }
 
       console.error('Error editing message:', error);
+      track(EVENTS.AI_RESPONSE_ERROR, {
+        error_type: error instanceof Error ? error.message.slice(0, 100) : 'unknown',
+      });
       // Instead of removing messages, show an error state that allows retry
       setChats(prev =>
         prev.map(c =>
@@ -860,6 +1017,7 @@ export function useChats() {
   // Regenerate the AI response for a user message
   const regenerateResponse = async (userMessageId: string) => {
     if (!currentChatId || isLoading || !canSendMessage()) return;
+    track(EVENTS.MESSAGE_REGENERATED);
 
     const chat = chats.find(c => c.id === currentChatId);
     if (!chat) return;
@@ -895,6 +1053,7 @@ export function useChats() {
     );
 
     let streamedContent = ''; // Declare here so it's accessible in catch block
+    let regenResponseStartTime = Date.now();
 
     try {
       // Create new AbortController for this request
@@ -912,6 +1071,8 @@ export function useChats() {
         signal: abortControllerRef.current.signal,
       });
 
+      regenResponseStartTime = Date.now();
+
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.error || 'Failed to regenerate');
@@ -927,6 +1088,9 @@ export function useChats() {
 
       streamedContent = ''; // Reset for this request (declared before try block)
       let receivedDone = false;
+      let regenChunkCount = 0;
+      const regenStreamStart = Date.now();
+      let regenStreamingStartTracked = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -939,6 +1103,12 @@ export function useChats() {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
+
+              // Track streaming_started on first data chunk
+              if (!regenStreamingStartTracked && !data.searching) {
+                regenStreamingStartTracked = true;
+                track(EVENTS.STREAMING_STARTED);
+              }
 
               if (data.searching !== undefined) {
                 setIsSearching(data.searching);
@@ -985,6 +1155,7 @@ export function useChats() {
 
               if (data.text) {
                 streamedContent += data.text;
+                regenChunkCount++;
                 const contentToSet = streamedContent; // Capture in closure to avoid race conditions
                 setChats(prev =>
                   prev.map(c =>
@@ -1006,6 +1177,13 @@ export function useChats() {
               if (data.done) {
                 receivedDone = true;
                 setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+                track(EVENTS.STREAMING_COMPLETED, {
+                  total_chunks: regenChunkCount,
+                  duration_ms: Date.now() - regenStreamStart,
+                });
+                if (streamedContent.trim() === '') {
+                  track(EVENTS.AI_RESPONSE_EMPTY);
+                }
               }
 
               if (data.error) {
@@ -1029,6 +1207,10 @@ export function useChats() {
       // If user stopped the generation, don't show error - keep whatever was streamed
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('Generation stopped by user');
+        track(EVENTS.STREAMING_INTERRUPTED, {
+          streamed_length: streamedContent.length,
+          duration_ms: Date.now() - regenResponseStartTime,
+        });
         // Backend already counted this message, so update frontend count
         setLocalMessagesUsed(prev => (prev ?? 0) + 1);
         if (!streamedContent) {
@@ -1042,6 +1224,9 @@ export function useChats() {
       }
 
       console.error('Error regenerating response:', error);
+      track(EVENTS.AI_RESPONSE_ERROR, {
+        error_type: error instanceof Error ? error.message.slice(0, 100) : 'unknown',
+      });
       // Instead of removing messages, show an error state that allows retry
       setChats(prev =>
         prev.map(c =>
