@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import Anthropic from "@anthropic-ai/sdk";
 import { webSearch, formatSearchResults } from "@/lib/search";
 import { getEffectivePlan, getPlanLimit } from "@/lib/plans";
+import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from "@/lib/rate-limit";
 
 // SECURITY: Sanitize title to prevent XSS and prompt injection artifacts
 function sanitizeTitle(title: string): string {
@@ -32,6 +33,33 @@ const supabase = createClient(
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 });
+
+// API credit exhaustion circuit breaker
+// When Anthropic returns a billing/credit error, block all requests for 10 minutes
+// instead of letting every user hit the same error
+let apiDownUntil: number = 0;
+const API_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+
+function isApiDown(): boolean {
+  return Date.now() < apiDownUntil;
+}
+
+function markApiDown() {
+  apiDownUntil = Date.now() + API_COOLDOWN_MS;
+  console.error(`[CIRCUIT BREAKER] Anthropic API credit exhausted. Blocking requests until ${new Date(apiDownUntil).toISOString()}`);
+}
+
+function isAnthropicCreditError(error: unknown): boolean {
+  if (error instanceof Anthropic.APIError) {
+    // 402 = payment required, 429 with billing message = credit exhausted
+    if (error.status === 402) return true;
+    if (error.status === 429 && /credit|billing|balance|quota/i.test(error.message)) return true;
+  }
+  if (error instanceof Error) {
+    return /credit|billing|balance|insufficient.*fund/i.test(error.message);
+  }
+  return false;
+}
 
 // Web search tool definition
 const tools: Anthropic.Tool[] = [
@@ -113,6 +141,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Please log in to use the chat." },
         { status: 401 }
+      );
+    }
+
+    // Circuit breaker: if API credits are exhausted, show maintenance message
+    if (isApiDown()) {
+      return NextResponse.json(
+        { error: "We're running a quick system update. Please try again in about 10 minutes!" },
+        { status: 503 }
+      );
+    }
+
+    // Rate limiting - 60 requests per minute
+    const clientIP = getClientIP(req);
+    const rateLimitKey = getUserIPKey(session.user.id, clientIP, 'chat-post');
+    const rateLimitResult = rateLimit(rateLimitKey, RATE_LIMITS.messages);
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: "Too many requests. Please slow down." },
+        { status: 429, headers: rateLimitHeaders(rateLimitResult) }
       );
     }
 
@@ -622,7 +670,12 @@ CHAT CHARACTERS RULES — VERY IMPORTANT:
           controller.close();
         } catch (error) {
           console.error("Streaming error:", error);
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Stream error" })}\n\n`));
+          if (isAnthropicCreditError(error)) {
+            markApiDown();
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "We're running a quick system update. Please try again in about 10 minutes!" })}\n\n`));
+          } else {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Stream error" })}\n\n`));
+          }
           controller.close();
         }
       },
@@ -638,6 +691,13 @@ CHAT CHARACTERS RULES — VERY IMPORTANT:
 
   } catch (error) {
     console.error("Error in /api/chat:", error);
+    if (isAnthropicCreditError(error)) {
+      markApiDown();
+      return NextResponse.json(
+        { error: "We're running a quick system update. Please try again in about 10 minutes!" },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: "Something went wrong talking to Claude." },
       { status: 500 }
