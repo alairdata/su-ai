@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense, useRef, useCallback } from "react
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useChats } from "./hooks/useChats";
 import { useTheme } from "./hooks/useTheme";
+import { useMemories } from "./hooks/useMemories";
 import { useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { track, EVENTS } from "@/lib/analytics";
@@ -623,6 +624,7 @@ const OnboardingScreen3 = ({ onComplete }: { onComplete: () => void }) => {
 function HomePage() {
   const { data: session, status, update: updateSession } = useSession();
   const { theme, toggleTheme } = useTheme();
+  const { memories, isLoading: isMemoriesLoading, plan: memoryPlan, fetchMemories, deleteMemory: deleteMemoryItem, clearAll: clearAllMemories } = useMemories();
   const searchParams = useSearchParams();
   
   const [authMode, setAuthMode] = useState<AuthMode>("signin");
@@ -1033,12 +1035,13 @@ function HomePage() {
     }
   };
 
-  // Sync selected timezone when modal opens
+  // Sync selected timezone and fetch memories when modal opens
   useEffect(() => {
     if (showAccountModal && session?.user) {
       setSelectedTimezone(session.user.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
+      fetchMemories();
     }
-  }, [showAccountModal, session]);
+  }, [showAccountModal, session, fetchMemories]);
 
   // Update user's timezone
   const updateTimezone = async (newTimezone: string) => {
@@ -4310,6 +4313,132 @@ function HomePage() {
                   </div>
                   </div>
 
+                </div>
+
+                {/* AI Memory Section */}
+                <div style={currentStyles.modalSection}>
+                  <h3 style={currentStyles.modalSectionTitle}>AI Memory</h3>
+                  <p style={{ fontSize: '13px', color: theme === 'dark' ? '#888' : '#666', marginBottom: '12px' }}>
+                    The AI remembers things about you across conversations to give more personal responses.
+                  </p>
+                  {memoryPlan === 'Free' || (!memoryPlan && session?.user?.plan === 'Free') ? (
+                    <div style={{
+                      padding: '16px',
+                      background: theme === 'dark' ? 'rgba(232, 160, 76, 0.08)' : 'rgba(208, 138, 48, 0.06)',
+                      border: `1px solid ${theme === 'dark' ? 'rgba(232, 160, 76, 0.2)' : 'rgba(208, 138, 48, 0.2)'}`,
+                      borderRadius: '10px',
+                      textAlign: 'center',
+                    }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={theme === 'dark' ? '#E8A04C' : '#D08A30'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
+                        <path d="M12 2a10 10 0 0 1 10 10 10 10 0 0 1-10 10A10 10 0 0 1 2 12 10 10 0 0 1 12 2z"/>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                      </svg>
+                      <p style={{ fontSize: '14px', fontWeight: 500, color: theme === 'dark' ? '#E8A04C' : '#D08A30', marginBottom: '4px' }}>
+                        Upgrade to Pro to enable AI Memory
+                      </p>
+                      <p style={{ fontSize: '12px', color: theme === 'dark' ? '#888' : '#999' }}>
+                        The AI will remember your name, preferences, and interests across conversations.
+                      </p>
+                    </div>
+                  ) : isMemoriesLoading ? (
+                    <div style={{ textAlign: 'center', padding: '20px', color: theme === 'dark' ? '#888' : '#999' }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                        <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                      </svg>
+                    </div>
+                  ) : memories.length === 0 ? (
+                    <div style={{
+                      padding: '16px',
+                      background: theme === 'dark' ? '#1a1a1c' : '#f9f9f8',
+                      borderRadius: '10px',
+                      textAlign: 'center',
+                      color: theme === 'dark' ? '#888' : '#999',
+                      fontSize: '13px',
+                    }}>
+                      No memories yet. As you chat, the AI will automatically learn about you.
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        marginBottom: '10px',
+                      }}>
+                        {memories.map((memory) => (
+                          <div key={memory.id} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 10px',
+                            background: theme === 'dark' ? '#1a1a1c' : '#f9f9f8',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                          }}>
+                            <span style={{
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              textTransform: 'uppercase',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: memory.category === 'personal' ? (theme === 'dark' ? 'rgba(100,210,255,0.15)' : 'rgba(59,130,246,0.1)')
+                                : memory.category === 'preference' ? (theme === 'dark' ? 'rgba(179,136,255,0.15)' : 'rgba(139,92,246,0.1)')
+                                : memory.category === 'interest' ? (theme === 'dark' ? 'rgba(105,240,174,0.15)' : 'rgba(34,197,94,0.1)')
+                                : (theme === 'dark' ? 'rgba(232,160,76,0.15)' : 'rgba(234,179,8,0.1)'),
+                              color: memory.category === 'personal' ? (theme === 'dark' ? '#64D2FF' : '#3b82f6')
+                                : memory.category === 'preference' ? (theme === 'dark' ? '#B388FF' : '#8b5cf6')
+                                : memory.category === 'interest' ? (theme === 'dark' ? '#69F0AE' : '#22c55e')
+                                : (theme === 'dark' ? '#E8A04C' : '#eab308'),
+                              flexShrink: 0,
+                              letterSpacing: '0.5px',
+                            }}>
+                              {memory.category}
+                            </span>
+                            <span style={{ flex: 1, color: theme === 'dark' ? '#ccc' : '#333', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {memory.content}
+                            </span>
+                            <button
+                              onClick={() => deleteMemoryItem(memory.id)}
+                              title="Delete memory"
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: theme === 'dark' ? '#555' : '#ccc',
+                                cursor: 'pointer',
+                                padding: '2px',
+                                flexShrink: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        onClick={clearAllMemories}
+                        style={{
+                          background: 'none',
+                          border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
+                          color: theme === 'dark' ? '#888' : '#999',
+                          fontSize: '12px',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          width: '100%',
+                        }}
+                      >
+                        Clear all memories ({memories.length})
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Support Section */}

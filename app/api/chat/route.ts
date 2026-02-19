@@ -6,6 +6,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { webSearch, formatSearchResults } from "@/lib/search";
 import { getEffectivePlan, getPlanLimit } from "@/lib/plans";
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from "@/lib/rate-limit";
+import { extractMemories, getMemoriesForPrompt, getUserMemories } from "@/lib/memory";
 
 // SECURITY: Sanitize title to prevent XSS and prompt injection artifacts
 function sanitizeTitle(title: string): string {
@@ -337,9 +338,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Build messages for API — summarize old context, keep recent messages raw
-    const MAX_HISTORY = 10;
-    const RECENT_RAW = 4; // Keep last 4 messages as-is
+    // Paid users get expanded context window
+    const hasMemoryAccess = userPlan !== 'Free';
+    const MAX_HISTORY = hasMemoryAccess ? 20 : 10;
+    const RECENT_RAW = hasMemoryAccess ? 6 : 4;
     const historyMessages = allMessages.slice(-MAX_HISTORY);
 
     let apiMessages: Anthropic.MessageParam[];
@@ -430,6 +432,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Fetch user memories for prompt injection (paid users only, non-character messages)
+    let memoryBlock = "";
+    if (hasMemoryAccess && !mentionedCharacter) {
+      memoryBlock = await getMemoriesForPrompt(session.user.id);
+    }
+
     // Build effective system prompt
     const effectiveSystemPrompt = mentionedCharacter
       ? `You are ${mentionedCharacter.name}. ${mentionedCharacter.personality || 'You are a helpful AI character.'}
@@ -450,7 +458,7 @@ IMPORTANT IDENTITY RULES:
 - If asked who you are, just describe yourself based on your personality. You are ${mentionedCharacter.name}, period.
 - If asked about the main AI or other characters, talk about them as separate people: "The main AI thinks X, but I think Y."
 - Stay in character at ALL times. Never break the fourth wall.`
-      : SYSTEM_PROMPT + (allMessages.some(m => m.character_name) ? `
+      : SYSTEM_PROMPT + memoryBlock + (allMessages.some(m => m.character_name) ? `
 
 CHAT CHARACTERS RULES — VERY IMPORTANT:
 - This conversation includes Chat Characters (other AI personas added by the user).
@@ -664,6 +672,13 @@ CHAT CHARACTERS RULES — VERY IMPORTANT:
           }
 
           await Promise.all(savePromises);
+
+          // Fire-and-forget: extract memories from this exchange (paid users, non-character only)
+          if (hasMemoryAccess && !mentionedCharacter && !isRegenerate && fullResponse) {
+            getUserMemories(userId).then((existingMemories) =>
+              extractMemories(userId, chatId, userMessage, fullResponse, existingMemories)
+            ).catch(() => {}); // Never block on memory errors
+          }
 
           // Send done signal
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
