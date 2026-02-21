@@ -403,7 +403,7 @@ const OnboardingScreen2 = ({ onNext, onSkip }: { onNext: () => void; onSkip: () 
             <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
           </svg>
           <span style={{ fontSize: '13px', color: '#8A8690' }}>
-            <strong style={{ color: '#E8A04C' }}>10 messages</strong> reset at midnight in your timezone
+            <strong style={{ color: '#E8A04C' }}>5 messages</strong> reset at midnight in your timezone
           </span>
         </div>
       )}
@@ -1016,7 +1016,7 @@ function HomePage() {
   // Calculate progress percentage
   const getProgressPercentage = () => {
     if (!session?.user) return 0;
-    const limits: Record<string, number> = { Free: 10, Pro: 100, Plus: 300 };
+    const limits: Record<string, number> = { Free: 5, Pro: 100, Plus: 300 };
     const limit = limits[session.user.plan as keyof typeof limits];
     if (limit === Infinity) return 100;
     return (messagesUsed / limit) * 100;
@@ -1727,7 +1727,7 @@ function HomePage() {
         }
         showConfirm(
           "Cancel Subscription?",
-          `Your ${currentPlan} subscription will remain active until the end of your billing period. After that, you'll be on the Free plan with 10 messages/day.`,
+          `Your ${currentPlan} subscription will remain active until the end of your billing period. After that, you'll be on the Free plan with 5 messages/day.`,
           "Cancel Subscription",
           doCancelSubscription,
           true
@@ -2737,7 +2737,7 @@ function HomePage() {
               <span style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30', fontWeight: 500 }}>
                 {messagesUsed}
               </span>
-              /{session?.user?.plan === 'Free' ? 10 : session?.user?.plan === 'Pro' ? 100 : 300}
+              /{session?.user?.plan === 'Free' ? 5 : session?.user?.plan === 'Pro' ? 100 : 300}
             </div>
           </div>
         </aside>
@@ -4093,7 +4093,7 @@ function HomePage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                       <div style={currentStyles.planBadgeLarge}>{session?.user?.plan}</div>
                       <div style={currentStyles.planDescription}>
-                        {session?.user?.plan === "Free" && `${messagesUsed}/10 messages used today`}
+                        {session?.user?.plan === "Free" && `${messagesUsed}/5 messages used today`}
                         {session?.user?.plan === "Pro" && `${messagesUsed}/100 messages used today`}
                         {session?.user?.plan === "Plus" && `${messagesUsed}/300 messages used today`}
                       </div>
@@ -4200,7 +4200,7 @@ function HomePage() {
                       <h5 style={currentStyles.planCardTitle}>Free</h5>
                       <div style={currentStyles.planPrice}>$0<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
-                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> 10 messages per day</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> 5 messages per day</li>
                         <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Basic support</li>
                         <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Chat on web</li>
                         <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Limited uploads</li>
@@ -4234,7 +4234,7 @@ function HomePage() {
                       <div style={currentStyles.planPrice}>$4.99<span style={currentStyles.planPricePeriod}>/mo</span></div>
                       <ul style={currentStyles.planFeatures}>
                         <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> 100 messages per day</li>
-                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> 10x more than Free</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> 20x more than Free</li>
                         <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Expanded memory and context</li>
                         <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Early access to new features</li>
                         <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Advanced reasoning models</li>
@@ -4284,7 +4284,7 @@ function HomePage() {
                       <ul style={currentStyles.planFeatures}>
                         <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Everything in Pro</li>
                         <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> 300 messages per day</li>
-                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> 30x more than Free, 3x more than Pro</li>
+                        <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> 60x more than Free, 3x more than Pro</li>
                         <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Higher outputs for more tasks</li>
                         <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Priority access at high traffic</li>
                         <li style={currentStyles.planFeature}><span style={currentStyles.checkMark}>&#10003;</span> Early access to advanced features</li>

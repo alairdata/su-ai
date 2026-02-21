@@ -199,7 +199,7 @@ export async function sendSubscriptionEmail(
 
   const planFeatures: Record<string, string[]> = {
     Pro: [
-      '10x more than Free',
+      '20x more than Free',
       'Expanded memory &amp; context',
       'Early access to new features',
       'Advanced reasoning models',

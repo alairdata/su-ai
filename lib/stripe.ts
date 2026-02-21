@@ -7,11 +7,11 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 export const PLAN_CONFIG = {
   Free: {
     priceUSD: 0,
-    messagesPerDay: 10,
+    messagesPerDay: 5,
     name: 'Free Plan',
-    description: '10 messages per day',
+    description: '5 messages per day',
     features: [
-      '10 messages per day',
+      '5 messages per day',
       'Basic support',
       'Chat on web',
       'Limited uploads',
