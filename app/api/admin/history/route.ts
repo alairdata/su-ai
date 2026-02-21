@@ -331,8 +331,8 @@ function groupDataByPeriod(
   const result: { label: string; count: number; cumulative: number }[] = [];
   let cumulative = 0;
 
-  const sortedKeys = Array.from(groups.keys()).sort();
-  for (const key of sortedKeys) {
+  // Use insertion order (already chronological from startDate → endDate)
+  for (const key of groups.keys()) {
     const count = groups.get(key) || 0;
     cumulative += count;
     result.push({ label: key, count, cumulative });
