@@ -42,6 +42,8 @@ interface Stats {
   signupsThisMonth: number;
   avgMessagesPerUser: number;
   totalMessages: number;
+  deletedMessages: number;
+  allTimeMessages: number;
 }
 
 interface TrendData {
@@ -464,7 +466,13 @@ export default function AdminPage() {
         {stats && (
           <div style={S.statsGrid}>
             <StatCard label="Total Users" value={stats.totalUsers} icon="👥" accent="#3b82f6" />
-            <StatCard label="Total Messages" value={stats.totalMessages.toLocaleString()} icon="💬" accent="#8b5cf6" />
+            <StatCard
+              label="Total Messages"
+              value={stats.allTimeMessages.toLocaleString()}
+              icon="💬"
+              accent="#8b5cf6"
+              sub={stats.deletedMessages > 0 ? `${stats.totalMessages.toLocaleString()} active · ${stats.deletedMessages.toLocaleString()} deleted` : undefined}
+            />
             <StatCard label="Messages Today" value={stats.totalMessagesToday} icon="📨" accent="#f59e0b" />
             <StatCard
               label="Avg Msgs/Day"
@@ -932,7 +940,7 @@ export default function AdminPage() {
 }
 
 // --- Sub-components ---
-function StatCard({ label, value, icon, accent }: { label: string; value: string | number; icon: string; accent: string }) {
+function StatCard({ label, value, icon, accent, sub }: { label: string; value: string | number; icon: string; accent: string; sub?: string }) {
   return (
     <div style={{
       background: '#141416',
@@ -945,6 +953,7 @@ function StatCard({ label, value, icon, accent }: { label: string; value: string
       <div style={{ position: 'absolute', top: '12px', right: '14px', fontSize: '20px', opacity: 0.4 }}>{icon}</div>
       <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 500, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
       <div style={{ fontSize: '26px', fontWeight: 700, color: '#f0ede8', letterSpacing: '-0.02em' }}>{value}</div>
+      {sub && <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '4px' }}>{sub}</div>}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '3px', background: `linear-gradient(90deg, ${accent}, transparent)` }} />
     </div>
   );

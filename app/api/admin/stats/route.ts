@@ -75,37 +75,27 @@ export async function GET(req: NextRequest) {
   const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
   const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  // Get chat IDs belonging to excluded users
-  let excludedChatIds: string[] = [];
-  if (excludedUserIds.length > 0) {
-    const { data: excludedChats } = await supabase
-      .from("chats")
-      .select("id")
-      .in("user_id", excludedUserIds);
-    excludedChatIds = (excludedChats || []).map(c => c.id);
-  }
+  // Get message counts from user_message_stats view (includes deleted + undeleted)
+  const { data: messageStats } = await supabase
+    .from("user_message_stats")
+    .select("id, undeleted_messages, deleted_messages, total_messages");
 
-  // Get total messages count (excluding messages from excluded users' chats)
-  // ONLY count user messages, not assistant responses
-  let totalMessages = 0;
-  if (excludedChatIds.length > 0) {
-    // Count user messages NOT in excluded chats
-    const { count } = await supabase
-      .from("messages")
-      .select("*", { count: "exact", head: true })
-      .eq("role", "user")
-      .not("chat_id", "in", `(${excludedChatIds.join(",")})`);
-    totalMessages = count || 0;
-  } else {
-    const { count } = await supabase
-      .from("messages")
-      .select("*", { count: "exact", head: true })
-      .eq("role", "user");
-    totalMessages = count || 0;
+  // Filter out excluded users
+  const filteredStats = (messageStats || []).filter(
+    s => !excludedUserIds.includes(s.id)
+  );
+
+  let totalUndeletedMessages = 0;
+  let totalDeletedMessages = 0;
+  let totalAllMessages = 0;
+  for (const s of filteredStats) {
+    totalUndeletedMessages += s.undeleted_messages || 0;
+    totalDeletedMessages += s.deleted_messages || 0;
+    totalAllMessages += s.total_messages || 0;
   }
 
   const avgMessagesPerUser = users.length > 0
-    ? Math.round((totalMessages / users.length) * 10) / 10
+    ? Math.round((totalAllMessages / users.length) * 10) / 10
     : 0;
 
   const stats = {
@@ -121,7 +111,9 @@ export async function GET(req: NextRequest) {
     signupsThisWeek: users.filter(u => new Date(u.created_at) >= thisWeek).length,
     signupsThisMonth: users.filter(u => new Date(u.created_at) >= thisMonth).length,
     avgMessagesPerUser,
-    totalMessages: totalMessages || 0,
+    totalMessages: totalUndeletedMessages,
+    deletedMessages: totalDeletedMessages,
+    allTimeMessages: totalAllMessages,
   };
 
   return NextResponse.json({ stats });
