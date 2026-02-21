@@ -284,9 +284,12 @@ export default function AdminPage() {
   const computed = useMemo(() => {
     if (!stats || users.length === 0) return null;
     const ghosts = users.filter(u => (u.total_messages || 0) === 0);
+    const paidUsers = users.filter(u => u.plan !== 'Free');
+    const freeActive = users.filter(u => u.plan === 'Free' && (u.total_messages || 0) >= 1 && (u.total_messages || 0) <= 10);
+    const freePower = users.filter(u => u.plan === 'Free' && (u.total_messages || 0) > 10);
+    // Keep these for funnel/health metrics (all users regardless of plan)
     const activeUsers = users.filter(u => (u.total_messages || 0) >= 1 && (u.total_messages || 0) <= 10);
     const powerUsers = users.filter(u => (u.total_messages || 0) > 10);
-    const paidUsers = users.filter(u => u.plan !== 'Free');
 
     const ghostRate = users.length > 0 ? ghosts.length / users.length : 0;
     const mrr = stats.planCounts.Pro * 4.99 + stats.planCounts.Plus * 9.99;
@@ -317,6 +320,8 @@ export default function AdminPage() {
       activeCount: activeUsers.length,
       powerCount: powerUsers.length,
       paidCount: paidUsers.length,
+      freeActiveCount: freeActive.length,
+      freePowerCount: freePower.length,
       funnel: { signupCount, oneMsg, tenMsg, paidCount },
       targetMRR,
       targetUsers,
@@ -723,8 +728,8 @@ export default function AdminPage() {
             {computed ? (
               <DonutChart segments={[
                 { label: 'Ghost (0 msgs)', value: computed.ghosts, color: '#6b7280' },
-                { label: 'Active (1-10)', value: computed.activeCount, color: '#3b82f6' },
-                { label: 'Power (11+)', value: computed.powerCount, color: '#8b5cf6' },
+                { label: 'Free (1-10)', value: computed.freeActiveCount, color: '#3b82f6' },
+                { label: 'Free (11+)', value: computed.freePowerCount, color: '#8b5cf6' },
                 { label: 'Paid', value: computed.paidCount, color: '#22c55e' },
               ]} />
             ) : <div style={S.chartLoading}>No data</div>}
