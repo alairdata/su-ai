@@ -15,8 +15,11 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .map(email => email.trim().toLowerCase())
   .filter(email => email.length > 0);
 
-// Emails to exclude from aggregations/stats
-const EXCLUDED_EMAILS = ['datawithprincilla@gmail.com'];
+// SECURITY: Emails to exclude from aggregations/stats - moved to env var
+const EXCLUDED_EMAILS = (process.env.EXCLUDED_STATS_EMAILS || '')
+  .split(',')
+  .map(email => email.trim().toLowerCase())
+  .filter(email => email.length > 0);
 
 // Fixed start date for all data: Jan 28th 2026
 const DATA_START_DATE = new Date('2026-01-28T00:00:00.000Z');
