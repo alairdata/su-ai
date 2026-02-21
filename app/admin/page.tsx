@@ -516,21 +516,6 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ========= PLAN PILLS ========= */}
-        {stats && (
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '24px', flexWrap: 'wrap' }}>
-            <span style={{ ...S.pill, background: 'rgba(107,114,128,0.15)', color: '#9ca3af', border: '1px solid rgba(107,114,128,0.3)' }}>
-              Free: {stats.planCounts.Free}
-            </span>
-            <span style={{ ...S.pill, background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)' }}>
-              Pro: {stats.planCounts.Pro}
-            </span>
-            <span style={{ ...S.pill, background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}>
-              Plus: {stats.planCounts.Plus}
-            </span>
-          </div>
-        )}
-
         {/* ========= CONVERSION FUNNEL ========= */}
         {computed && (
           <div style={S.card}>

@@ -156,47 +156,45 @@ export async function GET(req: NextRequest) {
     allMessages = data || [];
   }
 
-  // Count messages per user in period
-  // ONLY count user messages, not assistant responses
-  const userMessageCounts: Map<string, number> = new Map();
-  if (excludedChatIds.length > 0) {
-    const { data: periodMessages } = await supabase
-      .from("messages")
-      .select("chat_id")
-      .eq("role", "user")
-      .gte("created_at", startDate.toISOString());
-
-    const { data: allChats } = await supabase
-      .from("chats")
-      .select("id, user_id");
-
-    const chatToUser = new Map((allChats || []).map(c => [c.id, c.user_id]));
-
-    for (const msg of (periodMessages || [])) {
-      const userId = chatToUser.get(msg.chat_id);
-      if (userId && !excludedUserIds.includes(userId)) {
-        const currentCount = userMessageCounts.get(userId) || 0;
-        userMessageCounts.set(userId, currentCount + 1);
+  // Fetch deleted messages from deleted_chats (archived as JSON)
+  // and merge them into messages, allMessages for complete chart data
+  try {
+    let deletedQuery = supabase.from("deleted_chats").select("messages, user_id");
+    if (excludedUserIds.length > 0) {
+      deletedQuery = deletedQuery.not("user_id", "in", `(${excludedUserIds.join(",")})`);
+    }
+    const { data: deletedChats } = await deletedQuery;
+    if (deletedChats) {
+      for (const chat of deletedChats) {
+        const msgs = Array.isArray(chat.messages) ? chat.messages : [];
+        for (const m of msgs) {
+          if (m.role === "user" && m.created_at) {
+            allMessages.push({ created_at: m.created_at });
+            if (new Date(m.created_at) >= startDate) {
+              messages.push({ created_at: m.created_at, chat_id: `deleted_${chat.user_id}` });
+            }
+          }
+        }
       }
     }
-  } else {
-    const { data: periodMessages } = await supabase
-      .from("messages")
-      .select("chat_id")
-      .eq("role", "user")
-      .gte("created_at", startDate.toISOString());
+  } catch (e) {
+    console.error("Failed to fetch deleted messages for charts:", e);
+  }
 
-    const { data: allChats } = await supabase
-      .from("chats")
-      .select("id, user_id");
+  // Re-sort after merging deleted messages
+  allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-    const chatToUser = new Map((allChats || []).map(c => [c.id, c.user_id]));
+  // Count messages per user in period using user_message_stats for accurate totals
+  const userMessageCounts: Map<string, number> = new Map();
+  const { data: userMsgStats } = await supabase
+    .from("user_message_stats")
+    .select("id, total_messages");
 
-    for (const msg of (periodMessages || [])) {
-      const userId = chatToUser.get(msg.chat_id);
-      if (userId && !excludedUserIds.includes(userId)) {
-        const currentCount = userMessageCounts.get(userId) || 0;
-        userMessageCounts.set(userId, currentCount + 1);
+  if (userMsgStats) {
+    for (const s of userMsgStats) {
+      if (!excludedUserIds.includes(s.id) && (s.total_messages || 0) > 0) {
+        userMessageCounts.set(s.id, s.total_messages);
       }
     }
   }
