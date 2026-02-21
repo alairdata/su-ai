@@ -257,7 +257,7 @@ const OnboardingScreen2 = ({ onNext, onSkip }: { onNext: () => void; onSkip: () 
       c++;
       setCount(c);
       setFilledPills(prev => [...prev, c]);
-      if (c >= 10) {
+      if (c >= 5) {
         clearInterval(interval);
         setTimeout(() => setRefillAnimate(true), 400);
         setTimeout(() => setShowRefill(true), 800);
@@ -344,7 +344,7 @@ const OnboardingScreen2 = ({ onNext, onSkip }: { onNext: () => void; onSkip: () 
         </div>
 
         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '16px', maxWidth: '240px', margin: '0 auto 16px' }}>
-          {Array.from({ length: 10 }).map((_, i) => (
+          {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} style={{
               width: '18px', height: '18px',
               borderRadius: '5px',
