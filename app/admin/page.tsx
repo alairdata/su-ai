@@ -628,21 +628,26 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* Avg Messages / Day */}
+            {/* Signups */}
             <div style={S.chartInner}>
               <div style={S.chartHeader}>
-                <h3 style={S.chartTitle}>Avg Messages / Day</h3>
-                <span style={{ ...S.chartBadge, color: '#34d399' }}>
-                  {avgTrend.length > 0 ? avgTrend[avgTrend.length - 1]?.avg?.toFixed(1) || 0 : 0} avg
-                </span>
+                <h3 style={S.chartTitle}>Signups</h3>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <span style={{ ...S.chartBadge, color: '#34d399' }}>
+                    {userTrend.length > 0 ? userTrend[userTrend.length - 1]?.cumulative || 0 : 0} total
+                  </span>
+                  <span style={{ ...S.chartBadge, color: '#6b7280' }}>
+                    {userTrend.reduce((sum, d) => sum + d.count, 0)} in period
+                  </span>
+                </div>
               </div>
               {chartLoading ? (
                 <div style={S.chartLoading}>Loading...</div>
               ) : (
                 <ResponsiveContainer width="100%" height={240}>
-                  <AreaChart data={avgTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                  <AreaChart data={userTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                     <defs>
-                      <linearGradient id="gAvg" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient id="gSignups" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
                         <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
                       </linearGradient>
@@ -651,9 +656,9 @@ export default function AdminPage() {
                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#6b7280" }} width={30} />
                     <Tooltip content={<DarkTooltip />} />
                     <Area
-                      type="monotone" dataKey="avg" stroke="#10b981" strokeWidth={2}
-                      fill="url(#gAvg)" activeDot={{ r: 4, fill: "#10b981", stroke: "#0c0c0e", strokeWidth: 2 }}
-                      name="Avg"
+                      type="monotone" dataKey="count" stroke="#10b981" strokeWidth={2}
+                      fill="url(#gSignups)" activeDot={{ r: 4, fill: "#10b981", stroke: "#0c0c0e", strokeWidth: 2 }}
+                      name="Signups"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
