@@ -510,6 +510,9 @@ export default function AdminPage() {
               accent="#10b981"
               sub="avg msgs per active day"
             />
+            <StatCard label="Free Users" value={stats.planCounts.Free} icon="🆓" accent="#6b7280" sub={`$0/mo`} />
+            <StatCard label="Pro Users" value={stats.planCounts.Pro} icon="⚡" accent="#3b82f6" sub={`$4.99/mo each`} />
+            <StatCard label="Plus Users" value={stats.planCounts.Plus} icon="💎" accent="#a855f7" sub={`$9.99/mo each`} />
           </div>
         )}
 
