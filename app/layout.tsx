@@ -14,8 +14,8 @@ export const metadata: Metadata = {
   title: "So UnFiltered AI",
   description: "Your intelligent AI assistant",
   icons: {
-    icon: "/logo.png",
-    apple: "/logo.png",
+    icon: "/bolt-icon.png",
+    apple: "/bolt-icon.png",
   },
 };
 
