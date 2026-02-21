@@ -471,28 +471,29 @@ export default function AdminPage() {
         {stats && (
           <div style={S.statsGrid}>
             {/* Row 1 */}
-            <StatCard label="Total Users" value={stats.totalUsers} icon="👥" accent="#3b82f6" />
+            <StatCard label="Total Users" value={stats.totalUsers} sub="all-time signups" icon="👥" accent="#3b82f6" />
             <StatCard
               label="Total Messages"
               value={stats.allTimeMessages.toLocaleString()}
               icon="💬"
               accent="#8b5cf6"
-              sub={stats.deletedMessages > 0 ? `${stats.totalMessages.toLocaleString()} active · ${stats.deletedMessages.toLocaleString()} deleted` : undefined}
+              sub={stats.deletedMessages > 0 ? `${stats.totalMessages.toLocaleString()} active · ${stats.deletedMessages.toLocaleString()} deleted` : 'all-time'}
             />
-            <StatCard label="Messages Today" value={stats.totalMessagesToday} icon="📨" accent="#f59e0b" />
+            <StatCard label="Messages Today" value={stats.totalMessagesToday} sub="user messages sent today" icon="📨" accent="#f59e0b" />
             <StatCard
               label="Msgs/Active User"
               value={computed?.avgSessionDepth.toFixed(1) || '0'}
               icon="🎯"
               accent="#8b5cf6"
-              sub="users with 1+ msg"
+              sub="avg for users with 1+ msg"
             />
-            <StatCard label="Active Subs" value={stats.activeSubscriptions} icon="💳" accent="#ec4899" />
+            <StatCard label="Active Subs" value={stats.activeSubscriptions} sub="paid subscriptions" icon="💳" accent="#ec4899" />
             <StatCard
               label="MRR"
               value={`$${computed?.mrr.toFixed(2) || '0.00'}`}
               icon="💰"
               accent="#E8A04C"
+              sub="monthly recurring revenue"
             />
             {/* Row 2 */}
             <StatCard
@@ -507,11 +508,8 @@ export default function AdminPage() {
               value={users.length > 0 ? (users.reduce((sum, u) => sum + getAvgMsgsDay(u), 0) / users.length).toFixed(1) : '0'}
               icon="📅"
               accent="#10b981"
+              sub="avg msgs per active day"
             />
-            <StatCard label="Ghost Rate" value={`${computed ? (computed.ghostRate * 100).toFixed(1) : '0'}%`} icon="👻" accent={computed && computed.ghostRate > 0.5 ? '#ef4444' : '#f59e0b'} sub={`${computed?.ghosts || 0} users, 0 msgs`} />
-            <StatCard label="Retention" value={`${computed ? (computed.retentionRate * 100).toFixed(1) : '0'}%`} icon="🔄" accent="#22c55e" sub="users with 1+ msg" />
-            <StatCard label="Signups This Week" value={stats.signupsThisWeek} icon="📈" accent="#6366f1" />
-            <StatCard label="Signups This Month" value={stats.signupsThisMonth} icon="📆" accent="#14b8a6" />
           </div>
         )}
 
