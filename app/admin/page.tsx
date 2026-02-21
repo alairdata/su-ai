@@ -667,8 +667,8 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* ========= SECOND ROW: Top 10 / Distribution / Donut ========= */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+        {/* ========= SECOND ROW: Top 10 / Distribution (2x1) ========= */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
           {/* Top 10 Users (CSS bar chart) */}
           <div style={S.card}>
             <div style={S.chartHeader}>
@@ -722,7 +722,10 @@ export default function AdminPage() {
               </div>
             )}
           </div>
+        </div>
 
+        {/* ========= THIRD ROW: Donut / Retention & Churn (2x1) ========= */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
           {/* User Status Donut */}
           <div style={S.card}>
             <div style={S.chartHeader}>
@@ -735,6 +738,52 @@ export default function AdminPage() {
                 { label: 'Free (11+)', value: computed.freePowerCount, color: '#8b5cf6' },
                 { label: 'Paid', value: computed.paidCount, color: '#22c55e' },
               ]} />
+            ) : <div style={S.chartLoading}>No data</div>}
+          </div>
+
+          {/* Retention & Churn */}
+          <div style={S.card}>
+            <div style={S.chartHeader}>
+              <h3 style={S.chartTitle}>Retention & Churn</h3>
+            </div>
+            {computed ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '12px 0' }}>
+                {/* Retention bar */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>Retention Rate</span>
+                    <span style={{ fontSize: '13px', color: '#22c55e', fontWeight: 700 }}>{(computed.retentionRate * 100).toFixed(1)}%</span>
+                  </div>
+                  <div style={{ width: '100%', height: '12px', background: '#1A1A1E', borderRadius: '6px', overflow: 'hidden' }}>
+                    <div style={{ width: `${computed.retentionRate * 100}%`, height: '100%', background: 'linear-gradient(90deg, #22c55e, #16a34a)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{users.filter(u => (u.total_messages || 0) > 0).length} of {users.length} users sent 1+ message</div>
+                </div>
+
+                {/* Churn/Ghost bar */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>Ghost Rate (Churn)</span>
+                    <span style={{ fontSize: '13px', color: computed.ghostRate > 0.5 ? '#ef4444' : '#f59e0b', fontWeight: 700 }}>{(computed.ghostRate * 100).toFixed(1)}%</span>
+                  </div>
+                  <div style={{ width: '100%', height: '12px', background: '#1A1A1E', borderRadius: '6px', overflow: 'hidden' }}>
+                    <div style={{ width: `${computed.ghostRate * 100}%`, height: '100%', background: computed.ghostRate > 0.5 ? 'linear-gradient(90deg, #ef4444, #dc2626)' : 'linear-gradient(90deg, #f59e0b, #d97706)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{computed.ghosts} users signed up but never messaged</div>
+                </div>
+
+                {/* Paid conversion bar */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>Paid Conversion</span>
+                    <span style={{ fontSize: '13px', color: '#a855f7', fontWeight: 700 }}>{users.length > 0 ? ((computed.paidCount / users.length) * 100).toFixed(1) : '0'}%</span>
+                  </div>
+                  <div style={{ width: '100%', height: '12px', background: '#1A1A1E', borderRadius: '6px', overflow: 'hidden' }}>
+                    <div style={{ width: `${users.length > 0 ? (computed.paidCount / users.length) * 100 : 0}%`, height: '100%', background: 'linear-gradient(90deg, #a855f7, #7c3aed)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{computed.paidCount} of {users.length} users on a paid plan</div>
+                </div>
+              </div>
             ) : <div style={S.chartLoading}>No data</div>}
           </div>
         </div>
