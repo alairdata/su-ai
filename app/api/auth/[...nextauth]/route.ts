@@ -334,11 +334,20 @@ export const authOptions: NextAuthOptions = {
             }
           }
 
-          console.log('Reset check:', { currentDateStr, lastResetStr, resetTimezone, lastResetDate: user.last_reset_date });
+          // Check if it's a new day — if so, reset the counter in DB
+          // This ensures the frontend sees 0 messages used even before the user sends
+          const isNewDay = !lastResetStr || currentDateStr !== lastResetStr;
 
-          // Daily reset is now handled atomically by the increment_messages_used_today RPC
-          // Session callback only reads the current count — no more resetting here
-          session.user.messagesUsedToday = user.messages_used_today;
+          if (isNewDay && user.messages_used_today > 0) {
+            // Reset count in DB so frontend reflects the new day
+            await supabase
+              .from('users')
+              .update({ messages_used_today: 0, last_reset_date: new Date().toISOString() })
+              .eq('id', token.id);
+            session.user.messagesUsedToday = 0;
+          } else {
+            session.user.messagesUsedToday = user.messages_used_today;
+          }
         }
       }
       return session;
