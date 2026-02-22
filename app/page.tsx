@@ -3321,7 +3321,7 @@ function HomePage() {
                       </div>
                     </div>
                     <div style={currentStyles.inputFooter}>
-                      <span style={currentStyles.inputHint}>{chatCharacters.length > 0 ? 'Type @ to mention a character' : 'Unfiltered means unfiltered. Verify what matters.'}</span>
+                      <span style={currentStyles.inputHint}>{chatCharacters.length > 0 ? 'Type @ to mention a character' : 'Verify what matters.'}</span>
                     </div>
                   </div>
                 </div>
@@ -3952,7 +3952,7 @@ function HomePage() {
                     </div>
                   </div>
                   <div style={currentStyles.inputFooter}>
-                    <span style={currentStyles.inputHint}>{chatCharacters.length > 0 ? 'Type @ to mention a character' : 'Unfiltered means unfiltered. Verify what matters.'}</span>
+                    <span style={currentStyles.inputHint}>{chatCharacters.length > 0 ? 'Type @ to mention a character' : 'Verify what matters.'}</span>
                   </div>
                 </div>
               </div>
