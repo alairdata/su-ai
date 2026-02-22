@@ -6359,7 +6359,7 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   inputFooter: {
     display: 'flex',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     padding: '8px 4px 0',
     maxWidth: '100%',
