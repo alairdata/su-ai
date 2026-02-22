@@ -1648,10 +1648,6 @@ function HomePage() {
     // Clean up preview URL
     if (previewToRevoke) URL.revokeObjectURL(previewToRevoke);
 
-    const defaultMsg = uploadResult && uploadResult.fileType !== "image"
-      ? "Analyze this file"
-      : "What's in this image?";
-
     // Detect @mention for character routing
     const mentionMatch = messageToSend.match(/@(\w+)/);
     const mentionedChar = mentionMatch
@@ -1661,7 +1657,7 @@ function HomePage() {
     setShowMentionDropdown(false);
 
     await sendMessage(
-      messageToSend || defaultMsg,
+      messageToSend,
       uploadResult?.fileType === "image" ? uploadResult.url : undefined,
       uploadResult ? uploadResult : undefined,
       mentionedChar?.id
