@@ -4102,7 +4102,7 @@ function HomePage() {
               <button
                 onClick={() => {
                   setShowImageGenModal(false);
-                  window.location.href = '/checkout?plan=Plus';
+                  upgradePlan('Plus');
                 }}
                 style={{
                   width: '100%',
