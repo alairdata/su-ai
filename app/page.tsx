@@ -642,6 +642,7 @@ function HomePage() {
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [whatsNewScreen, setWhatsNewScreen] = useState(1);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showImageGenModal, setShowImageGenModal] = useState(false);
   const [showMemorySection, setShowMemorySection] = useState(false);
   const [selectedTimezone, setSelectedTimezone] = useState("");
   const [isUpdatingTimezone, setIsUpdatingTimezone] = useState(false);
@@ -3245,7 +3246,7 @@ function HomePage() {
                                   <span>Add Files</span>
                                 </div>
                               </button>
-                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); openUpgradeModal(); }}>
+                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowImageGenModal(true); }}>
                                 <div style={currentStyles.plusMenuItemContent}>
                                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <circle cx="12" cy="12" r="4" />
@@ -3876,7 +3877,7 @@ function HomePage() {
                                 <span>Add Files</span>
                               </div>
                             </button>
-                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowImageGenModal(true); }}>
                               <div style={currentStyles.plusMenuItemContent}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <circle cx="12" cy="12" r="4" />
@@ -3956,6 +3957,177 @@ function HomePage() {
           </div>
         </main>
       </div>
+
+      {/* Image Generation Upsell Modal */}
+      {showImageGenModal && (
+        <>
+          <div style={currentStyles.modalOverlay} onClick={() => setShowImageGenModal(false)} />
+          <div style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '90%',
+            maxWidth: '440px',
+            maxHeight: '90vh',
+            overflowY: 'auto' as const,
+            background: isDarkMode ? '#141416' : '#ffffff',
+            border: `1px solid ${isDarkMode ? '#1E1E22' : '#e5e5e5'}`,
+            borderRadius: '20px',
+            zIndex: 10001,
+            padding: '32px 28px',
+          }}>
+            {/* Close button */}
+            <button
+              onClick={() => setShowImageGenModal(false)}
+              style={{
+                position: 'absolute' as const,
+                top: '16px',
+                right: '16px',
+                background: 'none',
+                border: 'none',
+                color: isDarkMode ? '#5A5660' : '#999',
+                cursor: 'pointer',
+                padding: '4px',
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+
+            {/* Icon */}
+            <div style={{ textAlign: 'center' as const, marginBottom: '20px' }}>
+              <div style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, #7C4DFF 0%, #E040FB 100%)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Title */}
+            <h3 style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: '18px',
+              fontWeight: 700,
+              color: isDarkMode ? '#F0EDE8' : '#1a1a1a',
+              textAlign: 'center' as const,
+              margin: '0 0 8px',
+            }}>AI Image Generation</h3>
+
+            <p style={{
+              fontSize: '13px',
+              color: isDarkMode ? '#8A8690' : '#666',
+              textAlign: 'center' as const,
+              margin: '0 0 24px',
+              lineHeight: 1.5,
+            }}>You need the <strong style={{ color: '#E8A04C' }}>Plus Plan</strong> to unlock this feature.</p>
+
+            {/* Features list */}
+            <div style={{
+              background: isDarkMode ? '#0C0C0E' : '#f8f8f8',
+              borderRadius: '14px',
+              padding: '20px',
+              marginBottom: '24px',
+            }}>
+              {[
+                { icon: '🎨', title: 'Text to Image', desc: 'Describe anything, AI creates it instantly' },
+                { icon: '⚡', title: 'Multiple Styles', desc: 'Realistic, anime, 3D, pixel art and more' },
+                { icon: '🔄', title: 'Unlimited Generations', desc: 'Create as many images as you want' },
+                { icon: '📐', title: 'High Resolution', desc: 'Crisp, detailed images ready to download' },
+                { icon: '💬', title: 'In-Chat Creation', desc: 'Generate images right inside your conversations' },
+              ].map((feature, i) => (
+                <div key={i} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '10px 0',
+                  borderBottom: i < 4 ? `1px solid ${isDarkMode ? '#1E1E22' : '#eee'}` : 'none',
+                }}>
+                  <span style={{ fontSize: '18px', flexShrink: 0 }}>{feature.icon}</span>
+                  <div>
+                    <div style={{
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: isDarkMode ? '#F0EDE8' : '#1a1a1a',
+                      marginBottom: '2px',
+                    }}>{feature.title}</div>
+                    <div style={{
+                      fontSize: '11px',
+                      color: isDarkMode ? '#5A5660' : '#888',
+                      lineHeight: 1.4,
+                    }}>{feature.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Plus plan card */}
+            <div style={{
+              background: isDarkMode ? 'linear-gradient(135deg, #1A1330 0%, #141416 100%)' : 'linear-gradient(135deg, #f3eeff 0%, #fff 100%)',
+              border: `1px solid ${isDarkMode ? '#2D1B4E' : '#d4c4f0'}`,
+              borderRadius: '14px',
+              padding: '20px',
+              textAlign: 'center' as const,
+              marginBottom: '16px',
+            }}>
+              <div style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '1.5px',
+                textTransform: 'uppercase' as const,
+                color: '#B388FF',
+                marginBottom: '8px',
+              }}>PLUS PLAN</div>
+              <div style={{
+                fontSize: '32px',
+                fontWeight: 700,
+                color: isDarkMode ? '#F0EDE8' : '#1a1a1a',
+                marginBottom: '4px',
+              }}>$9.99<span style={{ fontSize: '14px', fontWeight: 400, color: isDarkMode ? '#5A5660' : '#888' }}>/mo</span></div>
+              <div style={{
+                fontSize: '12px',
+                color: isDarkMode ? '#8A8690' : '#666',
+                marginBottom: '16px',
+              }}>300 messages/day + Image Generation + everything in Pro</div>
+              <button
+                onClick={() => {
+                  setShowImageGenModal(false);
+                  window.location.href = '/checkout?plan=Plus';
+                }}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #E8A04C 0%, #F0C070 100%)',
+                  color: '#0C0C0E',
+                  fontSize: '15px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'opacity 0.2s',
+                }}
+              >Upgrade to Plus →</button>
+            </div>
+
+            <p style={{
+              fontSize: '11px',
+              color: isDarkMode ? '#3A3640' : '#bbb',
+              textAlign: 'center' as const,
+              margin: 0,
+            }}>Cancel anytime. No questions asked.</p>
+          </div>
+        </>
+      )}
 
       {/* Account Modal */}
       {showAccountModal && (
