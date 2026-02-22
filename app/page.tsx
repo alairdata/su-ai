@@ -895,17 +895,21 @@ function HomePage() {
     document.body.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Close plus menu when clicking outside
+  // Close plus menu when clicking/touching outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (plusMenuRef.current && !plusMenuRef.current.contains(event.target as Node)) {
         setShowPlusMenu(false);
       }
     };
     if (showPlusMenu) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, [showPlusMenu]);
 
   // Derive view from auth state — no useEffect delay
@@ -1369,7 +1373,56 @@ function HomePage() {
     return "text";
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Compress images to stay under Vercel's 4.5MB body limit
+  const MAX_UPLOAD_SIZE = 4 * 1024 * 1024; // 4MB (safe margin under Vercel's 4.5MB)
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      // Skip if already small enough
+      if (file.size <= MAX_UPLOAD_SIZE) { resolve(file); return; }
+      // GIFs can't be compressed via canvas (loses animation)
+      if (file.type === "image/gif") { resolve(file); return; }
+
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+
+        // Scale down if very large
+        const maxDim = 2048;
+        if (width > maxDim || height > maxDim) {
+          const ratio = Math.min(maxDim / width, maxDim / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(file); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Try progressively lower quality until under limit
+        const tryQuality = (quality: number) => {
+          canvas.toBlob((blob) => {
+            if (!blob) { resolve(file); return; }
+            if (blob.size <= MAX_UPLOAD_SIZE || quality <= 0.3) {
+              const compressed = new File([blob], file.name, { type: 'image/jpeg', lastModified: file.lastModified });
+              resolve(compressed);
+            } else {
+              tryQuality(quality - 0.1);
+            }
+          }, 'image/jpeg', quality);
+        };
+        tryQuality(0.85);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -1387,11 +1440,14 @@ function HomePage() {
       return;
     }
 
-    const fType = classifyFile(file);
-    track(EVENTS.FILE_SELECTED, { file_type: fType, file_size_kb: Math.round(file.size / 1024) });
-    setSelectedFile(file);
+    // Compress images that are too large for Vercel's body limit
+    const finalFile = isImage ? await compressImage(file) : file;
+
+    const fType = classifyFile(finalFile);
+    track(EVENTS.FILE_SELECTED, { file_type: fType, file_size_kb: Math.round(finalFile.size / 1024) });
+    setSelectedFile(finalFile);
     setSelectedFileType(fType);
-    setFilePreviewUrl(fType === "image" ? URL.createObjectURL(file) : null);
+    setFilePreviewUrl(fType === "image" ? URL.createObjectURL(finalFile) : null);
 
     // Reset file inputs so same file can be re-selected
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -3218,7 +3274,7 @@ function HomePage() {
                             <div style={currentStyles.plusMenu}>
                               <button style={currentStyles.plusMenuItem} onClick={() => {
                                 setShowPlusMenu(false);
-                                fileInputRef.current?.click();
+                                setTimeout(() => fileInputRef.current?.click(), 50);
                               }}>
                                 <div style={currentStyles.plusMenuItemContent}>
                                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3231,7 +3287,7 @@ function HomePage() {
                               </button>
                               <button style={currentStyles.plusMenuItem} onClick={() => {
                                 setShowPlusMenu(false);
-                                docInputRef.current?.click();
+                                setTimeout(() => docInputRef.current?.click(), 50);
                               }}>
                                 <div style={currentStyles.plusMenuItemContent}>
                                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
