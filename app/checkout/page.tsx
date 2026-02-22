@@ -72,12 +72,19 @@ function CheckoutContent() {
     }
   }, [status, router]);
 
-  // Redirect if already on a paid plan
+  // Redirect if already on the selected plan or higher
   useEffect(() => {
-    if (session?.user?.plan && session.user.plan !== 'Free') {
+    const userPlan = session?.user?.plan;
+    if (!userPlan) return;
+    // Already on Plus — no upgrade possible
+    if (userPlan === 'Plus') {
       router.push('/');
     }
-  }, [session, router]);
+    // On Pro and trying to buy Pro — already have it
+    if (userPlan === 'Pro' && selectedPlan === 'Pro') {
+      router.push('/');
+    }
+  }, [session, router, selectedPlan]);
 
   const handlePayment = async () => {
     if (!session?.user?.email) return;
