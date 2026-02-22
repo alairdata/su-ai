@@ -48,53 +48,66 @@ export async function extractMemories(
       : "None yet.";
 
     const response = await anthropic.messages.create({
-      model: "claude-3-5-haiku-20241022",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 300,
       messages: [
         {
           role: "user",
-          content: `Analyze this conversation exchange and extract persistent facts about the user that would be useful to remember across future conversations.
+          content: `You are a memory extraction system. Read this conversation and pick out ANY detail about the user worth remembering for future chats. Be aggressive — capture even small things.
 
-EXISTING MEMORIES (do NOT duplicate these):
+ALREADY SAVED (skip these):
 ${existingList}
 
-USER MESSAGE:
+USER SAID:
 ${userMessage.slice(0, 1000)}
 
-ASSISTANT RESPONSE:
+AI REPLIED:
 ${assistantResponse.slice(0, 500)}
 
-RULES:
-- Only extract PERSISTENT facts: name, job, location, family, preferences, interests, goals, important context
-- Do NOT extract: ephemeral things, questions, transient moods, what they asked about, conversation topics
-- Do NOT duplicate existing memories (check the list above)
-- Each memory must be under 100 characters
-- Max 3 new memories
-- If nothing worth remembering, return NONE
+WHAT TO CAPTURE:
+- Name, nickname, or how they refer to themselves
+- Location, country, city, timezone clues
+- Job, profession, skills, what they're working on
+- Age, gender, family, relationships
+- Preferences, opinions, communication style
+- Hobbies, interests, things they like or dislike
+- Goals, plans, things they're trying to do
+- Any personal detail — even if it seems small
 
-Format each memory as:
-category|fact
+WHAT TO SKIP:
+- Generic questions with no personal info (e.g. "what's the weather like")
+- Things already in the saved list above
+- The AI's own statements or opinions
 
+Max 3 memories. Each under 100 characters.
+
+Format: category|fact
 Categories: personal, preference, interest, context
 
 Examples:
-personal|Their name is Alex
-personal|They work as a software engineer in NYC
-preference|They prefer direct, no-BS advice
-interest|They're learning Rust programming
-context|They're preparing for a job interview next month
+personal|Name is Pricilla
+personal|Lives in Ghana
+personal|Works as a developer
+preference|Likes direct, blunt advice
+interest|Building an AI chat app
+context|Preparing for a product launch
 
-Respond with ONLY the memories (one per line) or NONE:`
+Return ONLY memories (one per line) or NONE if truly nothing personal was shared:`
         }
       ],
     });
+
+    console.log("[Memory] Haiku response:", response.content.map((b) => ("text" in b ? b.text : "")).join(""));
 
     const text = response.content
       .map((block) => ("text" in block ? block.text : ""))
       .join("")
       .trim();
 
-    if (!text || text === "NONE") return;
+    if (!text || text === "NONE") {
+      console.log("[Memory] No memories extracted (NONE or empty)");
+      return;
+    }
 
     const lines = text.split("\n").filter((l) => l.includes("|")).slice(0, 3);
 
@@ -111,7 +124,7 @@ Respond with ONLY the memories (one per line) or NONE:`
       const hash = hashMemory(content);
 
       // Upsert — unique constraint on (user_id, embedding_hash) handles dedup
-      await supabase.from("user_memories").upsert(
+      const { error: upsertError } = await supabase.from("user_memories").upsert(
         {
           user_id: userId,
           content,
@@ -122,6 +135,11 @@ Respond with ONLY the memories (one per line) or NONE:`
         },
         { onConflict: "user_id,embedding_hash" }
       );
+      if (upsertError) {
+        console.error("[Memory] Failed to save memory:", upsertError, { content, category });
+      } else {
+        console.log("[Memory] Saved:", category, "|", content);
+      }
     }
   } catch (error) {
     // Non-critical — log and move on, never block the user
