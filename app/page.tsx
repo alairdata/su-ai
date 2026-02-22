@@ -3212,54 +3212,6 @@ function HomePage() {
                         </div>
                       )}
                       <div style={currentStyles.inputRow}>
-                        <textarea
-                          ref={textareaRef}
-                          rows={1}
-                          placeholder={canSendMessage() ? "Talk, no filters..." : "Daily limit reached. Upgrade to continue."}
-                          value={input}
-                          onChange={handleInputChange}
-                          onKeyDown={handleKeyDown}
-                          onFocus={handleInputFocus}
-                          onInput={(e) => {
-                            const el = e.currentTarget;
-                            el.style.height = 'auto';
-                            el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
-                          }}
-                          disabled={chatLoading || !canSendMessage()}
-                          style={{ ...currentStyles.textarea, caretColor: input ? undefined : 'transparent' }}
-                        />
-                        {chatLoading ? (
-                          <button
-                            style={{
-                              ...currentStyles.sendBtn,
-                              background: '#ef4444',
-                            }}
-                            onClick={stopGeneration}
-                            title="Stop generating"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                              <rect x="6" y="6" width="12" height="12" rx="2" />
-                            </svg>
-                          </button>
-                        ) : (
-                          <button
-                            style={{
-                              ...currentStyles.sendBtn,
-                              ...((!input.trim() && !selectedFile) || !canSendMessage() ? currentStyles.sendBtnDisabled : {})
-                            }}
-                            onClick={handleSend}
-                            disabled={(!input.trim() && !selectedFile) || !canSendMessage()}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="22" y1="2" x2="11" y2="13" />
-                              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div style={currentStyles.inputFooter}>
-                      <div style={{ display: 'flex', gap: '4px' }}>
                         <div ref={showGreeting ? plusMenuRef : undefined} style={{ position: 'relative' }}>
                           <button
                             style={currentStyles.attachBtn}
@@ -3322,15 +3274,53 @@ function HomePage() {
                             </div>
                           )}
                         </div>
-                        <button style={currentStyles.attachBtn} title="Voice input" onClick={() => openUpgradeModal()}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-                            <path d="M19 10v2a7 7 0 01-14 0v-2"/>
-                            <line x1="12" y1="19" x2="12" y2="23"/>
-                            <line x1="8" y1="23" x2="16" y2="23"/>
-                          </svg>
-                        </button>
+                        <textarea
+                          ref={textareaRef}
+                          rows={1}
+                          placeholder={canSendMessage() ? "Talk, no filters..." : "Daily limit reached. Upgrade to continue."}
+                          value={input}
+                          onChange={handleInputChange}
+                          onKeyDown={handleKeyDown}
+                          onFocus={handleInputFocus}
+                          onInput={(e) => {
+                            const el = e.currentTarget;
+                            el.style.height = 'auto';
+                            el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
+                          }}
+                          disabled={chatLoading || !canSendMessage()}
+                          style={{ ...currentStyles.textarea, caretColor: input ? undefined : 'transparent' }}
+                        />
+                        {chatLoading ? (
+                          <button
+                            style={{
+                              ...currentStyles.sendBtn,
+                              background: '#ef4444',
+                            }}
+                            onClick={stopGeneration}
+                            title="Stop generating"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                              <rect x="6" y="6" width="12" height="12" rx="2" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <button
+                            style={{
+                              ...currentStyles.sendBtn,
+                              ...((!input.trim() && !selectedFile) || !canSendMessage() ? currentStyles.sendBtnDisabled : {})
+                            }}
+                            onClick={handleSend}
+                            disabled={(!input.trim() && !selectedFile) || !canSendMessage()}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="22" y1="2" x2="11" y2="13" />
+                              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
+                    </div>
+                    <div style={currentStyles.inputFooter}>
                       <span style={currentStyles.inputHint}>{chatCharacters.length > 0 ? 'Type @ to mention a character' : 'So-UnFiltered AI may produce inaccurate responses'}</span>
                     </div>
                   </div>
@@ -3853,6 +3843,68 @@ function HomePage() {
                       </div>
                     )}
                     <div style={currentStyles.inputRow}>
+                      <div ref={!showGreeting ? plusMenuRef : undefined} style={{ position: 'relative' }}>
+                        <button
+                          style={currentStyles.attachBtn}
+                          title="Attach file"
+                          onClick={() => setShowPlusMenu(!showPlusMenu)}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                          </svg>
+                        </button>
+                        {showPlusMenu && (
+                          <div style={currentStyles.plusMenu}>
+                            <button style={currentStyles.plusMenuItem} onClick={() => {
+                              setShowPlusMenu(false);
+                              setTimeout(() => fileInputRef.current?.click(), 50);
+                            }}>
+                              <div style={currentStyles.plusMenuItemContent}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                  <circle cx="8.5" cy="8.5" r="1.5" />
+                                  <polyline points="21 15 16 10 5 21" />
+                                </svg>
+                                <span>Add Photos</span>
+                              </div>
+                            </button>
+                            <button style={currentStyles.plusMenuItem} onClick={() => {
+                              setShowPlusMenu(false);
+                              setTimeout(() => docInputRef.current?.click(), 50);
+                            }}>
+                              <div style={currentStyles.plusMenuItemContent}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                  <polyline points="14 2 14 8 20 8" />
+                                </svg>
+                                <span>Add Files</span>
+                              </div>
+                            </button>
+                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
+                              <div style={currentStyles.plusMenuItemContent}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <circle cx="12" cy="12" r="4" />
+                                  <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
+                                </svg>
+                                <span>Generate Image</span>
+                              </div>
+                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
+                            </button>
+                            <button style={currentStyles.plusMenuItem} onClick={() => {
+                              setShowPlusMenu(false);
+                              openCharacterModal();
+                            }}>
+                              <div style={currentStyles.plusMenuItemContent}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                  <circle cx="12" cy="7" r="4" />
+                                </svg>
+                                <span>Add Chat Character</span>
+                              </div>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       <textarea
                         ref={textareaRef}
                         rows={1}
@@ -3900,78 +3952,6 @@ function HomePage() {
                     </div>
                   </div>
                   <div style={currentStyles.inputFooter}>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <div ref={!showGreeting ? plusMenuRef : undefined} style={{ position: 'relative' }}>
-                        <button
-                          style={currentStyles.attachBtn}
-                          title="Attach file"
-                          onClick={() => setShowPlusMenu(!showPlusMenu)}
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
-                          </svg>
-                        </button>
-                        {showPlusMenu && (
-                          <div style={currentStyles.plusMenu}>
-                            <button style={currentStyles.plusMenuItem} onClick={() => {
-                              setShowPlusMenu(false);
-                              fileInputRef.current?.click();
-                            }}>
-                              <div style={currentStyles.plusMenuItemContent}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                  <circle cx="8.5" cy="8.5" r="1.5" />
-                                  <polyline points="21 15 16 10 5 21" />
-                                </svg>
-                                <span>Add Photos</span>
-                              </div>
-                            </button>
-                            <button style={currentStyles.plusMenuItem} onClick={() => {
-                              setShowPlusMenu(false);
-                              docInputRef.current?.click();
-                            }}>
-                              <div style={currentStyles.plusMenuItemContent}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                  <polyline points="14 2 14 8 20 8" />
-                                </svg>
-                                <span>Add Files</span>
-                              </div>
-                            </button>
-                            <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowAccountModal(true); }}>
-                              <div style={currentStyles.plusMenuItemContent}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <circle cx="12" cy="12" r="4" />
-                                  <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
-                                </svg>
-                                <span>Generate Image</span>
-                              </div>
-                              <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                            </button>
-                            <button style={currentStyles.plusMenuItem} onClick={() => {
-                              setShowPlusMenu(false);
-                              openCharacterModal();
-                            }}>
-                              <div style={currentStyles.plusMenuItemContent}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                  <circle cx="12" cy="7" r="4" />
-                                </svg>
-                                <span>Add Chat Character</span>
-                              </div>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      <button style={currentStyles.attachBtn} title="Voice input" onClick={() => openUpgradeModal()}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                          <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-                          <path d="M19 10v2a7 7 0 01-14 0v-2"/>
-                          <line x1="12" y1="19" x2="12" y2="23"/>
-                          <line x1="8" y1="23" x2="16" y2="23"/>
-                        </svg>
-                      </button>
-                    </div>
                     <span style={currentStyles.inputHint}>{chatCharacters.length > 0 ? 'Type @ to mention a character' : 'So-UnFiltered AI may produce inaccurate responses'}</span>
                   </div>
                 </div>
@@ -5268,7 +5248,7 @@ function HomePage() {
                     <div className="wn-summary-card">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64D2FF" strokeWidth="2" strokeLinecap="round" style={{ marginBottom: 6 }}><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#F0EDE8', marginBottom: 2 }}>Files</div>
-                      <div style={{ fontSize: 10, color: '#5A5660' }}>Paperclip below input</div>
+                      <div style={{ fontSize: 10, color: '#5A5660' }}>Paperclip in input bar</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 10 }}>
