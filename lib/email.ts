@@ -30,7 +30,7 @@ export async function sendVerificationEmail(
 
   try {
     await resend.emails.send({
-      from: 'So-UnFiltered AI <noreply@app.so-unfiltered-ai.com>',
+      from: 'So-UnFiltered AI <support@so-unfiltered-ai.com>',
       to: email,
       subject: 'Verify your So-UnFiltered AI account',
       html: `
@@ -96,7 +96,7 @@ export async function sendPasswordResetEmail(
 
   try {
     await resend.emails.send({
-      from: 'So-UnFiltered AI <noreply@app.so-unfiltered-ai.com>',
+      from: 'So-UnFiltered AI <support@so-unfiltered-ai.com>',
       to: email,
       subject: 'Reset your So-UnFiltered AI password',
       html: `
@@ -220,7 +220,7 @@ export async function sendSubscriptionEmail(
 
   try {
     await resend.emails.send({
-      from: 'So-UnFiltered AI <noreply@app.so-unfiltered-ai.com>',
+      from: 'So-UnFiltered AI <support@so-unfiltered-ai.com>',
       to: email,
       subject: `So-UnFiltered AI — ${plan} ${type === 'cancelled' ? 'Cancelled' : 'Plan'}`,
       html: `
@@ -292,7 +292,7 @@ export async function sendFollowUpEmail(
 ) {
   try {
     await resend.emails.send({
-      from: 'So-UnFiltered AI <noreply@app.so-unfiltered-ai.com>',
+      from: 'So-UnFiltered AI <support@so-unfiltered-ai.com>',
       to: email,
       subject: "Your messages are going to waste — So-UnFiltered AI",
       html: `
