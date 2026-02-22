@@ -575,7 +575,7 @@ export function useChats() {
               if (data.done) {
                 receivedDone = true;
                 // Update local message count (images/files cost 2)
-                setLocalMessagesUsed(prev => (prev ?? 0) + messageCost);
+                setLocalMessagesUsed(prev => (prev ?? session?.user?.messagesUsedToday ?? 0) + messageCost);
                 const responseTimeMs = Date.now() - responseStartTime;
                 track(EVENTS.MESSAGE_RECEIVED, {
                   response_time_ms: responseTimeMs,
@@ -642,7 +642,7 @@ export function useChats() {
                     : c
                 )
               );
-              setLocalMessagesUsed(prev => (prev ?? 0) + messageCost);
+              setLocalMessagesUsed(prev => (prev ?? session?.user?.messagesUsedToday ?? 0) + messageCost);
             }
           }
         } catch {
@@ -651,7 +651,7 @@ export function useChats() {
         }
       } else if (!receivedDone && streamedContent) {
         // We got content but no done signal - still count it as a message
-        setLocalMessagesUsed(prev => (prev ?? 0) + messageCost);
+        setLocalMessagesUsed(prev => (prev ?? session?.user?.messagesUsedToday ?? 0) + messageCost);
       }
 
     } catch (error) {
@@ -663,7 +663,7 @@ export function useChats() {
           duration_ms: Date.now() - responseStartTime,
         });
         // Backend already counted this message, so update frontend count
-        setLocalMessagesUsed(prev => (prev ?? 0) + messageCost);
+        setLocalMessagesUsed(prev => (prev ?? session?.user?.messagesUsedToday ?? 0) + messageCost);
         // Remove empty assistant message if no content was streamed
         if (!streamedContent) {
           setChats(prev => prev.map(c =>
@@ -942,7 +942,7 @@ export function useChats() {
 
               if (data.done) {
                 receivedDone = true;
-                setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+                setLocalMessagesUsed(prev => (prev ?? session?.user?.messagesUsedToday ?? 0) + 1);
                 track(EVENTS.STREAMING_COMPLETED, {
                   total_chunks: editChunkCount,
                   duration_ms: Date.now() - editStreamStart,
@@ -965,7 +965,7 @@ export function useChats() {
 
       // Don't refetch from DB for edit - trust local state
       if (!receivedDone) {
-        setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+        setLocalMessagesUsed(prev => (prev ?? session?.user?.messagesUsedToday ?? 0) + 1);
       }
     } catch (error) {
       // If user stopped the generation, don't show error - keep whatever was streamed
@@ -976,7 +976,7 @@ export function useChats() {
           duration_ms: Date.now() - editResponseStartTime,
         });
         // Backend already counted this message, so update frontend count
-        setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+        setLocalMessagesUsed(prev => (prev ?? session?.user?.messagesUsedToday ?? 0) + 1);
         if (!streamedContent) {
           setChats(prev => prev.map(c =>
             c.id === currentChatId
@@ -1176,7 +1176,7 @@ export function useChats() {
 
               if (data.done) {
                 receivedDone = true;
-                setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+                setLocalMessagesUsed(prev => (prev ?? session?.user?.messagesUsedToday ?? 0) + 1);
                 track(EVENTS.STREAMING_COMPLETED, {
                   total_chunks: regenChunkCount,
                   duration_ms: Date.now() - regenStreamStart,
@@ -1201,7 +1201,7 @@ export function useChats() {
       // The backend has already updated the DB, local state is correct
       if (!receivedDone) {
         // Just increment the message count if stream didn't send done signal
-        setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+        setLocalMessagesUsed(prev => (prev ?? session?.user?.messagesUsedToday ?? 0) + 1);
       }
     } catch (error) {
       // If user stopped the generation, don't show error - keep whatever was streamed
@@ -1212,7 +1212,7 @@ export function useChats() {
           duration_ms: Date.now() - regenResponseStartTime,
         });
         // Backend already counted this message, so update frontend count
-        setLocalMessagesUsed(prev => (prev ?? 0) + 1);
+        setLocalMessagesUsed(prev => (prev ?? session?.user?.messagesUsedToday ?? 0) + 1);
         if (!streamedContent) {
           setChats(prev => prev.map(c =>
             c.id === currentChatId
