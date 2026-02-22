@@ -3971,8 +3971,8 @@ function HomePage() {
             maxWidth: '440px',
             maxHeight: '90vh',
             overflowY: 'auto' as const,
-            background: isDarkMode ? '#141416' : '#ffffff',
-            border: `1px solid ${isDarkMode ? '#1E1E22' : '#e5e5e5'}`,
+            background: theme === 'dark' ? '#141416' : '#ffffff',
+            border: `1px solid ${theme === 'dark' ? '#1E1E22' : '#e5e5e5'}`,
             borderRadius: '20px',
             zIndex: 10001,
             padding: '32px 28px',
@@ -3986,7 +3986,7 @@ function HomePage() {
                 right: '16px',
                 background: 'none',
                 border: 'none',
-                color: isDarkMode ? '#5A5660' : '#999',
+                color: theme === 'dark' ? '#5A5660' : '#999',
                 cursor: 'pointer',
                 padding: '4px',
               }}
@@ -4019,14 +4019,14 @@ function HomePage() {
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: '18px',
               fontWeight: 700,
-              color: isDarkMode ? '#F0EDE8' : '#1a1a1a',
+              color: theme === 'dark' ? '#F0EDE8' : '#1a1a1a',
               textAlign: 'center' as const,
               margin: '0 0 8px',
             }}>AI Image Generation</h3>
 
             <p style={{
               fontSize: '13px',
-              color: isDarkMode ? '#8A8690' : '#666',
+              color: theme === 'dark' ? '#8A8690' : '#666',
               textAlign: 'center' as const,
               margin: '0 0 24px',
               lineHeight: 1.5,
@@ -4034,7 +4034,7 @@ function HomePage() {
 
             {/* Features list */}
             <div style={{
-              background: isDarkMode ? '#0C0C0E' : '#f8f8f8',
+              background: theme === 'dark' ? '#0C0C0E' : '#f8f8f8',
               borderRadius: '14px',
               padding: '20px',
               marginBottom: '24px',
@@ -4051,19 +4051,19 @@ function HomePage() {
                   alignItems: 'center',
                   gap: '12px',
                   padding: '10px 0',
-                  borderBottom: i < 4 ? `1px solid ${isDarkMode ? '#1E1E22' : '#eee'}` : 'none',
+                  borderBottom: i < 4 ? `1px solid ${theme === 'dark' ? '#1E1E22' : '#eee'}` : 'none',
                 }}>
                   <span style={{ fontSize: '18px', flexShrink: 0 }}>{feature.icon}</span>
                   <div>
                     <div style={{
                       fontSize: '13px',
                       fontWeight: 600,
-                      color: isDarkMode ? '#F0EDE8' : '#1a1a1a',
+                      color: theme === 'dark' ? '#F0EDE8' : '#1a1a1a',
                       marginBottom: '2px',
                     }}>{feature.title}</div>
                     <div style={{
                       fontSize: '11px',
-                      color: isDarkMode ? '#5A5660' : '#888',
+                      color: theme === 'dark' ? '#5A5660' : '#888',
                       lineHeight: 1.4,
                     }}>{feature.desc}</div>
                   </div>
@@ -4073,8 +4073,8 @@ function HomePage() {
 
             {/* Plus plan card */}
             <div style={{
-              background: isDarkMode ? 'linear-gradient(135deg, #1A1330 0%, #141416 100%)' : 'linear-gradient(135deg, #f3eeff 0%, #fff 100%)',
-              border: `1px solid ${isDarkMode ? '#2D1B4E' : '#d4c4f0'}`,
+              background: theme === 'dark' ? 'linear-gradient(135deg, #1A1330 0%, #141416 100%)' : 'linear-gradient(135deg, #f3eeff 0%, #fff 100%)',
+              border: `1px solid ${theme === 'dark' ? '#2D1B4E' : '#d4c4f0'}`,
               borderRadius: '14px',
               padding: '20px',
               textAlign: 'center' as const,
@@ -4091,12 +4091,12 @@ function HomePage() {
               <div style={{
                 fontSize: '32px',
                 fontWeight: 700,
-                color: isDarkMode ? '#F0EDE8' : '#1a1a1a',
+                color: theme === 'dark' ? '#F0EDE8' : '#1a1a1a',
                 marginBottom: '4px',
-              }}>$9.99<span style={{ fontSize: '14px', fontWeight: 400, color: isDarkMode ? '#5A5660' : '#888' }}>/mo</span></div>
+              }}>$9.99<span style={{ fontSize: '14px', fontWeight: 400, color: theme === 'dark' ? '#5A5660' : '#888' }}>/mo</span></div>
               <div style={{
                 fontSize: '12px',
-                color: isDarkMode ? '#8A8690' : '#666',
+                color: theme === 'dark' ? '#8A8690' : '#666',
                 marginBottom: '16px',
               }}>300 messages/day + Image Generation + everything in Pro</div>
               <button
@@ -4121,7 +4121,7 @@ function HomePage() {
 
             <p style={{
               fontSize: '11px',
-              color: isDarkMode ? '#3A3640' : '#bbb',
+              color: theme === 'dark' ? '#3A3640' : '#bbb',
               textAlign: 'center' as const,
               margin: 0,
             }}>Cancel anytime. No questions asked.</p>
