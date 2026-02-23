@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
+import { getSessionFromRequest } from "@/lib/mobile-auth";
 import { createClient } from "@supabase/supabase-js";
 import { updateNameSchema, validateInput } from "@/lib/validations";
 import { sanitizeErrorForClient } from "@/lib/env";
@@ -15,7 +14,7 @@ const supabase = createClient(
 const NAME_CHANGE_LIMIT = { limit: 5, windowSeconds: 60 * 60 };
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getSessionFromRequest(req);
 
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

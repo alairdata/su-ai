@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
+import { getSessionFromRequest } from "@/lib/mobile-auth";
 import { createClient } from "@supabase/supabase-js";
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from "@/lib/rate-limit";
 
@@ -14,7 +13,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ chatId: string }> }
 ) {
-  const session = await getServerSession(authOptions);
+  const session = await getSessionFromRequest(req);
 
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

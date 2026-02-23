@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { getSessionFromRequest } from "@/lib/mobile-auth";
 import { createClient } from "@supabase/supabase-js";
 import { getEffectivePlan } from "@/lib/plans";
 
@@ -47,7 +46,7 @@ function isAllowedByExtension(fileName: string): boolean {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSessionFromRequest(req);
 
     if (!session?.user) {
       return NextResponse.json(

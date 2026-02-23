@@ -348,7 +348,7 @@ export default function AdminPage() {
     return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
   }) : filteredUsers;
 
-  const toggleSort = (field: 'total_messages' | 'days_active' | 'active_days' | 'created_at' | 'avg_msgs_day') => {
+  const toggleSort = (field: 'total_messages' | 'messages_used_today' | 'days_active' | 'active_days' | 'created_at' | 'avg_msgs_day') => {
     if (sortField === field) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     } else {
@@ -873,6 +873,9 @@ export default function AdminPage() {
                   <th style={{ ...S.th, ...S.thSort }} onClick={() => toggleSort('total_messages')}>
                     Messages {sortField === 'total_messages' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                   </th>
+                  <th style={{ ...S.th, ...S.thSort }} onClick={() => toggleSort('messages_used_today')}>
+                    Today {sortField === 'messages_used_today' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </th>
                   <th style={{ ...S.th, ...S.thSort }} onClick={() => toggleSort('days_active')}>
                     Days Since Joined {sortField === 'days_active' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                   </th>
@@ -927,6 +930,7 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td style={{ ...S.td, fontVariantNumeric: 'tabular-nums' }}>{user.total_messages || 0}</td>
+                      <td style={{ ...S.td, fontVariantNumeric: 'tabular-nums' }}>{user.messages_used_today || 0}</td>
                       <td style={{ ...S.td, fontVariantNumeric: 'tabular-nums' }}>{user.days_active || 0}</td>
                       <td style={{ ...S.td, fontVariantNumeric: 'tabular-nums' }}>{user.active_days || 0}</td>
                       <td style={{ ...S.td, fontSize: '12px', color: '#9ca3af' }}>{new Date(user.created_at).toLocaleDateString()}</td>
