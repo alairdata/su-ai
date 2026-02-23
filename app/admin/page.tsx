@@ -173,7 +173,7 @@ export default function AdminPage() {
   const [chartLoading, setChartLoading] = useState(false);
 
   // Sorting
-  const [sortField, setSortField] = useState<'total_messages' | 'days_active' | 'active_days' | 'created_at' | 'avg_msgs_day' | null>(null);
+  const [sortField, setSortField] = useState<'total_messages' | 'messages_used_today' | 'days_active' | 'active_days' | 'created_at' | 'avg_msgs_day' | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   // Pagination
