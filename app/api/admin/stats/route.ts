@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
   // Get user counts by plan (include id and email for filtering)
   const { data: allUsers, error: usersError } = await supabase
     .from("users")
-    .select("id, email, plan, messages_used_today, created_at, subscription_status");
+    .select("id, email, plan, messages_used_today, last_reset_date, created_at, subscription_status");
 
   if (usersError) {
     console.error("Failed to fetch stats:", usersError);
@@ -68,6 +68,17 @@ export async function GET(req: NextRequest) {
   const users = (allUsers || []).filter(
     u => !EXCLUDED_EMAILS.includes(u.email?.toLowerCase() || '')
   );
+
+  // Fix stale messages_used_today: if last_reset_date is not today, treat as 0
+  const todayStr = new Date().toISOString().split('T')[0];
+  for (const user of users) {
+    const resetDate = user.last_reset_date
+      ? new Date(user.last_reset_date).toISOString().split('T')[0]
+      : null;
+    if (resetDate !== todayStr) {
+      user.messages_used_today = 0;
+    }
+  }
 
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
