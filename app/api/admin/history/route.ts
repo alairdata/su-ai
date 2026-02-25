@@ -187,6 +187,17 @@ export async function GET(req: NextRequest) {
   allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
+  // Build chat_id → user_id map for active user tracking
+  const chatUserMap = new Map<string, string>();
+  const { data: chatMappings } = await supabase
+    .from("chats")
+    .select("id, user_id");
+  for (const chat of (chatMappings || [])) {
+    if (!excludedUserIds.includes(chat.user_id)) {
+      chatUserMap.set(chat.id, chat.user_id);
+    }
+  }
+
   // Count messages per user in period using user_message_stats for accurate totals
   const userMessageCounts: Map<string, number> = new Map();
   const { data: userMsgStats } = await supabase
@@ -264,6 +275,9 @@ export async function GET(req: NextRequest) {
     now
   );
 
+  // Calculate active user trend (unique users who sent messages per time bucket)
+  const activeUserTrend = calculateActiveUserTrend(messages, chatUserMap, groupBy, startDate, now);
+
   // Calculate period-specific stats
   const periodStats = {
     signups: users.length,
@@ -277,6 +291,7 @@ export async function GET(req: NextRequest) {
     userTrend,
     messageTrend,
     avgTrend,
+    activeUserTrend,
     topUsers,
     messageDistribution,
     periodStats,
@@ -416,5 +431,45 @@ function calculateAvgTrend(
     });
   }
 
+  return result;
+}
+
+function calculateActiveUserTrend(
+  messages: { created_at: string; chat_id?: string }[],
+  chatUserMap: Map<string, string>,
+  groupBy: "hour" | "day" | "week" | "month",
+  startDate: Date,
+  endDate: Date
+): { label: string; count: number }[] {
+  // Group unique user IDs per time bucket
+  const bucketUsers = new Map<string, Set<string>>();
+
+  // Initialize all periods
+  const current = new Date(startDate);
+  while (current <= endDate) {
+    const key = getGroupKey(current, groupBy);
+    if (!bucketUsers.has(key)) bucketUsers.set(key, new Set());
+    switch (groupBy) {
+      case "hour": current.setHours(current.getHours() + 1); break;
+      case "day": current.setDate(current.getDate() + 1); break;
+      case "week": current.setDate(current.getDate() + 7); break;
+      case "month": current.setMonth(current.getMonth() + 1); break;
+    }
+  }
+
+  // Count unique users per bucket
+  for (const msg of messages) {
+    const userId = msg.chat_id ? chatUserMap.get(msg.chat_id) : null;
+    if (!userId) continue;
+    const key = getGroupKey(new Date(msg.created_at), groupBy);
+    const users = bucketUsers.get(key);
+    if (users) users.add(userId);
+  }
+
+  // Convert to array (insertion order = chronological)
+  const result: { label: string; count: number }[] = [];
+  for (const [label, users] of bucketUsers) {
+    result.push({ label, count: users.size });
+  }
   return result;
 }

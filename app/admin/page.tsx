@@ -167,6 +167,7 @@ export default function AdminPage() {
   const [messageTrend, setMessageTrend] = useState<TrendData[]>([]);
   const [avgTrend, setAvgTrend] = useState<AvgTrendData[]>([]);
   const [topUsers, setTopUsers] = useState<TopUser[]>([]);
+  const [activeUserTrend, setActiveUserTrend] = useState<{ label: string; count: number }[]>([]);
   const [messageDistribution, setMessageDistribution] = useState<MessageDistribution[]>([]);
   const [periodStats, setPeriodStats] = useState<PeriodStats | null>(null);
   const [chartPeriod, setChartPeriod] = useState<Period>("month");
@@ -242,6 +243,7 @@ export default function AdminPage() {
         setUserTrend(data.userTrend || []);
         setMessageTrend(data.messageTrend || []);
         setAvgTrend(data.avgTrend || []);
+        setActiveUserTrend(data.activeUserTrend || []);
         setTopUsers(data.topUsers || []);
         setMessageDistribution(data.messageDistribution || []);
         setPeriodStats(data.periodStats || null);
@@ -659,6 +661,45 @@ export default function AdminPage() {
                       type="monotone" dataKey="count" stroke="#10b981" strokeWidth={2}
                       fill="url(#gSignups)" activeDot={{ r: 4, fill: "#10b981", stroke: "#0c0c0e", strokeWidth: 2 }}
                       name="Signups"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+
+          {/* Active Users trend */}
+          <div style={{ marginTop: '16px' }}>
+            <div style={S.chartInner}>
+              <div style={S.chartHeader}>
+                <h3 style={S.chartTitle}>Active Users</h3>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <span style={{ ...S.chartBadge, color: '#f59e0b' }}>
+                    {activeUserTrend.length > 0 ? Math.max(...activeUserTrend.map(d => d.count)) : 0} peak
+                  </span>
+                  <span style={{ ...S.chartBadge, color: '#6b7280' }}>
+                    unique users who messaged
+                  </span>
+                </div>
+              </div>
+              {chartLoading ? (
+                <div style={S.chartLoading}>Loading...</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={240}>
+                  <AreaChart data={activeUserTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                    <defs>
+                      <linearGradient id="gActive" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#6b7280" }} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#6b7280" }} width={30} allowDecimals={false} />
+                    <Tooltip content={<DarkTooltip />} />
+                    <Area
+                      type="monotone" dataKey="count" stroke="#f59e0b" strokeWidth={2}
+                      fill="url(#gActive)" activeDot={{ r: 4, fill: "#f59e0b", stroke: "#0c0c0e", strokeWidth: 2 }}
+                      name="Active Users"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
