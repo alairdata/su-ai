@@ -2600,10 +2600,7 @@ function HomePage() {
 
       {showDowntimeBanner && (
         <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
+          position: 'relative',
           zIndex: 10000,
           background: 'linear-gradient(90deg, #D97706, #F59E0B)',
           color: '#fff',
@@ -2615,6 +2612,7 @@ function HomePage() {
           fontWeight: 500,
           fontFamily: "'Inter', sans-serif",
           textAlign: 'center' as const,
+          flexShrink: 0,
         }}>
           <span>System downtime — try again later</span>
           <button
@@ -2643,7 +2641,7 @@ function HomePage() {
         </div>
       )}
 
-      <div style={{ ...currentStyles.app, ...(showDowntimeBanner ? { paddingTop: 40 } : {}) }}>
+      <div style={{ ...currentStyles.app, height: showDowntimeBanner ? 'calc(100dvh - 40px)' : '100dvh' }}>
         {isMobile && sidebarOpen && (
           <div
             style={currentStyles.mobileOverlay}
@@ -2657,7 +2655,7 @@ function HomePage() {
           ...(isMobile ? {
             position: 'fixed' as const,
             left: sidebarOpen ? 0 : '-280px',
-            top: 0,
+            top: showDowntimeBanner ? 40 : 0,
             bottom: 0,
             zIndex: 1000,
             width: '280px',
