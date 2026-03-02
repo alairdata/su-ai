@@ -640,6 +640,7 @@ function HomePage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingScreen, setOnboardingScreen] = useState(1);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [showDowntimeBanner, setShowDowntimeBanner] = useState(true);
   const [whatsNewScreen, setWhatsNewScreen] = useState(1);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showImageGenModal, setShowImageGenModal] = useState(false);
@@ -2597,7 +2598,52 @@ function HomePage() {
         </div>
       )}
 
-      <div style={currentStyles.app}>
+      {showDowntimeBanner && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10000,
+          background: 'linear-gradient(90deg, #D97706, #F59E0B)',
+          color: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '10px 40px 10px 16px',
+          fontSize: '14px',
+          fontWeight: 500,
+          fontFamily: "'Inter', sans-serif",
+          textAlign: 'center' as const,
+        }}>
+          <span>System downtime — try again later</span>
+          <button
+            onClick={() => setShowDowntimeBanner(false)}
+            style={{
+              position: 'absolute',
+              right: 12,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'none',
+              border: 'none',
+              color: '#fff',
+              cursor: 'pointer',
+              padding: 4,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            title="Dismiss"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      <div style={{ ...currentStyles.app, ...(showDowntimeBanner ? { paddingTop: 40 } : {}) }}>
         {isMobile && sidebarOpen && (
           <div
             style={currentStyles.mobileOverlay}
