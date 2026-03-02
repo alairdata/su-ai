@@ -2614,7 +2614,7 @@ function HomePage() {
           textAlign: 'center' as const,
           flexShrink: 0,
         }}>
-          <span>System downtime — try again later</span>
+          <span>System operations restored — Refresh and try again</span>
           <button
             onClick={() => setShowDowntimeBanner(false)}
             style={{
