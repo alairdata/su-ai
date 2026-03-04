@@ -401,7 +401,7 @@ export default function AdminPage() {
     return (
       <div style={S.page}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#9ca3af', fontSize: '15px', gap: '12px' }}>
-          <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid #E8A04C', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          <span style={{ display: 'inline-block', width: 18, height: 18, border: '2px solid #E69F00', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           Loading admin dashboard...
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
@@ -413,7 +413,7 @@ export default function AdminPage() {
     return (
       <div style={S.page}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: '16px' }}>
-          <div style={{ color: '#ef4444', fontSize: '18px', fontWeight: 600 }}>{error}</div>
+          <div style={{ color: '#D55E00', fontSize: '18px', fontWeight: 600 }}>{error}</div>
           <button onClick={() => router.push("/")} style={S.btnSecondary}>Back to app</button>
         </div>
       </div>
@@ -433,7 +433,7 @@ export default function AdminPage() {
             <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
               <defs>
                 <linearGradient id="logoGrad" x1="30%" y1="0%" x2="70%" y2="100%">
-                  <stop offset="0%" stopColor="#E8A04C" />
+                  <stop offset="0%" stopColor="#E69F00" />
                   <stop offset="100%" stopColor="#E8624C" />
                 </linearGradient>
               </defs>
@@ -444,7 +444,7 @@ export default function AdminPage() {
               <span style={{ fontSize: '11px', color: '#6b7280' }}>So-UnFiltered AI</span>
             </div>
             <span style={S.liveBadge}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#009E73', display: 'inline-block' }} />
               Live
             </span>
           </div>
@@ -473,28 +473,28 @@ export default function AdminPage() {
         {stats && (
           <div style={S.statsGrid}>
             {/* Row 1 */}
-            <StatCard label="Total Users" value={stats.totalUsers} sub="all-time signups" icon="👥" accent="#3b82f6" />
+            <StatCard label="Total Users" value={stats.totalUsers} sub="all-time signups" icon="👥" accent="#0072B2" />
             <StatCard
               label="Total Messages"
               value={stats.allTimeMessages.toLocaleString()}
               icon="💬"
-              accent="#8b5cf6"
+              accent="#CC79A7"
               sub={stats.deletedMessages > 0 ? `${stats.totalMessages.toLocaleString()} active · ${stats.deletedMessages.toLocaleString()} deleted` : 'all-time'}
             />
-            <StatCard label="Messages Today" value={stats.totalMessagesToday} sub="user messages sent today" icon="📨" accent="#f59e0b" />
+            <StatCard label="Messages Today" value={stats.totalMessagesToday} sub="user messages sent today" icon="📨" accent="#E69F00" />
             <StatCard
               label="Msgs/Active User"
               value={computed?.avgSessionDepth.toFixed(1) || '0'}
               icon="🎯"
-              accent="#8b5cf6"
+              accent="#CC79A7"
               sub="avg for users with 1+ msg"
             />
-            <StatCard label="Active Subs" value={stats.activeSubscriptions} sub="paid subscriptions" icon="💳" accent="#ec4899" />
+            <StatCard label="Active Subs" value={stats.activeSubscriptions} sub="paid subscriptions" icon="💳" accent="#56B4E9" />
             <StatCard
               label="MRR"
               value={`$${computed?.mrr.toFixed(2) || '0.00'}`}
               icon="💰"
-              accent="#E8A04C"
+              accent="#E69F00"
               sub="monthly recurring revenue"
             />
             {/* Row 2 */}
@@ -502,19 +502,19 @@ export default function AdminPage() {
               label="Msgs/User"
               value={stats.avgMessagesPerUser.toFixed(1)}
               icon="📊"
-              accent="#3b82f6"
+              accent="#0072B2"
               sub="all-time incl. ghosts"
             />
             <StatCard
               label="Msgs/Active Day"
               value={users.length > 0 ? (users.reduce((sum, u) => sum + getAvgMsgsDay(u), 0) / users.length).toFixed(1) : '0'}
               icon="📅"
-              accent="#10b981"
+              accent="#009E73"
               sub="avg msgs per active day"
             />
             <StatCard label="Free Users" value={stats.planCounts.Free} icon="🆓" accent="#6b7280" sub={`$0/mo`} />
-            <StatCard label="Pro Users" value={stats.planCounts.Pro} icon="⚡" accent="#3b82f6" sub={`$4.99/mo each`} />
-            <StatCard label="Plus Users" value={stats.planCounts.Plus} icon="💎" accent="#a855f7" sub={`$9.99/mo each`} />
+            <StatCard label="Pro Users" value={stats.planCounts.Pro} icon="⚡" accent="#0072B2" sub={`$4.99/mo each`} />
+            <StatCard label="Plus Users" value={stats.planCounts.Plus} icon="💎" accent="#CC79A7" sub={`$9.99/mo each`} />
           </div>
         )}
 
@@ -524,10 +524,10 @@ export default function AdminPage() {
             <h2 style={S.sectionTitle}>Conversion Funnel</h2>
             <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
               {[
-                { label: 'Signed Up', value: computed.funnel.signupCount, color: '#3b82f6' },
-                { label: '1+ Messages', value: computed.funnel.oneMsg, color: '#8b5cf6' },
-                { label: '10+ Messages', value: computed.funnel.tenMsg, color: '#f59e0b' },
-                { label: 'Paid', value: computed.funnel.paidCount, color: '#22c55e' },
+                { label: 'Signed Up', value: computed.funnel.signupCount, color: '#0072B2' },
+                { label: '1+ Messages', value: computed.funnel.oneMsg, color: '#CC79A7' },
+                { label: '10+ Messages', value: computed.funnel.tenMsg, color: '#E69F00' },
+                { label: 'Paid', value: computed.funnel.paidCount, color: '#009E73' },
               ].map((step, i, arr) => {
                 const pct = computed.funnel.signupCount > 0 ? (step.value / computed.funnel.signupCount * 100) : 0;
                 const dropoff = i > 0 && arr[i - 1].value > 0
@@ -552,7 +552,7 @@ export default function AdminPage() {
                       <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{pct.toFixed(0)}% of total</div>
                     </div>
                     {dropoff && (
-                      <div style={{ fontSize: '10px', color: '#ef4444', marginTop: '6px', fontWeight: 500 }}>-{dropoff}% drop</div>
+                      <div style={{ fontSize: '10px', color: '#D55E00', marginTop: '6px', fontWeight: 500 }}>-{dropoff}% drop</div>
                     )}
                   </div>
                 );
@@ -589,10 +589,10 @@ export default function AdminPage() {
               <div style={S.chartHeader}>
                 <h3 style={S.chartTitle}>Cumulative Growth</h3>
                 <div style={{ display: 'flex', gap: '6px' }}>
-                  <span style={{ ...S.chartBadge, color: '#60a5fa' }}>
+                  <span style={{ ...S.chartBadge, color: '#0072B2' }}>
                     {userTrend.length > 0 ? userTrend[userTrend.length - 1]?.cumulative || 0 : 0} users
                   </span>
-                  <span style={{ ...S.chartBadge, color: '#a78bfa' }}>
+                  <span style={{ ...S.chartBadge, color: '#CC79A7' }}>
                     {messageTrend.length > 0 ? messageTrend[messageTrend.length - 1]?.cumulative || 0 : 0} msgs
                   </span>
                 </div>
@@ -611,20 +611,20 @@ export default function AdminPage() {
                   >
                     <defs>
                       <linearGradient id="gUsers" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
+                        <stop offset="5%" stopColor="#0072B2" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#0072B2" stopOpacity={0.02} />
                       </linearGradient>
                       <linearGradient id="gMessages" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.02} />
+                        <stop offset="5%" stopColor="#CC79A7" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#CC79A7" stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
                     <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#6b7280" }} dy={10} />
-                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#60a5fa" }} width={35} />
-                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#a78bfa" }} width={40} />
+                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#0072B2" }} width={35} />
+                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#CC79A7" }} width={40} />
                     <Tooltip content={<DarkTooltip />} />
-                    <Area yAxisId="left" type="monotone" dataKey="users" stroke="#3b82f6" strokeWidth={2} fill="url(#gUsers)" name="Users" />
-                    <Area yAxisId="right" type="monotone" dataKey="messages" stroke="#8b5cf6" strokeWidth={2} fill="url(#gMessages)" name="Messages" />
+                    <Area yAxisId="left" type="monotone" dataKey="users" stroke="#0072B2" strokeWidth={2} fill="url(#gUsers)" name="Users" />
+                    <Area yAxisId="right" type="monotone" dataKey="messages" stroke="#CC79A7" strokeWidth={2} fill="url(#gMessages)" name="Messages" />
                   </AreaChart>
                 </ResponsiveContainer>
               )}
@@ -635,7 +635,7 @@ export default function AdminPage() {
               <div style={S.chartHeader}>
                 <h3 style={S.chartTitle}>Signups</h3>
                 <div style={{ display: 'flex', gap: '6px' }}>
-                  <span style={{ ...S.chartBadge, color: '#34d399' }}>
+                  <span style={{ ...S.chartBadge, color: '#009E73' }}>
                     {userTrend.length > 0 ? userTrend[userTrend.length - 1]?.cumulative || 0 : 0} total
                   </span>
                   <span style={{ ...S.chartBadge, color: '#6b7280' }}>
@@ -650,16 +650,16 @@ export default function AdminPage() {
                   <AreaChart data={userTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                     <defs>
                       <linearGradient id="gSignups" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
+                        <stop offset="5%" stopColor="#009E73" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#009E73" stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
                     <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#6b7280" }} dy={10} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#6b7280" }} width={30} />
                     <Tooltip content={<DarkTooltip />} />
                     <Area
-                      type="monotone" dataKey="count" stroke="#10b981" strokeWidth={2}
-                      fill="url(#gSignups)" activeDot={{ r: 4, fill: "#10b981", stroke: "#0c0c0e", strokeWidth: 2 }}
+                      type="monotone" dataKey="count" stroke="#009E73" strokeWidth={2}
+                      fill="url(#gSignups)" activeDot={{ r: 4, fill: "#009E73", stroke: "#0c0c0e", strokeWidth: 2 }}
                       name="Signups"
                     />
                   </AreaChart>
@@ -674,7 +674,7 @@ export default function AdminPage() {
               <div style={S.chartHeader}>
                 <h3 style={S.chartTitle}>Active Users</h3>
                 <div style={{ display: 'flex', gap: '6px' }}>
-                  <span style={{ ...S.chartBadge, color: '#f59e0b' }}>
+                  <span style={{ ...S.chartBadge, color: '#E69F00' }}>
                     {activeUserTrend.length > 0 ? Math.max(...activeUserTrend.map(d => d.count)) : 0} peak
                   </span>
                   <span style={{ ...S.chartBadge, color: '#6b7280' }}>
@@ -689,16 +689,16 @@ export default function AdminPage() {
                   <AreaChart data={activeUserTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                     <defs>
                       <linearGradient id="gActive" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.02} />
+                        <stop offset="5%" stopColor="#E69F00" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#E69F00" stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
                     <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#6b7280" }} dy={10} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#6b7280" }} width={30} allowDecimals={false} />
                     <Tooltip content={<DarkTooltip />} />
                     <Area
-                      type="monotone" dataKey="count" stroke="#f59e0b" strokeWidth={2}
-                      fill="url(#gActive)" activeDot={{ r: 4, fill: "#f59e0b", stroke: "#0c0c0e", strokeWidth: 2 }}
+                      type="monotone" dataKey="count" stroke="#E69F00" strokeWidth={2}
+                      fill="url(#gActive)" activeDot={{ r: 4, fill: "#E69F00", stroke: "#0c0c0e", strokeWidth: 2 }}
                       name="Active Users"
                     />
                   </AreaChart>
@@ -714,7 +714,7 @@ export default function AdminPage() {
           <div style={S.card}>
             <div style={S.chartHeader}>
               <h3 style={S.chartTitle}>Top 10 Users</h3>
-              <span style={{ ...S.chartBadge, color: '#fbbf24' }}>{chartPeriod}</span>
+              <span style={{ ...S.chartBadge, color: '#E69F00' }}>{chartPeriod}</span>
             </div>
             {chartLoading ? <div style={S.chartLoading}>Loading...</div> : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -723,12 +723,12 @@ export default function AdminPage() {
                     <span style={{ color: '#6b7280', width: '16px', textAlign: 'right', flexShrink: 0, fontWeight: 500 }}>{i + 1}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
-                        background: `linear-gradient(90deg, rgba(245,158,11,0.25) ${(u.messageCount / topUserMax * 100)}%, transparent ${(u.messageCount / topUserMax * 100)}%)`,
+                        background: `linear-gradient(90deg, rgba(230,159,0,0.25) ${(u.messageCount / topUserMax * 100)}%, transparent ${(u.messageCount / topUserMax * 100)}%)`,
                         borderRadius: '4px', padding: '4px 8px',
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       }}>
                         <span style={{ color: '#e5e7eb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={u.email}>{u.name}</span>
-                        <span style={{ color: '#fbbf24', fontWeight: 600, flexShrink: 0, marginLeft: '8px' }}>{u.messageCount}</span>
+                        <span style={{ color: '#E69F00', fontWeight: 600, flexShrink: 0, marginLeft: '8px' }}>{u.messageCount}</span>
                       </div>
                     </div>
                   </div>
@@ -742,7 +742,7 @@ export default function AdminPage() {
           <div style={S.card}>
             <div style={S.chartHeader}>
               <h3 style={S.chartTitle}>Daily Msg Distribution</h3>
-              <span style={{ ...S.chartBadge, color: '#f87171' }}>msgs/day</span>
+              <span style={{ ...S.chartBadge, color: '#D55E00' }}>msgs/day</span>
             </div>
             {chartLoading ? <div style={S.chartLoading}>Loading...</div> : (
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '180px', paddingTop: '12px' }}>
@@ -752,7 +752,7 @@ export default function AdminPage() {
                     <div style={{
                       width: '100%',
                       height: `${distMax > 0 ? Math.max(d.count / distMax * 100, d.count > 0 ? 4 : 0) : 0}%`,
-                      background: 'linear-gradient(180deg, #ef4444, #b91c1c)',
+                      background: 'linear-gradient(180deg, #D55E00, #A04000)',
                       borderRadius: '4px 4px 0 0',
                       minHeight: d.count > 0 ? '4px' : '0',
                       transition: 'height 0.3s ease',
@@ -775,9 +775,9 @@ export default function AdminPage() {
             {computed ? (
               <DonutChart segments={[
                 { label: 'Ghost (0 msgs)', value: computed.ghosts, color: '#6b7280' },
-                { label: 'Free (1-10)', value: computed.freeActiveCount, color: '#3b82f6' },
-                { label: 'Free (11+)', value: computed.freePowerCount, color: '#8b5cf6' },
-                { label: 'Paid', value: computed.paidCount, color: '#22c55e' },
+                { label: 'Free (1-10)', value: computed.freeActiveCount, color: '#0072B2' },
+                { label: 'Free (11+)', value: computed.freePowerCount, color: '#CC79A7' },
+                { label: 'Paid', value: computed.paidCount, color: '#009E73' },
               ]} />
             ) : <div style={S.chartLoading}>No data</div>}
           </div>
@@ -793,10 +793,10 @@ export default function AdminPage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>Retention Rate</span>
-                    <span style={{ fontSize: '13px', color: '#22c55e', fontWeight: 700 }}>{(computed.retentionRate * 100).toFixed(1)}%</span>
+                    <span style={{ fontSize: '13px', color: '#009E73', fontWeight: 700 }}>{(computed.retentionRate * 100).toFixed(1)}%</span>
                   </div>
                   <div style={{ width: '100%', height: '12px', background: '#1A1A1E', borderRadius: '6px', overflow: 'hidden' }}>
-                    <div style={{ width: `${computed.retentionRate * 100}%`, height: '100%', background: 'linear-gradient(90deg, #22c55e, #16a34a)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
+                    <div style={{ width: `${computed.retentionRate * 100}%`, height: '100%', background: 'linear-gradient(90deg, #009E73, #009E73)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
                   </div>
                   <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{users.filter(u => (u.total_messages || 0) > 0).length} of {users.length} users sent 1+ message</div>
                 </div>
@@ -805,10 +805,10 @@ export default function AdminPage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>Ghost Rate (Churn)</span>
-                    <span style={{ fontSize: '13px', color: computed.ghostRate > 0.5 ? '#ef4444' : '#f59e0b', fontWeight: 700 }}>{(computed.ghostRate * 100).toFixed(1)}%</span>
+                    <span style={{ fontSize: '13px', color: computed.ghostRate > 0.5 ? '#D55E00' : '#E69F00', fontWeight: 700 }}>{(computed.ghostRate * 100).toFixed(1)}%</span>
                   </div>
                   <div style={{ width: '100%', height: '12px', background: '#1A1A1E', borderRadius: '6px', overflow: 'hidden' }}>
-                    <div style={{ width: `${computed.ghostRate * 100}%`, height: '100%', background: computed.ghostRate > 0.5 ? 'linear-gradient(90deg, #ef4444, #dc2626)' : 'linear-gradient(90deg, #f59e0b, #d97706)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
+                    <div style={{ width: `${computed.ghostRate * 100}%`, height: '100%', background: computed.ghostRate > 0.5 ? 'linear-gradient(90deg, #D55E00, #D55E00)' : 'linear-gradient(90deg, #E69F00, #E69F00)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
                   </div>
                   <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{computed.ghosts} users signed up but never messaged</div>
                 </div>
@@ -817,10 +817,10 @@ export default function AdminPage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>Paid Conversion</span>
-                    <span style={{ fontSize: '13px', color: '#a855f7', fontWeight: 700 }}>{users.length > 0 ? ((computed.paidCount / users.length) * 100).toFixed(1) : '0'}%</span>
+                    <span style={{ fontSize: '13px', color: '#CC79A7', fontWeight: 700 }}>{users.length > 0 ? ((computed.paidCount / users.length) * 100).toFixed(1) : '0'}%</span>
                   </div>
                   <div style={{ width: '100%', height: '12px', background: '#1A1A1E', borderRadius: '6px', overflow: 'hidden' }}>
-                    <div style={{ width: `${users.length > 0 ? (computed.paidCount / users.length) * 100 : 0}%`, height: '100%', background: 'linear-gradient(90deg, #a855f7, #7c3aed)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
+                    <div style={{ width: `${users.length > 0 ? (computed.paidCount / users.length) * 100 : 0}%`, height: '100%', background: 'linear-gradient(90deg, #CC79A7, #CC79A7)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
                   </div>
                   <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{computed.paidCount} of {users.length} users on a paid plan</div>
                 </div>
@@ -835,7 +835,7 @@ export default function AdminPage() {
             {/* MRR Card */}
             <div style={S.card}>
               <h3 style={S.chartTitle}>Monthly Recurring Revenue</h3>
-              <div style={{ fontSize: '36px', fontWeight: 700, color: '#E8A04C', margin: '12px 0 16px', letterSpacing: '-0.02em' }}>
+              <div style={{ fontSize: '36px', fontWeight: 700, color: '#E69F00', margin: '12px 0 16px', letterSpacing: '-0.02em' }}>
                 ${computed.mrr.toFixed(2)}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -863,21 +863,21 @@ export default function AdminPage() {
                   current={computed.mrr}
                   target={computed.targetMRR}
                   format="currency"
-                  color="#E8A04C"
+                  color="#E69F00"
                 />
                 <ProgressTarget
                   label="User Target"
                   current={stats.totalUsers}
                   target={computed.targetUsers}
                   format="number"
-                  color="#3b82f6"
+                  color="#0072B2"
                 />
                 <ProgressTarget
                   label="Paid Conversion"
                   current={computed.paidCount}
                   target={Math.max(Math.ceil(stats.totalUsers * 0.1), 1)}
                   format="number"
-                  color="#22c55e"
+                  color="#009E73"
                   suffix={` / ${Math.max(Math.ceil(stats.totalUsers * 0.1), 1)} (10% target)`}
                 />
               </div>
@@ -952,8 +952,8 @@ export default function AdminPage() {
                           ...S.badge,
                           background: user.plan === "Plus" ? 'rgba(139,92,246,0.2)' :
                                      user.plan === "Pro" ? 'rgba(59,130,246,0.2)' : 'rgba(107,114,128,0.2)',
-                          color: user.plan === "Plus" ? '#a78bfa' :
-                                 user.plan === "Pro" ? '#60a5fa' : '#9ca3af',
+                          color: user.plan === "Plus" ? '#CC79A7' :
+                                 user.plan === "Pro" ? '#0072B2' : '#9ca3af',
                           border: `1px solid ${user.plan === "Plus" ? 'rgba(139,92,246,0.3)' :
                                                 user.plan === "Pro" ? 'rgba(59,130,246,0.3)' : 'rgba(107,114,128,0.3)'}`,
                         }}>
@@ -964,7 +964,7 @@ export default function AdminPage() {
                         <span style={{
                           ...S.badge,
                           background: isPower ? 'rgba(139,92,246,0.15)' : isActive ? 'rgba(34,197,94,0.15)' : 'rgba(107,114,128,0.15)',
-                          color: isPower ? '#a78bfa' : isActive ? '#4ade80' : '#6b7280',
+                          color: isPower ? '#CC79A7' : isActive ? '#4ade80' : '#6b7280',
                           border: `1px solid ${isPower ? 'rgba(139,92,246,0.3)' : isActive ? 'rgba(34,197,94,0.3)' : 'rgba(107,114,128,0.2)'}`,
                         }}>
                           {isPower ? 'Power' : isActive ? 'Active' : 'Ghost'}
@@ -1148,7 +1148,7 @@ const S: { [key: string]: React.CSSProperties } = {
   btnDanger: {
     padding: '8px 16px',
     background: 'rgba(239,68,68,0.15)',
-    color: '#f87171',
+    color: '#D55E00',
     border: '1px solid rgba(239,68,68,0.3)',
     borderRadius: '8px',
     cursor: 'pointer',
@@ -1158,7 +1158,7 @@ const S: { [key: string]: React.CSSProperties } = {
   btnDangerSmall: {
     padding: '4px 8px',
     background: 'rgba(239,68,68,0.15)',
-    color: '#f87171',
+    color: '#D55E00',
     border: '1px solid rgba(239,68,68,0.3)',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -1178,7 +1178,7 @@ const S: { [key: string]: React.CSSProperties } = {
   },
   btnAccent: {
     padding: '8px 16px',
-    background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+    background: 'linear-gradient(135deg, #E69F00, #E8624C)',
     color: '#0c0c0e',
     border: 'none',
     borderRadius: '8px',
