@@ -15,12 +15,6 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .map(email => email.trim().toLowerCase())
   .filter(email => email.length > 0);
 
-// SECURITY: Emails to exclude from aggregations/stats - moved to env var
-const EXCLUDED_EMAILS = (process.env.EXCLUDED_STATS_EMAILS || '')
-  .split(',')
-  .map(email => email.trim().toLowerCase())
-  .filter(email => email.length > 0);
-
 function isAdmin(email: string | null | undefined): boolean {
   if (!email) return false;
   return ADMIN_EMAILS.includes(email.toLowerCase());
@@ -59,15 +53,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 });
   }
 
-  // Get excluded user IDs
-  const excludedUserIds = (allUsers || [])
-    .filter(u => EXCLUDED_EMAILS.includes(u.email?.toLowerCase() || ''))
-    .map(u => u.id);
-
-  // Filter out excluded emails from aggregations
-  const users = (allUsers || []).filter(
-    u => !EXCLUDED_EMAILS.includes(u.email?.toLowerCase() || '')
-  );
+  const users = allUsers || [];
 
   // Fix stale messages_used_today: if last_reset_date is not today, treat as 0
   const todayStr = new Date().toISOString().split('T')[0];
@@ -90,15 +76,10 @@ export async function GET(req: NextRequest) {
     .from("user_message_stats")
     .select("id, undeleted_messages, deleted_messages, total_messages");
 
-  // Filter out excluded users
-  const filteredStats = (messageStats || []).filter(
-    s => !excludedUserIds.includes(s.id)
-  );
-
   let totalUndeletedMessages = 0;
   let totalDeletedMessages = 0;
   let totalAllMessages = 0;
-  for (const s of filteredStats) {
+  for (const s of (messageStats || [])) {
     totalUndeletedMessages += s.undeleted_messages || 0;
     totalDeletedMessages += s.deleted_messages || 0;
     totalAllMessages += s.total_messages || 0;

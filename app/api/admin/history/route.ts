@@ -14,12 +14,6 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .map(email => email.trim().toLowerCase())
   .filter(email => email.length > 0);
 
-// SECURITY: Emails to exclude from aggregations/stats - moved to env var
-const EXCLUDED_EMAILS = (process.env.EXCLUDED_STATS_EMAILS || '')
-  .split(',')
-  .map(email => email.trim().toLowerCase())
-  .filter(email => email.length > 0);
-
 // Fixed start date for all data: Jan 28th 2026
 const DATA_START_DATE = new Date('2026-01-28T00:00:00.000Z');
 
@@ -85,10 +79,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Failed to fetch history" }, { status: 500 });
   }
 
-  // Filter out excluded emails
-  const users = (usersRaw || []).filter(
-    u => !EXCLUDED_EMAILS.includes(u.email?.toLowerCase() || '')
-  );
+  const users = usersRaw || [];
 
   // Fetch ALL users for cumulative count (for avg calculation)
   const { data: allUsersRaw } = await supabase
@@ -96,76 +87,33 @@ export async function GET(req: NextRequest) {
     .select("id, email, created_at")
     .order("created_at", { ascending: true });
 
-  // Get excluded user IDs and filter out excluded emails
-  const excludedUserIds = (allUsersRaw || [])
-    .filter(u => EXCLUDED_EMAILS.includes(u.email?.toLowerCase() || ''))
-    .map(u => u.id);
+  const allUsers = allUsersRaw || [];
 
-  const allUsers = (allUsersRaw || []).filter(
-    u => !EXCLUDED_EMAILS.includes(u.email?.toLowerCase() || '')
-  );
-
-  // Get chat IDs belonging to excluded users
-  let excludedChatIds: string[] = [];
-  if (excludedUserIds.length > 0) {
-    const { data: excludedChats } = await supabase
-      .from("chats")
-      .select("id")
-      .in("user_id", excludedUserIds);
-    excludedChatIds = (excludedChats || []).map(c => c.id);
-  }
-
-  // Fetch messages for message trend (within period) - excluding messages from excluded users
+  // Fetch messages for message trend (within period)
   // ONLY count user messages, not assistant responses
-  let messages: { created_at: string; chat_id?: string }[] = [];
-  if (excludedChatIds.length > 0) {
-    const { data, error: messagesError } = await supabase
-      .from("messages")
-      .select("created_at, chat_id")
-      .eq("role", "user")
-      .gte("created_at", startDate.toISOString())
-      .order("created_at", { ascending: true });
+  const { data: messagesData, error: messagesError } = await supabase
+    .from("messages")
+    .select("created_at, chat_id")
+    .eq("role", "user")
+    .gte("created_at", startDate.toISOString())
+    .order("created_at", { ascending: true });
 
-    messages = (data || []).filter(m => !excludedChatIds.includes(m.chat_id));
-    if (messagesError) console.error("Messages error:", messagesError);
-  } else {
-    const { data, error: messagesError } = await supabase
-      .from("messages")
-      .select("created_at, chat_id")
-      .eq("role", "user")
-      .gte("created_at", startDate.toISOString())
-      .order("created_at", { ascending: true });
-    messages = data || [];
-    if (messagesError) console.error("Messages error:", messagesError);
-  }
+  let messages: { created_at: string; chat_id?: string }[] = messagesData || [];
+  if (messagesError) console.error("Messages error:", messagesError);
 
-  // Fetch ALL messages for cumulative count - excluding messages from excluded users
+  // Fetch ALL messages for cumulative count
   // ONLY count user messages, not assistant responses
-  let allMessages: { created_at: string }[] = [];
-  if (excludedChatIds.length > 0) {
-    const { data } = await supabase
-      .from("messages")
-      .select("created_at, chat_id")
-      .eq("role", "user")
-      .order("created_at", { ascending: true });
-    allMessages = (data || []).filter(m => !excludedChatIds.includes(m.chat_id));
-  } else {
-    const { data } = await supabase
-      .from("messages")
-      .select("created_at")
-      .eq("role", "user")
-      .order("created_at", { ascending: true });
-    allMessages = data || [];
-  }
+  const { data: allMessagesData } = await supabase
+    .from("messages")
+    .select("created_at")
+    .eq("role", "user")
+    .order("created_at", { ascending: true });
+  let allMessages: { created_at: string }[] = allMessagesData || [];
 
   // Fetch deleted messages from deleted_chats (archived as JSON)
   // and merge them into messages, allMessages for complete chart data
   try {
-    let deletedQuery = supabase.from("deleted_chats").select("messages, user_id");
-    if (excludedUserIds.length > 0) {
-      deletedQuery = deletedQuery.not("user_id", "in", `(${excludedUserIds.join(",")})`);
-    }
-    const { data: deletedChats } = await deletedQuery;
+    const { data: deletedChats } = await supabase.from("deleted_chats").select("messages, user_id");
     if (deletedChats) {
       for (const chat of deletedChats) {
         const msgs = Array.isArray(chat.messages) ? chat.messages : [];
@@ -193,9 +141,7 @@ export async function GET(req: NextRequest) {
     .from("chats")
     .select("id, user_id");
   for (const chat of (chatMappings || [])) {
-    if (!excludedUserIds.includes(chat.user_id)) {
-      chatUserMap.set(chat.id, chat.user_id);
-    }
+    chatUserMap.set(chat.id, chat.user_id);
   }
 
   // Count messages per user in period using user_message_stats for accurate totals
@@ -206,7 +152,7 @@ export async function GET(req: NextRequest) {
 
   if (userMsgStats) {
     for (const s of userMsgStats) {
-      if (!excludedUserIds.includes(s.id) && (s.total_messages || 0) > 0) {
+      if ((s.total_messages || 0) > 0) {
         userMessageCounts.set(s.id, s.total_messages);
       }
     }
