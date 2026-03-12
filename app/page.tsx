@@ -645,6 +645,7 @@ function HomePage() {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showImageGenModal, setShowImageGenModal] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitCountdown, setLimitCountdown] = useState({ h: 0, m: 0, s: 0 });
   const [showMemorySection, setShowMemorySection] = useState(false);
   const [selectedTimezone, setSelectedTimezone] = useState("");
   const [isUpdatingTimezone, setIsUpdatingTimezone] = useState(false);
@@ -965,6 +966,25 @@ function HomePage() {
       setShowLimitModal(true);
     }
   }, [canSendMessage, isChatsLoaded]);
+
+  // Live countdown timer for limit modal
+  useEffect(() => {
+    if (!showLimitModal) return;
+    const tick = () => {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      const diff = Math.max(0, Math.floor((midnight.getTime() - now.getTime()) / 1000));
+      setLimitCountdown({
+        h: Math.floor(diff / 3600),
+        m: Math.floor((diff % 3600) / 60),
+        s: diff % 60,
+      });
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [showLimitModal]);
 
   // Dynamic greeting based on time of day
   const getGreeting = () => {
@@ -3652,15 +3672,7 @@ function HomePage() {
       {/* Image Generation Upsell Modal */}
       {/* Daily Limit Modal */}
       {showLimitModal && (() => {
-        // Calculate time until midnight
-        const now = new Date();
-        const midnight = new Date(now);
-        midnight.setHours(24, 0, 0, 0);
-        const diffMs = midnight.getTime() - now.getTime();
-        const totalSecs = Math.floor(diffMs / 1000);
-        const h = Math.floor(totalSecs / 3600);
-        const m = Math.floor((totalSecs % 3600) / 60);
-        const s = totalSecs % 60;
+        const { h, m, s } = limitCountdown;
 
         const plan = session?.user?.plan || 'Free';
         const limit = plan === 'Free' ? 5 : plan === 'Pro' ? 100 : 300;
