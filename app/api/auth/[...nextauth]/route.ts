@@ -336,7 +336,9 @@ export const authOptions: NextAuthOptions = {
 
           // Check if it's a new day — if so, reset the counter in DB
           // This ensures the frontend sees 0 messages used even before the user sends
-          const isNewDay = !lastResetStr || currentDateStr !== lastResetStr;
+          // Only reset if last_reset_date exists AND is a different day
+          // If last_reset_date is null, the user hasn't sent messages yet — don't reset
+          const isNewDay = lastResetStr !== null && currentDateStr !== lastResetStr;
 
           if (isNewDay && user.messages_used_today > 0) {
             // Reset count in DB so frontend reflects the new day

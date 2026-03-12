@@ -208,6 +208,14 @@ export async function POST(req: NextRequest) {
         daily_limit: dailyLimit
       });
 
+    // Ensure last_reset_date is set so session callback knows when the last message was sent
+    if (incrementResult !== false && !incrementError) {
+      await supabase
+        .from('users')
+        .update({ last_reset_date: new Date().toISOString() })
+        .eq('id', session.user.id);
+    }
+
     // If increment failed or limit exceeded, reject the request
     if (incrementError) {
       console.error("Failed to increment message count:", incrementError);
