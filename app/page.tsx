@@ -959,6 +959,13 @@ function HomePage() {
   const showIntroMessage = newChatSessionRef.current !== null;
   const remainingMessages = getRemainingMessages();
 
+  // Auto-show limit modal when user hits daily limit
+  useEffect(() => {
+    if (!canSendMessage() && isChatsLoaded) {
+      setShowLimitModal(true);
+    }
+  }, [canSendMessage, isChatsLoaded]);
+
   // Dynamic greeting based on time of day
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -3443,18 +3450,6 @@ function HomePage() {
                   ...currentStyles.inputWrapper,
                   ...(isMobile ? currentStyles.inputWrapperMobile : {})
                 }}>
-                  {!canSendMessage() && (
-                    <div style={currentStyles.limitWarning}>
-                      <strong>Daily limit reached!</strong> You&apos;ve used all your messages for today.
-                      {" "}
-                      <span
-                        style={currentStyles.upgradeLink}
-                        onClick={() => setShowLimitModal(true)}
-                      >
-                        Upgrade your plan
-                      </span> for more messages.
-                    </div>
-                  )}
 
                   <div style={currentStyles.inputCard}>
                     {/* File preview strip */}
