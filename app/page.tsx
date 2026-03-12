@@ -942,6 +942,20 @@ function HomePage() {
   // Also don't show if we're waiting for a stored chat to load
   const isWaitingForStoredChat = currentChatId && !currentChat;
   const showGreeting = isChatsLoaded && !chatLoading && !isWaitingForStoredChat && (!currentChat || messages.length === 0);
+
+  // Track whether this chat session started as a new conversation
+  const newChatSessionRef = useRef<string | null>(null);
+  // When there's no currentChat (new conversation), mark the session
+  if (!currentChatId) {
+    newChatSessionRef.current = '__new__';
+  } else if (newChatSessionRef.current === '__new__' && currentChatId) {
+    // Chat was just created from a new session — keep showing intro
+    newChatSessionRef.current = currentChatId;
+  } else if (currentChatId && newChatSessionRef.current !== currentChatId && newChatSessionRef.current !== '__new__') {
+    // Switched to a different existing chat — not a new session
+    newChatSessionRef.current = null;
+  }
+  const showIntroMessage = newChatSessionRef.current !== null;
   const remainingMessages = getRemainingMessages();
 
   // Dynamic greeting based on time of day
@@ -2977,398 +2991,7 @@ function HomePage() {
                 </div>
               )}
 
-              {showGreeting && (
-                <div style={currentStyles.emptyState}>
-                  <div style={currentStyles.greetingText}>
-                    <BoltLogo size={36} />
-                    <span style={{ marginLeft: '8px' }}>
-                      {greeting.text || getGreeting().text}{greeting.name ? ', ' : ''}
-                      {greeting.name && (
-                        <span style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30' }}>
-                          {greeting.name}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <div style={{
-                    fontSize: '16px',
-                    color: theme === 'dark' ? '#5A5660' : '#9A9590',
-                    marginBottom: '24px',
-                    marginTop: '-16px',
-                  }}>
-                    Time to spill.
-                  </div>
-                  {/* Scrolling prompt chips carousel */}
-                  {canSendMessage() && (
-                    <div className="quick-actions-wrapper" style={{ marginBottom: '48px' }}>
-                      <div className="quick-actions-carousel">
-                        {/* First set */}
-                        <button
-                          style={currentStyles.quickChip}
-                          onClick={() => handleChipClick('Roast my business idea brutally')}
-                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
-                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
-                        >
-                          <span style={currentStyles.chipIcon}>&#128293;</span> Roast my idea
-                        </button>
-                        <button
-                          style={currentStyles.quickChip}
-                          onClick={() => handleChipClick('Give me brutally honest life advice')}
-                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
-                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
-                        >
-                          <span style={currentStyles.chipIcon}>&#128172;</span> Real talk
-                        </button>
-                        <button
-                          style={currentStyles.quickChip}
-                          onClick={() => handleChipClick('Write something unhinged and creative')}
-                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
-                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
-                        >
-                          <span style={currentStyles.chipIcon}>&#9997;&#65039;</span> Write unhinged
-                        </button>
-                        <button
-                          style={currentStyles.quickChip}
-                          onClick={() => handleChipClick('Settle this debate for me once and for all')}
-                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
-                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
-                        >
-                          <span style={currentStyles.chipIcon}>&#9878;&#65039;</span> Settle a debate
-                        </button>
-                        <button
-                          style={currentStyles.quickChip}
-                          onClick={() => handleChipClick('Help me cook up a savage comeback')}
-                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
-                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
-                        >
-                          <span style={currentStyles.chipIcon}>&#128165;</span> Savage comeback
-                        </button>
-                        <button
-                          style={currentStyles.quickChip}
-                          onClick={() => handleChipClick('Tell me what I need to hear not what I want to hear')}
-                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
-                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
-                        >
-                          <span style={currentStyles.chipIcon}>&#128142;</span> Hard truth
-                        </button>
-                        {/* Duplicate set for seamless loop */}
-                        <button
-                          style={currentStyles.quickChip}
-                          onClick={() => handleChipClick('Roast my business idea brutally')}
-                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
-                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
-                        >
-                          <span style={currentStyles.chipIcon}>&#128293;</span> Roast my idea
-                        </button>
-                        <button
-                          style={currentStyles.quickChip}
-                          onClick={() => handleChipClick('Give me brutally honest life advice')}
-                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
-                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
-                        >
-                          <span style={currentStyles.chipIcon}>&#128172;</span> Real talk
-                        </button>
-                        <button
-                          style={currentStyles.quickChip}
-                          onClick={() => handleChipClick('Write something unhinged and creative')}
-                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
-                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
-                        >
-                          <span style={currentStyles.chipIcon}>&#9997;&#65039;</span> Write unhinged
-                        </button>
-                        <button
-                          style={currentStyles.quickChip}
-                          onClick={() => handleChipClick('Settle this debate for me once and for all')}
-                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
-                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
-                        >
-                          <span style={currentStyles.chipIcon}>&#9878;&#65039;</span> Settle a debate
-                        </button>
-                        <button
-                          style={currentStyles.quickChip}
-                          onClick={() => handleChipClick('Help me cook up a savage comeback')}
-                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
-                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
-                        >
-                          <span style={currentStyles.chipIcon}>&#128165;</span> Savage comeback
-                        </button>
-                        <button
-                          style={currentStyles.quickChip}
-                          onClick={() => handleChipClick('Tell me what I need to hear not what I want to hear')}
-                          onMouseEnter={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChipHover)}
-                          onMouseLeave={(e) => Object.assign(e.currentTarget.style, currentStyles.quickChip)}
-                        >
-                          <span style={currentStyles.chipIcon}>&#128142;</span> Hard truth
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Hidden file inputs for uploads */}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/gif,image/webp"
-                    ref={fileInputRef}
-                    onChange={handleFileSelect}
-                    style={{ display: 'none' }}
-                  />
-                  <input
-                    type="file"
-                    accept=".pdf,.txt,.csv,.md,.json,.js,.ts,.py,.html,.css,.jsx,.tsx,.sql,.xml,.yaml,.yml,.sh,.rb,.go,.rs,.java,.cpp,.c,.h"
-                    ref={docInputRef}
-                    onChange={handleFileSelect}
-                    style={{ display: 'none' }}
-                  />
-
-                  {/* Input area centered with greeting */}
-                  <div style={{
-                    ...currentStyles.inputWrapper,
-                    ...(isMobile ? currentStyles.inputWrapperMobile : {}),
-                    padding: '16px 24px',
-                    marginTop: '8px',
-                  }}>
-                    {!canSendMessage() && (
-                      <div style={currentStyles.limitWarning}>
-                        <strong>Daily limit reached!</strong> You&apos;ve used all your messages for today.
-                        {" "}
-                        <span
-                          style={currentStyles.upgradeLink}
-                          onClick={() => openUpgradeModal()}
-                        >
-                          Upgrade your plan
-                        </span> for more messages.
-                      </div>
-                    )}
-
-                    <div style={{ ...currentStyles.inputCard, position: 'relative' as const }}>
-                      {/* @mention dropdown */}
-                      {showMentionDropdown && chatCharacters.length > 0 && (
-                        <div style={{
-                          position: 'absolute', bottom: 'calc(100% + 8px)', left: 12,
-                          background: theme === 'dark' ? '#1A1A1E' : '#E4E3DF',
-                          border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.13)'}`,
-                          borderRadius: 12, padding: 6, minWidth: 200,
-                          boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 50,
-                        }}>
-                          {chatCharacters.map(char => (
-                            <div
-                              key={char.id}
-                              className="mention-dropdown-item"
-                              onClick={() => {
-                                track(EVENTS.MENTION_DROPDOWN_SELECTED, { character_name: char.name, characters_available: chatCharacters.length });
-                                const atIdx = input.lastIndexOf('@');
-                                setInput(input.substring(0, atIdx) + '@' + char.name + ' ');
-                                setShowMentionDropdown(false);
-                              }}
-                              style={{
-                                display: 'flex', alignItems: 'center', gap: 10,
-                                padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-                                transition: 'background 0.15s',
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = theme === 'dark' ? '#222228' : '#DDDCD8'}
-                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                            >
-                              <div style={{
-                                width: 24, height: 24, borderRadius: '50%',
-                                background: char.color_bg, color: char.color_fg,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: 10, fontWeight: 700,
-                              }}>{char.name.substring(0, 2).toUpperCase()}</div>
-                              <div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: char.color_fg }}>{char.name}</div>
-                                <div style={{ fontSize: 11, color: theme === 'dark' ? '#5A5660' : '#9A9590' }}>{char.personality?.substring(0, 30) || 'Character'}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {/* File preview strip */}
-                      {(filePreviewUrl || (selectedFile && selectedFileType !== "image")) && (
-                        <div style={{
-                          padding: '8px 12px 0',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                        }}>
-                          <div style={{ position: 'relative', display: 'inline-block' }}>
-                            {selectedFileType === "image" && filePreviewUrl ? (
-                              <img
-                                src={filePreviewUrl}
-                                alt="Selected"
-                                style={{
-                                  height: '60px',
-                                  maxWidth: '120px',
-                                  objectFit: 'cover',
-                                  borderRadius: '8px',
-                                  border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
-                                }}
-                              />
-                            ) : selectedFile ? (
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '8px 12px',
-                                background: 'var(--bg-tertiary, #1a1a1e)',
-                                borderRadius: '8px',
-                                border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
-                              }}>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={selectedFileType === "pdf" ? "#ef4444" : "#E8A04C"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                  <polyline points="14 2 14 8 20 8" />
-                                </svg>
-                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary, #f0ede8)', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedFile.name}</span>
-                                  <span style={{ fontSize: '10px', color: 'var(--text-secondary, #888)' }}>{(selectedFile.size / 1024).toFixed(1)} KB</span>
-                                </div>
-                              </div>
-                            ) : null}
-                            <button
-                              onClick={handleFileRemove}
-                              style={{
-                                position: 'absolute',
-                                top: '-6px',
-                                right: '-6px',
-                                width: '20px',
-                                height: '20px',
-                                borderRadius: '50%',
-                                background: '#ef4444',
-                                color: 'white',
-                                border: 'none',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '12px',
-                                lineHeight: 1,
-                                padding: 0,
-                              }}
-                            >
-                              &times;
-                            </button>
-                          </div>
-                          {isUploading && (
-                            <span style={{ fontSize: '12px', color: 'var(--text-secondary, #888)' }}>Uploading...</span>
-                          )}
-                        </div>
-                      )}
-                      <div style={currentStyles.inputRow}>
-                        <div ref={showGreeting ? plusMenuRef : undefined} style={{ position: 'relative' }}>
-                          <button
-                            style={currentStyles.attachBtn}
-                            title="Attach file"
-                            onClick={() => setShowPlusMenu(!showPlusMenu)}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
-                            </svg>
-                          </button>
-                          {showPlusMenu && (
-                            <div style={currentStyles.plusMenu}>
-                              <button style={currentStyles.plusMenuItem} onClick={() => {
-                                setShowPlusMenu(false);
-                                setTimeout(() => fileInputRef.current?.click(), 50);
-                              }}>
-                                <div style={currentStyles.plusMenuItemContent}>
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                    <circle cx="8.5" cy="8.5" r="1.5" />
-                                    <polyline points="21 15 16 10 5 21" />
-                                  </svg>
-                                  <span>Add Photos</span>
-                                </div>
-                              </button>
-                              <button style={currentStyles.plusMenuItem} onClick={() => {
-                                setShowPlusMenu(false);
-                                setTimeout(() => docInputRef.current?.click(), 50);
-                              }}>
-                                <div style={currentStyles.plusMenuItemContent}>
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                    <polyline points="14 2 14 8 20 8" />
-                                  </svg>
-                                  <span>Add Files</span>
-                                </div>
-                              </button>
-                              <button style={currentStyles.plusMenuItem} onClick={() => { setShowPlusMenu(false); setShowImageGenModal(true); }}>
-                                <div style={currentStyles.plusMenuItemContent}>
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <circle cx="12" cy="12" r="4" />
-                                    <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
-                                  </svg>
-                                  <span>Generate Image</span>
-                                </div>
-                                <span style={currentStyles.upgradeBadge}>Upgrade</span>
-                              </button>
-                              <button style={currentStyles.plusMenuItem} onClick={() => {
-                                setShowPlusMenu(false);
-                                openCharacterModal();
-                              }}>
-                                <div style={currentStyles.plusMenuItemContent}>
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                    <circle cx="12" cy="7" r="4" />
-                                  </svg>
-                                  <span>Add Chat Character</span>
-                                </div>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        <textarea
-                          ref={textareaRef}
-                          rows={1}
-                          placeholder={canSendMessage() ? "Talk, no filters..." : "Daily limit reached. Upgrade to continue."}
-                          value={input}
-                          onChange={handleInputChange}
-                          onKeyDown={handleKeyDown}
-                          onFocus={handleInputFocus}
-                          onInput={(e) => {
-                            const el = e.currentTarget;
-                            el.style.height = 'auto';
-                            el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
-                          }}
-                          disabled={chatLoading || !canSendMessage()}
-                          style={{ ...currentStyles.textarea, caretColor: input ? undefined : 'transparent' }}
-                        />
-                        {chatLoading ? (
-                          <button
-                            style={{
-                              ...currentStyles.sendBtn,
-                              background: '#ef4444',
-                            }}
-                            onClick={stopGeneration}
-                            title="Stop generating"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                              <rect x="6" y="6" width="12" height="12" rx="2" />
-                            </svg>
-                          </button>
-                        ) : (
-                          <button
-                            style={{
-                              ...currentStyles.sendBtn,
-                              ...((!input.trim() && !selectedFile) || !canSendMessage() ? currentStyles.sendBtnDisabled : {})
-                            }}
-                            onClick={handleSend}
-                            disabled={(!input.trim() && !selectedFile) || !canSendMessage()}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="22" y1="2" x2="11" y2="13" />
-                              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div style={currentStyles.inputFooter}>
-                      <span style={currentStyles.inputHint}>{chatCharacters.length > 0 ? 'Type @ to mention a character' : 'Verify what matters.'}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!showGreeting && isChatsLoaded && !isWaitingForStoredChat && (() => {
+              {isChatsLoaded && !isWaitingForStoredChat && (() => {
                 // Find the index of the last assistant message (for showing buttons only on last one)
                 const lastAssistantIndex = messages.reduce((lastIdx, m, idx) =>
                   m.role === 'assistant' ? idx : lastIdx, -1);
@@ -3378,6 +3001,26 @@ function HomePage() {
                   ...currentStyles.chatMessages,
                   ...(isMobile ? currentStyles.chatMessagesMobile : {})
                 }}>
+                  {/* Intro message - always shown as the first message */}
+                  {(
+                    <div style={currentStyles.messageRowAssistant}>
+                      <div style={currentStyles.messageWrapper}>
+                        <div
+                          className="message-bubble"
+                          style={currentStyles.messageBubbleAssistant}
+                        >
+                          <div style={currentStyles.messageText}>
+                            <p style={{ margin: 0, display: 'block' }}>
+                              I&apos;m not here to hold your hand or tell you what you want to hear.{' '}
+                              <span style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30' }}>
+                                So let&apos;s skip the small talk and get to it{greeting.name ? `, ${greeting.name}` : ''}.
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {messages.map((m, index) => {
                     const isLastAssistant = m.role === 'assistant' && index === lastAssistantIndex;
 
@@ -3792,8 +3435,8 @@ function HomePage() {
               </button>
             )}
 
-            {/* Bottom input area - only shown when there are messages */}
-            {!showGreeting && (
+            {/* Bottom input area */}
+            {(
               <div style={currentStyles.inputArea}>
                 <div style={{
                   ...currentStyles.inputWrapper,
