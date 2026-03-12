@@ -961,11 +961,12 @@ function HomePage() {
   const remainingMessages = getRemainingMessages();
 
   // Auto-show limit modal when user hits daily limit
+  const canSend = canSendMessage();
   useEffect(() => {
-    if (!canSendMessage() && isChatsLoaded) {
+    if (!canSend && isChatsLoaded && session?.user) {
       setShowLimitModal(true);
     }
-  }, [canSendMessage, isChatsLoaded]);
+  }, [canSend, isChatsLoaded, session?.user]);
 
   // Live countdown timer for limit modal
   useEffect(() => {
@@ -1622,7 +1623,11 @@ function HomePage() {
   }, []);
 
   const handleSend = async () => {
-    if ((!input.trim() && !selectedFile) || chatLoading || !canSendMessage()) return;
+    if (!canSendMessage()) {
+      setShowLimitModal(true);
+      return;
+    }
+    if ((!input.trim() && !selectedFile) || chatLoading) return;
 
     // Clear typing/abandon tracking on send
     typingStartedRef.current = false;
