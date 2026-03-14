@@ -492,12 +492,11 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* ========= FINANCE TAB ========= */}
-        {activeTab === 'finance' && <>
-        {/* ========= HERO STATS ========= */}
+        {/* ========= USERS TAB ========= */}
+        {activeTab === 'users' && <>
+        {/* ========= USER STATS ========= */}
         {stats && (
           <div style={S.statsGrid}>
-            {/* Row 1 */}
             <StatCard label="Total Users" value={stats.totalUsers} sub="all-time signups" icon="👥" accent="#0072B2" />
             <StatCard
               label="Total Messages"
@@ -514,15 +513,6 @@ export default function AdminPage() {
               accent="#CC79A7"
               sub="avg for users with 1+ msg"
             />
-            <StatCard label="Active Subs" value={stats.activeSubscriptions} sub="paid subscriptions" icon="💳" accent="#56B4E9" />
-            <StatCard
-              label="MRR"
-              value={`$${computed?.mrr.toFixed(2) || '0.00'}`}
-              icon="💰"
-              accent="#E69F00"
-              sub="monthly recurring revenue"
-            />
-            {/* Row 2 */}
             <StatCard
               label="Msgs/User"
               value={stats.avgMessagesPerUser.toFixed(1)}
@@ -537,56 +527,8 @@ export default function AdminPage() {
               accent="#009E73"
               sub="avg msgs per active day"
             />
-            <StatCard label="Free Users" value={stats.planCounts.Free} icon="🆓" accent="#6b7280" sub={`$0/mo`} />
-            <StatCard label="Pro Users" value={stats.planCounts.Pro} icon="⚡" accent="#0072B2" sub={`$4.99/mo each`} />
-            <StatCard label="Plus Users" value={stats.planCounts.Plus} icon="💎" accent="#CC79A7" sub={`$9.99/mo each`} />
           </div>
         )}
-
-        {/* ========= CONVERSION FUNNEL ========= */}
-        {computed && (
-          <div style={S.card}>
-            <h2 style={S.sectionTitle}>Conversion Funnel</h2>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
-              {[
-                { label: 'Signed Up', value: computed.funnel.signupCount, color: '#0072B2' },
-                { label: '1+ Messages', value: computed.funnel.oneMsg, color: '#CC79A7' },
-                { label: '10+ Messages', value: computed.funnel.tenMsg, color: '#E69F00' },
-                { label: 'Paid', value: computed.funnel.paidCount, color: '#009E73' },
-              ].map((step, i, arr) => {
-                const pct = computed.funnel.signupCount > 0 ? (step.value / computed.funnel.signupCount * 100) : 0;
-                const dropoff = i > 0 && arr[i - 1].value > 0
-                  ? ((arr[i - 1].value - step.value) / arr[i - 1].value * 100).toFixed(0)
-                  : null;
-                return (
-                  <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
-                    {i > 0 && (
-                      <div style={{ position: 'absolute', left: -8, top: '50%', transform: 'translateY(-50%)', color: '#4b5563', fontSize: '16px' }}>→</div>
-                    )}
-                    <div style={{
-                      background: `${step.color}15`,
-                      border: `1px solid ${step.color}40`,
-                      borderRadius: '12px',
-                      padding: '16px 12px',
-                      textAlign: 'center',
-                      width: '100%',
-                      margin: '0 6px',
-                    }}>
-                      <div style={{ fontSize: '24px', fontWeight: 700, color: step.color }}>{step.value}</div>
-                      <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px', fontWeight: 500 }}>{step.label}</div>
-                      <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{pct.toFixed(0)}% of total</div>
-                    </div>
-                    {dropoff && (
-                      <div style={{ fontSize: '10px', color: '#D55E00', marginTop: '6px', fontWeight: 500 }}>-{dropoff}% drop</div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Health metrics moved to hero stats grid above */}
 
         {/* ========= TREND CHARTS ========= */}
         <div style={S.card}>
@@ -790,9 +732,8 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* ========= THIRD ROW: Donut / Retention & Churn (2x1) ========= */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-          {/* User Status Donut */}
+        {/* ========= User Status Donut ========= */}
+        <div style={{ marginBottom: '24px' }}>
           <div style={S.card}>
             <div style={S.chartHeader}>
               <h3 style={S.chartTitle}>User Status</h3>
@@ -806,114 +747,8 @@ export default function AdminPage() {
               ]} />
             ) : <div style={S.chartLoading}>No data</div>}
           </div>
-
-          {/* Retention & Churn */}
-          <div style={S.card}>
-            <div style={S.chartHeader}>
-              <h3 style={S.chartTitle}>Retention & Churn</h3>
-            </div>
-            {computed ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '12px 0' }}>
-                {/* Retention bar */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>Retention Rate</span>
-                    <span style={{ fontSize: '13px', color: '#009E73', fontWeight: 700 }}>{(computed.retentionRate * 100).toFixed(1)}%</span>
-                  </div>
-                  <div style={{ width: '100%', height: '12px', background: '#1A1A1E', borderRadius: '6px', overflow: 'hidden' }}>
-                    <div style={{ width: `${computed.retentionRate * 100}%`, height: '100%', background: 'linear-gradient(90deg, #009E73, #009E73)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{users.filter(u => (u.total_messages || 0) > 0).length} of {users.length} users sent 1+ message</div>
-                </div>
-
-                {/* Churn/Ghost bar */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>Ghost Rate (Churn)</span>
-                    <span style={{ fontSize: '13px', color: computed.ghostRate > 0.5 ? '#D55E00' : '#E69F00', fontWeight: 700 }}>{(computed.ghostRate * 100).toFixed(1)}%</span>
-                  </div>
-                  <div style={{ width: '100%', height: '12px', background: '#1A1A1E', borderRadius: '6px', overflow: 'hidden' }}>
-                    <div style={{ width: `${computed.ghostRate * 100}%`, height: '100%', background: computed.ghostRate > 0.5 ? 'linear-gradient(90deg, #D55E00, #D55E00)' : 'linear-gradient(90deg, #E69F00, #E69F00)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{computed.ghosts} users signed up but never messaged</div>
-                </div>
-
-                {/* Paid conversion bar */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>Paid Conversion</span>
-                    <span style={{ fontSize: '13px', color: '#CC79A7', fontWeight: 700 }}>{users.length > 0 ? ((computed.paidCount / users.length) * 100).toFixed(1) : '0'}%</span>
-                  </div>
-                  <div style={{ width: '100%', height: '12px', background: '#1A1A1E', borderRadius: '6px', overflow: 'hidden' }}>
-                    <div style={{ width: `${users.length > 0 ? (computed.paidCount / users.length) * 100 : 0}%`, height: '100%', background: 'linear-gradient(90deg, #CC79A7, #CC79A7)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{computed.paidCount} of {users.length} users on a paid plan</div>
-                </div>
-              </div>
-            ) : <div style={S.chartLoading}>No data</div>}
-          </div>
         </div>
 
-        {/* ========= REVENUE ========= */}
-        {computed && stats && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-            {/* MRR Card */}
-            <div style={S.card}>
-              <h3 style={S.chartTitle}>Monthly Recurring Revenue</h3>
-              <div style={{ fontSize: '36px', fontWeight: 700, color: '#E69F00', margin: '12px 0 16px', letterSpacing: '-0.02em' }}>
-                ${computed.mrr.toFixed(2)}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                  <span style={{ color: '#9ca3af' }}>Pro ({stats.planCounts.Pro} users × $4.99)</span>
-                  <span style={{ color: '#e5e7eb', fontWeight: 600 }}>${(stats.planCounts.Pro * 4.99).toFixed(2)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                  <span style={{ color: '#9ca3af' }}>Plus ({stats.planCounts.Plus} users × $9.99)</span>
-                  <span style={{ color: '#e5e7eb', fontWeight: 600 }}>${(stats.planCounts.Plus * 9.99).toFixed(2)}</span>
-                </div>
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                  <span style={{ color: '#9ca3af' }}>ARR (projected)</span>
-                  <span style={{ color: '#e5e7eb', fontWeight: 600 }}>${(computed.mrr * 12).toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Growth Targets */}
-            <div style={S.card}>
-              <h3 style={S.chartTitle}>Growth Targets</h3>
-              <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <ProgressTarget
-                  label="MRR Target"
-                  current={computed.mrr}
-                  target={computed.targetMRR}
-                  format="currency"
-                  color="#E69F00"
-                />
-                <ProgressTarget
-                  label="User Target"
-                  current={stats.totalUsers}
-                  target={computed.targetUsers}
-                  format="number"
-                  color="#0072B2"
-                />
-                <ProgressTarget
-                  label="Paid Conversion"
-                  current={computed.paidCount}
-                  target={Math.max(Math.ceil(stats.totalUsers * 0.1), 1)}
-                  format="number"
-                  color="#009E73"
-                  suffix={` / ${Math.max(Math.ceil(stats.totalUsers * 0.1), 1)} (10% target)`}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        </>}
-
-        {/* ========= USERS TAB ========= */}
-        {activeTab === 'users' && <>
         {/* ========= USER TABLE ========= */}
         <div style={S.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -1064,6 +899,163 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+        </>}
+
+        {/* ========= FINANCE TAB ========= */}
+        {activeTab === 'finance' && <>
+        {/* ========= FINANCE STATS ========= */}
+        {stats && (
+          <div style={S.statsGrid}>
+            <StatCard label="Active Subs" value={stats.activeSubscriptions} sub="paid subscriptions" icon="💳" accent="#56B4E9" />
+            <StatCard
+              label="MRR"
+              value={`$${computed?.mrr.toFixed(2) || '0.00'}`}
+              icon="💰"
+              accent="#E69F00"
+              sub="monthly recurring revenue"
+            />
+            <StatCard label="Free Users" value={stats.planCounts.Free} icon="🆓" accent="#6b7280" sub={`$0/mo`} />
+            <StatCard label="Pro Users" value={stats.planCounts.Pro} icon="⚡" accent="#0072B2" sub={`$4.99/mo each`} />
+            <StatCard label="Plus Users" value={stats.planCounts.Plus} icon="💎" accent="#CC79A7" sub={`$9.99/mo each`} />
+          </div>
+        )}
+
+        {/* ========= CONVERSION FUNNEL ========= */}
+        {computed && (
+          <div style={S.card}>
+            <h2 style={S.sectionTitle}>Conversion Funnel</h2>
+            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+              {[
+                { label: 'Signed Up', value: computed.funnel.signupCount, color: '#0072B2' },
+                { label: '1+ Messages', value: computed.funnel.oneMsg, color: '#CC79A7' },
+                { label: '10+ Messages', value: computed.funnel.tenMsg, color: '#E69F00' },
+                { label: 'Paid', value: computed.funnel.paidCount, color: '#009E73' },
+              ].map((step, i, arr) => {
+                const pct = computed.funnel.signupCount > 0 ? (step.value / computed.funnel.signupCount * 100) : 0;
+                const dropoff = i > 0 && arr[i - 1].value > 0
+                  ? ((arr[i - 1].value - step.value) / arr[i - 1].value * 100).toFixed(0)
+                  : null;
+                return (
+                  <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                    {i > 0 && (
+                      <div style={{ position: 'absolute', left: -8, top: '50%', transform: 'translateY(-50%)', color: '#4b5563', fontSize: '16px' }}>→</div>
+                    )}
+                    <div style={{
+                      background: `${step.color}15`,
+                      border: `1px solid ${step.color}40`,
+                      borderRadius: '12px',
+                      padding: '16px 12px',
+                      textAlign: 'center',
+                      width: '100%',
+                      margin: '0 6px',
+                    }}>
+                      <div style={{ fontSize: '24px', fontWeight: 700, color: step.color }}>{step.value}</div>
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px', fontWeight: 500 }}>{step.label}</div>
+                      <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{pct.toFixed(0)}% of total</div>
+                    </div>
+                    {dropoff && (
+                      <div style={{ fontSize: '10px', color: '#D55E00', marginTop: '6px', fontWeight: 500 }}>-{dropoff}% drop</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ========= RETENTION & CHURN ========= */}
+        <div style={S.card}>
+          <div style={S.chartHeader}>
+            <h3 style={S.chartTitle}>Retention & Churn</h3>
+          </div>
+          {computed ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '12px 0' }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>Retention Rate</span>
+                  <span style={{ fontSize: '13px', color: '#009E73', fontWeight: 700 }}>{(computed.retentionRate * 100).toFixed(1)}%</span>
+                </div>
+                <div style={{ width: '100%', height: '12px', background: '#1A1A1E', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{ width: `${computed.retentionRate * 100}%`, height: '100%', background: 'linear-gradient(90deg, #009E73, #009E73)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
+                </div>
+                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{users.filter(u => (u.total_messages || 0) > 0).length} of {users.length} users sent 1+ message</div>
+              </div>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>Ghost Rate (Churn)</span>
+                  <span style={{ fontSize: '13px', color: computed.ghostRate > 0.5 ? '#D55E00' : '#E69F00', fontWeight: 700 }}>{(computed.ghostRate * 100).toFixed(1)}%</span>
+                </div>
+                <div style={{ width: '100%', height: '12px', background: '#1A1A1E', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{ width: `${computed.ghostRate * 100}%`, height: '100%', background: computed.ghostRate > 0.5 ? 'linear-gradient(90deg, #D55E00, #D55E00)' : 'linear-gradient(90deg, #E69F00, #E69F00)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
+                </div>
+                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{computed.ghosts} users signed up but never messaged</div>
+              </div>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>Paid Conversion</span>
+                  <span style={{ fontSize: '13px', color: '#CC79A7', fontWeight: 700 }}>{users.length > 0 ? ((computed.paidCount / users.length) * 100).toFixed(1) : '0'}%</span>
+                </div>
+                <div style={{ width: '100%', height: '12px', background: '#1A1A1E', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{ width: `${users.length > 0 ? (computed.paidCount / users.length) * 100 : 0}%`, height: '100%', background: 'linear-gradient(90deg, #CC79A7, #CC79A7)', borderRadius: '6px', transition: 'width 0.5s ease' }} />
+                </div>
+                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{computed.paidCount} of {users.length} users on a paid plan</div>
+              </div>
+            </div>
+          ) : <div style={S.chartLoading}>No data</div>}
+        </div>
+
+        {/* ========= REVENUE ========= */}
+        {computed && stats && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+            <div style={S.card}>
+              <h3 style={S.chartTitle}>Monthly Recurring Revenue</h3>
+              <div style={{ fontSize: '36px', fontWeight: 700, color: '#E69F00', margin: '12px 0 16px', letterSpacing: '-0.02em' }}>
+                ${computed.mrr.toFixed(2)}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span style={{ color: '#9ca3af' }}>Pro ({stats.planCounts.Pro} users × $4.99)</span>
+                  <span style={{ color: '#e5e7eb', fontWeight: 600 }}>${(stats.planCounts.Pro * 4.99).toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span style={{ color: '#9ca3af' }}>Plus ({stats.planCounts.Plus} users × $9.99)</span>
+                  <span style={{ color: '#e5e7eb', fontWeight: 600 }}>${(stats.planCounts.Plus * 9.99).toFixed(2)}</span>
+                </div>
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span style={{ color: '#9ca3af' }}>ARR (projected)</span>
+                  <span style={{ color: '#e5e7eb', fontWeight: 600 }}>${(computed.mrr * 12).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+            <div style={S.card}>
+              <h3 style={S.chartTitle}>Growth Targets</h3>
+              <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <ProgressTarget
+                  label="MRR Target"
+                  current={computed.mrr}
+                  target={computed.targetMRR}
+                  format="currency"
+                  color="#E69F00"
+                />
+                <ProgressTarget
+                  label="User Target"
+                  current={stats.totalUsers}
+                  target={computed.targetUsers}
+                  format="number"
+                  color="#0072B2"
+                />
+                <ProgressTarget
+                  label="Paid Conversion"
+                  current={computed.paidCount}
+                  target={Math.max(Math.ceil(stats.totalUsers * 0.1), 1)}
+                  format="number"
+                  color="#009E73"
+                  suffix={` / ${Math.max(Math.ceil(stats.totalUsers * 0.1), 1)} (10% target)`}
+                />
+              </div>
+            </div>
+          </div>
+        )}
         </>}
 
       </div>
