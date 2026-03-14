@@ -640,7 +640,7 @@ function HomePage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingScreen, setOnboardingScreen] = useState(1);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
-  const [showDowntimeBanner, setShowDowntimeBanner] = useState(false);
+  const [showDowntimeBanner, setShowDowntimeBanner] = useState(true);
   const [whatsNewScreen, setWhatsNewScreen] = useState(1);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showImageGenModal, setShowImageGenModal] = useState(false);
@@ -2661,7 +2661,7 @@ function HomePage() {
           textAlign: 'center' as const,
           flexShrink: 0,
         }}>
-          <span>System operations restored — Refresh and try again</span>
+          <span>System operation down — Maintenance underway</span>
           <button
             onClick={() => setShowDowntimeBanner(false)}
             style={{
