@@ -161,6 +161,7 @@ export default function AdminPage() {
   const [error, setError] = useState("");
   const [updatingUser, setUpdatingUser] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState<'users' | 'finance'>('users');
 
   // Chart data
   const [userTrend, setUserTrend] = useState<TrendData[]>([]);
@@ -469,6 +470,30 @@ export default function AdminPage() {
           </div>
         </header>
 
+        {/* ========= TAB SWITCHER ========= */}
+        <div style={S.tabBar}>
+          <button
+            onClick={() => setActiveTab('users')}
+            style={{
+              ...S.tabBtn,
+              ...(activeTab === 'users' ? S.tabBtnActive : {}),
+            }}
+          >
+            Users
+          </button>
+          <button
+            onClick={() => setActiveTab('finance')}
+            style={{
+              ...S.tabBtn,
+              ...(activeTab === 'finance' ? S.tabBtnActive : {}),
+            }}
+          >
+            Finance
+          </button>
+        </div>
+
+        {/* ========= FINANCE TAB ========= */}
+        {activeTab === 'finance' && <>
         {/* ========= HERO STATS ========= */}
         {stats && (
           <div style={S.statsGrid}>
@@ -885,6 +910,10 @@ export default function AdminPage() {
           </div>
         )}
 
+        </>}
+
+        {/* ========= USERS TAB ========= */}
+        {activeTab === 'users' && <>
         {/* ========= USER TABLE ========= */}
         <div style={S.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -1035,6 +1064,7 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+        </>}
 
       </div>
     </div>
@@ -1144,6 +1174,31 @@ const S: { [key: string]: React.CSSProperties } = {
     border: '1px solid rgba(34,197,94,0.2)',
     padding: '4px 10px',
     borderRadius: '20px',
+  },
+  tabBar: {
+    display: 'flex',
+    gap: '2px',
+    background: 'rgba(255,255,255,0.04)',
+    padding: '3px',
+    borderRadius: '10px',
+    marginBottom: '24px',
+    width: 'fit-content',
+  },
+  tabBtn: {
+    padding: '8px 24px',
+    background: 'transparent',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#6b7280',
+    transition: 'all 0.15s ease',
+  },
+  tabBtnActive: {
+    background: 'rgba(255,255,255,0.08)',
+    color: '#f0ede8',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
   },
   btnDanger: {
     padding: '8px 16px',
