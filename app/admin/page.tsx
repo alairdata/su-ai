@@ -1252,6 +1252,7 @@ const adminCSS = `
   background:var(--bg);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   font-size:13px;line-height:1.5;min-height:100vh;
+  height:100vh;overflow-y:auto;
 }
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:48px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:100;}
 .topbar-left{display:flex;align-items:center;gap:12px;}
