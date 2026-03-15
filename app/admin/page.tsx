@@ -243,6 +243,35 @@ export default function AdminPage() {
     };
   }, [users, stats]);
 
+  // ── Filtered stats (reactive to status/plan filters) ──
+  const hasFilter = !!(statusFilter || planFilter);
+
+  const filteredStats = useMemo(() => {
+    // Apply status + plan filters (not search) to get filtered user set for stats
+    const base = users.filter(u => {
+      const isActive = (u.total_messages || 0) > 0;
+      const matchStatus = !statusFilter ||
+        (statusFilter === "active" && isActive) ||
+        (statusFilter === "ghost" && !isActive);
+      const matchPlan = !planFilter ||
+        (planFilter === "free" && u.plan === "Free") ||
+        (planFilter === "pro" && u.plan !== "Free");
+      return matchStatus && matchPlan;
+    });
+
+    const totalUsers = base.length;
+    const totalMsgs = base.reduce((s, u) => s + (u.total_messages || 0), 0);
+    const todayMsgs = base.reduce((s, u) => s + (u.messages_used_today || 0), 0);
+    const withMsgs = base.filter(u => (u.total_messages || 0) > 0);
+    const avgPerActive = withMsgs.length > 0
+      ? withMsgs.reduce((s, u) => s + (u.total_messages || 0), 0) / withMsgs.length : 0;
+    const avgPerUser = totalUsers > 0 ? totalMsgs / totalUsers : 0;
+    const avgPerDay = base.length > 0
+      ? base.reduce((s, u) => s + ((u.total_messages || 0) / Math.max(u.active_days || 1, 1)), 0) / base.length : 0;
+
+    return { totalUsers, totalMsgs, todayMsgs, avgPerActive, avgPerUser, avgPerDay };
+  }, [users, statusFilter, planFilter]);
+
   // ── Filtering & sorting ──
   const getAvgMsgsDay = (user: User) => (user.total_messages || 0) / Math.max(user.active_days || 1, 1);
 
@@ -680,15 +709,15 @@ export default function AdminPage() {
       {/* ══ USERS TAB ══ */}
       {activeTab === "users" && (
         <div className="page-content">
-          {/* Stat cards */}
+          {/* Stat cards - reactive to filters */}
           {stats && (
             <div className="stat-grid">
-              <div className="sc"><div className="sc-label">TOTAL USERS</div><div className="sc-val">{stats.totalUsers}</div><div className="sc-sub">all-time signups</div></div>
-              <div className="sc"><div className="sc-label">TOTAL MESSAGES</div><div className="sc-val">{stats.allTimeMessages.toLocaleString()}</div><div className="sc-sub"><span className="g">{stats.totalMessages.toLocaleString()}</span> active{stats.deletedMessages > 0 ? ` · ${stats.deletedMessages.toLocaleString()} deleted` : ""}</div></div>
-              <div className="sc"><div className="sc-label">MESSAGES TODAY</div><div className="sc-val">{stats.totalMessagesToday}</div><div className="sc-sub">new messages sent today</div></div>
-              <div className="sc"><div className="sc-label">MSG / ACTIVE USER</div><div className="sc-val">{computed?.avgSessionDepth.toFixed(1) || "0"}</div><div className="sc-sub">avg per user w/ 1+ msg</div></div>
-              <div className="sc"><div className="sc-label">MSG / USER</div><div className="sc-val">{stats.avgMessagesPerUser.toFixed(1)}</div><div className="sc-sub">all-time incl. ghosts</div></div>
-              <div className="sc"><div className="sc-label">MSG / ACTIVE DAY</div><div className="sc-val">{computed?.avgPerActiveDay.toFixed(1) || "0"}</div><div className="sc-sub">avg msgs per active day</div></div>
+              <div className="sc"><div className="sc-label">TOTAL USERS</div><div className="sc-val">{hasFilter ? filteredStats.totalUsers : stats.totalUsers}</div><div className="sc-sub">{hasFilter ? "filtered" : "all-time signups"}</div></div>
+              <div className="sc"><div className="sc-label">TOTAL MESSAGES</div><div className="sc-val">{hasFilter ? filteredStats.totalMsgs.toLocaleString() : stats.allTimeMessages.toLocaleString()}</div><div className="sc-sub">{hasFilter ? "from filtered users" : <><span className="g">{stats.totalMessages.toLocaleString()}</span> active{stats.deletedMessages > 0 ? ` · ${stats.deletedMessages.toLocaleString()} deleted` : ""}</>}</div></div>
+              <div className="sc"><div className="sc-label">MESSAGES TODAY</div><div className="sc-val">{hasFilter ? filteredStats.todayMsgs : stats.totalMessagesToday}</div><div className="sc-sub">new messages sent today</div></div>
+              <div className="sc"><div className="sc-label">MSG / ACTIVE USER</div><div className="sc-val">{hasFilter ? filteredStats.avgPerActive.toFixed(1) : (computed?.avgSessionDepth.toFixed(1) || "0")}</div><div className="sc-sub">avg per user w/ 1+ msg</div></div>
+              <div className="sc"><div className="sc-label">MSG / USER</div><div className="sc-val">{hasFilter ? filteredStats.avgPerUser.toFixed(1) : stats.avgMessagesPerUser.toFixed(1)}</div><div className="sc-sub">{hasFilter ? "filtered avg" : "all-time incl. ghosts"}</div></div>
+              <div className="sc"><div className="sc-label">MSG / ACTIVE DAY</div><div className="sc-val">{hasFilter ? filteredStats.avgPerDay.toFixed(1) : (computed?.avgPerActiveDay.toFixed(1) || "0")}</div><div className="sc-sub">avg msgs per active day</div></div>
             </div>
           )}
 
@@ -708,7 +737,7 @@ export default function AdminPage() {
           <div className="row2" style={{ marginBottom: 10 }}>
             <div className="cc">
               <InfoKicker label="Cumulative Growth" title="Cumulative Growth" body="Total users and messages accumulated over time. Shows overall product growth trajectory." how="Running total of all signups and messages sent since launch. A steepening curve = accelerating growth." />
-              <div className="cc-title">{stats?.totalUsers || 0} users · {stats?.allTimeMessages.toLocaleString() || 0} msgs</div>
+              <div className="cc-title">{hasFilter ? filteredStats.totalUsers : (stats?.totalUsers || 0)} users · {hasFilter ? filteredStats.totalMsgs.toLocaleString() : (stats?.allTimeMessages.toLocaleString() || 0)} msgs</div>
               <div className="chart-legend">
                 <div className="legend-item"><div className="legend-sq" style={{ background: "#648FFF" }} />Users</div>
                 <div className="legend-item"><div className="legend-sq" style={{ background: "#FFB000" }} />Messages</div>
