@@ -40,6 +40,17 @@ interface TrendData { label: string; count: number; cumulative: number }
 interface TopUser { id: string; name: string; email: string; messageCount: number }
 interface MessageDistribution { bucket: string; count: number }
 
+interface InsightsData {
+  sessionDepth: { sent1: number; sent3: number; sent5: number; sent10: number; sent20: number };
+  ghostBuckets: { day0: number; day1: number; day2_3: number; day4_7: number; day8_14: number; day15_30: number };
+  cohorts: { week: string; size: number; d1: number | null; d3: number | null; d7: number | null; d14: number | null; d30: number | null }[];
+  returnFreq: { daily: number; twoThree: number; weekly: number; biweekly: number; onceOnly: number };
+  dauMauData: { label: string; dau: number; mau: number; ratio: number }[];
+  avgDauMau: string;
+  mrrHistory: { label: string; mrr: number }[];
+  activeGhostTrend: { label: string; active: number; ghost: number }[];
+}
+
 type Period = "day" | "week" | "month" | "year";
 type Tab = "users" | "finance";
 type Scenario = "bear" | "base" | "bull";
@@ -82,6 +93,9 @@ export default function AdminPage() {
   const [messageDistribution, setMessageDistribution] = useState<MessageDistribution[]>([]);
   const [chartLoading, setChartLoading] = useState(false);
 
+  // Insights data (real from API)
+  const [insights, setInsights] = useState<InsightsData | null>(null);
+
   // Sorting & pagination
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -99,6 +113,7 @@ export default function AdminPage() {
     if (status === "authenticated") {
       fetchData();
       fetchChartData(chartPeriod);
+      fetchInsights();
     }
   }, [status]);
 
@@ -151,6 +166,18 @@ export default function AdminPage() {
       console.error("Failed to fetch chart data:", err);
     } finally {
       setChartLoading(false);
+    }
+  };
+
+  const fetchInsights = async () => {
+    try {
+      const res = await fetch("/api/admin/insights");
+      if (res.ok) {
+        const data = await res.json();
+        setInsights(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch insights:", err);
     }
   };
 
@@ -325,28 +352,20 @@ export default function AdminPage() {
       options: { ...baseOpts, scales: baseScales },
     });
 
-    // Signup chart (active vs ghost over time)
-    const activeOverTime = userTrend.map((d, i) => {
-      const cumUsers = d.cumulative;
-      const ghostEstimate = Math.round(cumUsers * (computed?.ghostRate || 0.23));
-      return cumUsers - ghostEstimate;
-    });
-    const ghostOverTime = userTrend.map((d, i) => {
-      const cumUsers = d.cumulative;
-      return Math.round(cumUsers * (computed?.ghostRate || 0.23));
-    });
-
-    createChart("signupChart", {
-      type: "line",
-      data: {
-        labels,
-        datasets: [
-          { label: "Active", data: activeOverTime, borderColor: "#009E73", backgroundColor: "rgba(0,158,115,0.08)", tension: 0.4, fill: true, pointRadius: 0, borderWidth: 2 },
-          { label: "Ghost", data: ghostOverTime, borderColor: "#999999", backgroundColor: "rgba(153,153,153,0.08)", tension: 0.4, fill: true, pointRadius: 0, borderWidth: 1.5, borderDash: [4, 3] },
-        ],
-      },
-      options: { ...baseOpts, scales: { ...baseScales, y: { ...baseScales.y, min: 0 } } },
-    });
+    // Signup chart (active vs ghost over time) - REAL DATA from insights API
+    if (insights?.activeGhostTrend && insights.activeGhostTrend.length > 0) {
+      createChart("signupChart", {
+        type: "line",
+        data: {
+          labels: insights.activeGhostTrend.map(d => d.label),
+          datasets: [
+            { label: "Active", data: insights.activeGhostTrend.map(d => d.active), borderColor: "#009E73", backgroundColor: "rgba(0,158,115,0.08)", tension: 0.4, fill: true, pointRadius: 0, borderWidth: 2 },
+            { label: "Ghost", data: insights.activeGhostTrend.map(d => d.ghost), borderColor: "#999999", backgroundColor: "rgba(153,153,153,0.08)", tension: 0.4, fill: true, pointRadius: 0, borderWidth: 1.5, borderDash: [4, 3] },
+          ],
+        },
+        options: { ...baseOpts, scales: { ...baseScales, y: { ...baseScales.y, min: 0 } } },
+      });
+    }
 
     // Active users chart
     createChart("activeChart", {
@@ -389,106 +408,92 @@ export default function AdminPage() {
         options: { responsive: true, maintainAspectRatio: false, cutout: "70%", plugins: { legend: { display: false }, tooltip: tip } },
       });
 
-      // Session depth funnel
-      const totalActive = computed.funnel.oneMsg;
-      const threeMsg = Math.round(totalActive * 0.53);
-      const fiveMsg = Math.round(totalActive * 0.29);
-      const tenMsg = computed.funnel.tenMsg;
-      const twentyMsg = users.filter(u => (u.total_messages || 0) >= 20).length;
-
-      createChart("sessionDepthChart", {
-        type: "bar",
-        data: {
-          labels: ["Sent 1 msg", "Sent 3 msgs", "Sent 5 msgs", "Sent 10 msgs", "Sent 20+ msgs"],
-          datasets: [{
-            label: "Users", data: [totalActive, threeMsg, fiveMsg, tenMsg, twentyMsg],
-            backgroundColor: ["rgba(100,143,255,0.7)", "rgba(100,143,255,0.6)", "rgba(100,143,255,0.5)", "rgba(100,143,255,0.4)", "rgba(100,143,255,0.3)"],
-            borderColor: "#648FFF", borderWidth: 1, borderRadius: 4,
-          }],
-        },
-        options: {
-          indexAxis: "y" as const, ...baseOpts,
-          scales: {
-            x: { grid, ticks: tickX, border: { display: false }, min: 0 },
-            y: { grid: { display: false }, ticks: { color: "#9896a8", font: { family: "inherit", size: 10 } }, border: { display: false } },
+      // Session depth funnel - REAL DATA from insights API
+      if (insights?.sessionDepth) {
+        createChart("sessionDepthChart", {
+          type: "bar",
+          data: {
+            labels: ["Sent 1 msg", "Sent 3 msgs", "Sent 5 msgs", "Sent 10 msgs", "Sent 20+ msgs"],
+            datasets: [{
+              label: "Users", data: [insights.sessionDepth.sent1, insights.sessionDepth.sent3, insights.sessionDepth.sent5, insights.sessionDepth.sent10, insights.sessionDepth.sent20],
+              backgroundColor: ["rgba(100,143,255,0.7)", "rgba(100,143,255,0.6)", "rgba(100,143,255,0.5)", "rgba(100,143,255,0.4)", "rgba(100,143,255,0.3)"],
+              borderColor: "#648FFF", borderWidth: 1, borderRadius: 4,
+            }],
           },
-        },
-      });
-
-      // Time to ghost
-      const ghostTotal = computed.ghosts;
-      const d0 = Math.round(ghostTotal * 0.42);
-      const d1 = Math.round(ghostTotal * 0.21);
-      const d23 = Math.round(ghostTotal * 0.16);
-      const d47 = Math.round(ghostTotal * 0.11);
-      const d814 = Math.round(ghostTotal * 0.07);
-      const d1530 = ghostTotal - d0 - d1 - d23 - d47 - d814;
-
-      createChart("ghostChart", {
-        type: "bar",
-        data: {
-          labels: ["Day 0 (never back)", "Day 1", "Day 2-3", "Day 4-7", "Day 8-14", "Day 15-30"],
-          datasets: [{
-            label: "Ghosts", data: [d0, d1, d23, d47, d814, Math.max(d1530, 0)],
-            backgroundColor: ["rgba(254,97,0,0.7)", "rgba(254,97,0,0.6)", "rgba(254,97,0,0.5)", "rgba(254,97,0,0.4)", "rgba(254,97,0,0.3)", "rgba(254,97,0,0.2)"],
-            borderColor: "#FE6100", borderWidth: 1, borderRadius: 4,
-          }],
-        },
-        options: { ...baseOpts, scales: { ...baseScales, y: { ...baseScales.y, min: 0 } } },
-      });
-
-      // DAU/MAU
-      const dauMauData = activeUserTrend.map(d => {
-        const mau = computed.activeCount || 1;
-        return Math.round((d.count / mau) * 100);
-      });
-      createChart("dauMauChart", {
-        type: "line",
-        data: {
-          labels: activeUserTrend.map(d => d.label),
-          datasets: [
-            { label: "DAU/MAU %", data: dauMauData, borderColor: "#FFB000", backgroundColor: "rgba(255,176,0,0.08)", tension: 0.4, fill: true, pointRadius: 0, borderWidth: 2 },
-            { label: "Target (20%)", data: dauMauData.map(() => 20), borderColor: "rgba(100,143,255,0.4)", borderDash: [6, 4], tension: 0, fill: false, pointRadius: 0, borderWidth: 1.5 },
-          ],
-        },
-        options: {
-          ...baseOpts,
-          scales: {
-            x: { grid, ticks: tickX, border: { display: false } },
-            y: { grid, ticks: { ...tickY, callback: (v: number) => v + "%" }, border: { display: false }, min: 0, max: 50 },
+          options: {
+            indexAxis: "y" as const, ...baseOpts,
+            scales: {
+              x: { grid, ticks: tickX, border: { display: false }, min: 0 },
+              y: { grid: { display: false }, ticks: { color: "#9896a8", font: { family: "inherit", size: 10 } }, border: { display: false } },
+            },
           },
-        },
-      });
+        });
+      }
 
-      // Return frequency
-      const daily = users.filter(u => u.active_days >= 20).length;
-      const twoThree = users.filter(u => u.active_days >= 8 && u.active_days < 20).length;
-      const weekly = users.filter(u => u.active_days >= 4 && u.active_days < 8).length;
-      const biweekly = users.filter(u => u.active_days >= 2 && u.active_days < 4).length;
-      const onceOnly = users.filter(u => u.active_days === 1).length;
+      // Time to ghost - REAL DATA from insights API
+      if (insights?.ghostBuckets) {
+        const gb = insights.ghostBuckets;
+        createChart("ghostChart", {
+          type: "bar",
+          data: {
+            labels: ["Day 0 (never back)", "Day 1", "Day 2-3", "Day 4-7", "Day 8-14", "Day 15-30"],
+            datasets: [{
+              label: "Ghosts", data: [gb.day0, gb.day1, gb.day2_3, gb.day4_7, gb.day8_14, gb.day15_30],
+              backgroundColor: ["rgba(254,97,0,0.7)", "rgba(254,97,0,0.6)", "rgba(254,97,0,0.5)", "rgba(254,97,0,0.4)", "rgba(254,97,0,0.3)", "rgba(254,97,0,0.2)"],
+              borderColor: "#FE6100", borderWidth: 1, borderRadius: 4,
+            }],
+          },
+          options: { ...baseOpts, scales: { ...baseScales, y: { ...baseScales.y, min: 0 } } },
+        });
+      }
 
-      createChart("returnFreqChart", {
-        type: "bar",
-        data: {
-          labels: ["Daily", "2-3x/week", "Weekly", "Bi-weekly", "Once only"],
-          datasets: [{
-            label: "Users", data: [daily, twoThree, weekly, biweekly, onceOnly],
-            backgroundColor: ["rgba(0,158,115,0.8)", "rgba(0,158,115,0.6)", "rgba(0,158,115,0.4)", "rgba(255,176,0,0.4)", "rgba(254,97,0,0.4)"],
-            borderColor: ["#009E73", "#009E73", "#009E73", "#FFB000", "#FE6100"],
-            borderWidth: 1, borderRadius: 4,
-          }],
-        },
-        options: { ...baseOpts, scales: { ...baseScales, y: { ...baseScales.y, min: 0 } } },
-      });
+      // DAU/MAU - REAL DATA from insights API
+      if (insights?.dauMauData && insights.dauMauData.length > 0) {
+        createChart("dauMauChart", {
+          type: "line",
+          data: {
+            labels: insights.dauMauData.map(d => d.label),
+            datasets: [
+              { label: "DAU/MAU %", data: insights.dauMauData.map(d => d.ratio), borderColor: "#FFB000", backgroundColor: "rgba(255,176,0,0.08)", tension: 0.4, fill: true, pointRadius: 0, borderWidth: 2 },
+              { label: "Target (20%)", data: insights.dauMauData.map(() => 20), borderColor: "rgba(100,143,255,0.4)", borderDash: [6, 4], tension: 0, fill: false, pointRadius: 0, borderWidth: 1.5 },
+            ],
+          },
+          options: {
+            ...baseOpts,
+            scales: {
+              x: { grid, ticks: tickX, border: { display: false } },
+              y: { grid, ticks: { ...tickY, callback: (v: number) => v + "%" }, border: { display: false }, min: 0, max: 50 },
+            },
+          },
+        });
+      }
+
+      // Return frequency - REAL DATA from insights API
+      if (insights?.returnFreq) {
+        const rf = insights.returnFreq;
+        createChart("returnFreqChart", {
+          type: "bar",
+          data: {
+            labels: ["Daily", "2-3x/week", "Weekly", "Bi-weekly", "Once only"],
+            datasets: [{
+              label: "Users", data: [rf.daily, rf.twoThree, rf.weekly, rf.biweekly, rf.onceOnly],
+              backgroundColor: ["rgba(0,158,115,0.8)", "rgba(0,158,115,0.6)", "rgba(0,158,115,0.4)", "rgba(255,176,0,0.4)", "rgba(254,97,0,0.4)"],
+              borderColor: ["#009E73", "#009E73", "#009E73", "#FFB000", "#FE6100"],
+              borderWidth: 1, borderRadius: 4,
+            }],
+          },
+          options: { ...baseOpts, scales: { ...baseScales, y: { ...baseScales.y, min: 0 } } },
+        });
+      }
     }
-  }, [chartJsLoaded, userTrend, messageTrend, activeUserTrend, messageDistribution, stats, chartLoading, computed, users, createChart, chartConfig]);
+  }, [chartJsLoaded, userTrend, messageTrend, activeUserTrend, messageDistribution, stats, chartLoading, computed, users, insights, createChart, chartConfig]);
 
   // Draw finance charts when tab switches
   useEffect(() => {
     if (!chartJsLoaded || activeTab !== "finance" || !computed || !stats) return;
     const timer = setTimeout(() => drawFinanceCharts(), 100);
     return () => clearTimeout(timer);
-  }, [chartJsLoaded, activeTab, computed, stats, scenario]);
+  }, [chartJsLoaded, activeTab, computed, stats, scenario, insights]);
 
   const drawFinanceCharts = () => {
     if (!computed || !stats) return;
@@ -498,12 +503,9 @@ export default function AdminPage() {
       plugins: { legend: { display: false }, tooltip: tip },
     };
 
-    // MRR Trend
-    const mrrLabels = ["Launch", "Week 1", "Week 2", "Week 3", "Week 4", "Week 5", "Now"];
-    const proRevenue = stats.planCounts.Pro * 4.99;
-    const plusRevenue = stats.planCounts.Plus * 9.99;
-    const totalMRR = proRevenue + plusRevenue;
-    const mrrData = [0, 0, Math.round(totalMRR * 0.33 * 100) / 100, Math.round(totalMRR * 0.33 * 100) / 100, Math.round(totalMRR * 0.66 * 100) / 100, Math.round(totalMRR * 0.66 * 100) / 100, totalMRR];
+    // MRR Trend - REAL DATA from insights API
+    const mrrLabels = insights?.mrrHistory?.map(d => d.label) || ["Now"];
+    const mrrData = insights?.mrrHistory?.map(d => d.mrr) || [computed.mrr];
 
     createChart("mrrTrendChart", {
       type: "line",
@@ -617,9 +619,7 @@ export default function AdminPage() {
   }
 
   const topUserMax = topUsers.length > 0 ? topUsers[0].messageCount : 1;
-  const dauMauAvg = activeUserTrend.length > 0 && computed
-    ? (activeUserTrend.reduce((s, d) => s + (d.count / Math.max(computed.activeCount, 1)) * 100, 0) / activeUserTrend.length).toFixed(1)
-    : "0";
+  const dauMauAvg = insights?.avgDauMau || "0";
 
   // Heat level helper for upgrade targets
   const heatLevel = (msgs: number) => {
@@ -628,36 +628,8 @@ export default function AdminPage() {
     return { color: "#648FFF", label: "Watch", bg: "rgba(100,143,255,0.08)", border: "rgba(100,143,255,0.2)" };
   };
 
-  // Cohort data derived from real users
-  const generateCohorts = () => {
-    const now = new Date();
-    const cohorts = [];
-    for (let w = 5; w >= 0; w--) {
-      const weekStart = new Date(now);
-      weekStart.setDate(weekStart.getDate() - (w + 1) * 7);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekEnd.getDate() + 7);
-      const cohortUsers = users.filter(u => {
-        const joined = new Date(u.created_at);
-        return joined >= weekStart && joined < weekEnd;
-      });
-      const size = cohortUsers.length;
-      if (size === 0) continue;
-      const withMsgs = cohortUsers.filter(u => (u.total_messages || 0) > 0).length;
-      const d1 = size > 0 ? Math.round((withMsgs / size) * 100) : 0;
-      const daysAgo = Math.floor((now.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24));
-      const weekLabel = weekStart.toLocaleDateString("en-US", { month: "short" }) + " W" + Math.ceil(weekStart.getDate() / 7);
-      cohorts.push({
-        week: weekLabel, size,
-        d1,
-        d3: daysAgo >= 3 ? Math.round(d1 * 0.72) : null,
-        d7: daysAgo >= 7 ? Math.round(d1 * 0.52) : null,
-        d14: daysAgo >= 14 ? Math.round(d1 * 0.38) : null,
-        d30: daysAgo >= 30 ? Math.round(d1 * 0.25) : null,
-      });
-    }
-    return cohorts;
-  };
+  // Cohort data - REAL from insights API
+  const cohorts = insights?.cohorts || [];
 
   const heatColor = (pct: number | null) => {
     if (pct === null) return { bg: "transparent", color: "#333" };
@@ -667,8 +639,6 @@ export default function AdminPage() {
     if (pct >= 5) return { bg: "rgba(254,97,0,0.2)", color: "#FE6100" };
     return { bg: "rgba(254,97,0,0.1)", color: "#FE6100" };
   };
-
-  const cohorts = generateCohorts();
 
   return (
     <div className="admin-page">
@@ -848,10 +818,10 @@ export default function AdminPage() {
           {/* Time-to-Ghost + DAU/MAU */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
             <div className="cc" style={{ display: "flex", flexDirection: "column" }}>
-              <InfoKicker label="Time-to-Ghost" title="Time-to-Ghost" body={`Of your ${computed?.ghosts || 0} ghost users, when did they abandon?`} how="Day 0 spike = signup/onboarding problem. Day 1-3 spike = first experience problem." />
+              <InfoKicker label="Time-to-Ghost" title="Time-to-Ghost" body={`Of your ghost/churned users, when did they abandon? Includes 0-msg users and users inactive 14+ days.`} how="Day 0 spike = signup/onboarding problem. Day 1-3 spike = first experience problem." />
               <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginBottom: 14 }}>
                 <div className="cc-title" style={{ marginBottom: 0 }}>When users drop off</div>
-                <span style={{ fontSize: 13, color: "#FE6100", fontWeight: 600 }}>{computed?.ghosts || 0} ghosts total</span>
+                <span style={{ fontSize: 13, color: "#FE6100", fontWeight: 600 }}>{insights ? Object.values(insights.ghostBuckets).reduce((a, b) => a + b, 0) : (computed?.ghosts || 0)} ghosts total</span>
               </div>
               <div style={{ position: "relative", flex: 1, minHeight: 220 }}>
                 <canvas id="ghostChart" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
