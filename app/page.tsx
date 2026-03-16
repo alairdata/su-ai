@@ -2649,7 +2649,7 @@ function HomePage() {
         <div style={{
           position: 'relative',
           zIndex: 10000,
-          background: 'linear-gradient(90deg, #D97706, #F59E0B)',
+          background: 'linear-gradient(90deg, #059669, #10B981)',
           color: '#fff',
           display: 'flex',
           alignItems: 'center',
@@ -2661,7 +2661,7 @@ function HomePage() {
           textAlign: 'center' as const,
           flexShrink: 0,
         }}>
-          <span>System operation down — Maintenance underway</span>
+          <span>System operations restored — All services are back online</span>
           <button
             onClick={() => setShowDowntimeBanner(false)}
             style={{
