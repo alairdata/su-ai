@@ -17,14 +17,14 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_timezone TEXT;
 CREATE OR REPLACE FUNCTION increment_messages_used_today(user_id_param UUID, daily_limit INTEGER)
 RETURNS BOOLEAN AS $$
 DECLARE
-  row_data RECORD;
   user_tz TEXT;
-  current_date_str TEXT;
-  last_reset_str TEXT;
+  actual_count INTEGER;
+  today_start TIMESTAMPTZ;
+  today_end TIMESTAMPTZ;
 BEGIN
-  -- Lock the row to prevent concurrent modifications
-  SELECT messages_used_today, last_reset_date, reset_timezone, timezone
-  INTO row_data
+  -- Lock the user row to prevent concurrent modifications
+  SELECT COALESCE(reset_timezone, timezone, 'UTC')
+  INTO user_tz
   FROM users
   WHERE id = user_id_param
   FOR UPDATE;
@@ -33,9 +33,6 @@ BEGIN
     RETURN FALSE;
   END IF;
 
-  -- Determine the user's reset timezone (prefer reset_timezone, fall back to timezone, then UTC)
-  user_tz := COALESCE(row_data.reset_timezone, row_data.timezone, 'UTC');
-
   -- Validate timezone; fall back to UTC if invalid
   BEGIN
     PERFORM NOW() AT TIME ZONE user_tz;
@@ -43,33 +40,35 @@ BEGIN
     user_tz := 'UTC';
   END;
 
-  -- Get current date in user's timezone
-  current_date_str := (NOW() AT TIME ZONE user_tz)::date::text;
+  -- Calculate today's start/end boundaries in user's timezone
+  today_start := ((NOW() AT TIME ZONE user_tz)::date)::timestamp AT TIME ZONE user_tz;
+  today_end := today_start + INTERVAL '1 day';
 
-  -- Get last reset date in user's timezone (or empty string if null)
-  IF row_data.last_reset_date IS NOT NULL THEN
-    last_reset_str := (row_data.last_reset_date AT TIME ZONE user_tz)::date::text;
-  ELSE
-    last_reset_str := '';
-  END IF;
+  -- Count ACTUAL user messages sent today from the messages table
+  -- This is the single source of truth — no more drifting counters
+  SELECT COUNT(*)
+  INTO actual_count
+  FROM messages m
+  JOIN chats c ON c.id = m.chat_id
+  WHERE c.user_id = user_id_param
+    AND m.role = 'user'
+    AND m.created_at >= today_start
+    AND m.created_at < today_end;
 
-  -- If it's a new day, reset the counter
-  IF current_date_str <> last_reset_str THEN
+  -- Check limit based on real count
+  IF actual_count >= daily_limit THEN
+    -- Sync counter to reality and reject
     UPDATE users
-    SET messages_used_today = 1,
+    SET messages_used_today = actual_count,
         last_reset_date = NOW()
     WHERE id = user_id_param;
-    RETURN TRUE;
-  END IF;
-
-  -- Same day: check limit before incrementing
-  IF row_data.messages_used_today >= daily_limit THEN
     RETURN FALSE;
   END IF;
 
-  -- Increment the counter
+  -- Allow message — set counter to actual + 1 (counting the message about to be saved)
   UPDATE users
-  SET messages_used_today = row_data.messages_used_today + 1
+  SET messages_used_today = actual_count + 1,
+      last_reset_date = NOW()
   WHERE id = user_id_param;
 
   RETURN TRUE;
