@@ -302,49 +302,11 @@ export const authOptions: NextAuthOptions = {
             session.user.plan = 'Plus';
           }
 
-          // SECURITY: Use reset_timezone (the timezone at last reset) for calculations
-          // This prevents abuse where users change timezone to trigger early resets
-          // Falls back to current timezone if reset_timezone doesn't exist
-          let resetTimezone = user.reset_timezone || user.timezone || 'UTC';
-          const now = new Date();
-
-          // Validate timezone - if invalid, fall back to UTC
-          try {
-            Intl.DateTimeFormat(undefined, { timeZone: resetTimezone });
-          } catch {
-            console.warn('Invalid timezone:', resetTimezone, '- falling back to UTC');
-            resetTimezone = 'UTC';
-          }
-
-          // Get current date in the RESET timezone (not current user timezone)
-          let currentDateStr: string;
-          let lastResetStr: string | null = null;
-
-          try {
-            currentDateStr = now.toLocaleDateString('en-CA', { timeZone: resetTimezone }); // YYYY-MM-DD format
-            if (user.last_reset_date) {
-              lastResetStr = new Date(user.last_reset_date).toLocaleDateString('en-CA', { timeZone: resetTimezone });
-            }
-          } catch (dateError) {
-            console.error('Date parsing error:', dateError);
-            // Fall back to UTC
-            currentDateStr = now.toLocaleDateString('en-CA', { timeZone: 'UTC' });
-            if (user.last_reset_date) {
-              lastResetStr = new Date(user.last_reset_date).toLocaleDateString('en-CA', { timeZone: 'UTC' });
-            }
-          }
-
-          // Check if it's a new day — if so, show 0 to the frontend
-          // Do NOT write to DB here — let the RPC function handle all resets
-          // Writing here caused race conditions that reset the counter mid-day
-          const isNewDay = lastResetStr !== null && currentDateStr !== lastResetStr;
-
-          if (isNewDay) {
-            // It's a new day — show 0 to frontend, RPC will reset DB on first message
-            session.user.messagesUsedToday = 0;
-          } else {
-            session.user.messagesUsedToday = user.messages_used_today;
-          }
+          // Get actual message count for today directly from the database
+          // This is the single source of truth — no more timezone gymnastics in JS
+          const { data: todayCount } = await supabase
+            .rpc('get_messages_used_today', { user_id_param: token.id });
+          session.user.messagesUsedToday = todayCount || 0;
         }
       }
       return session;
