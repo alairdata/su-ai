@@ -334,18 +334,13 @@ export const authOptions: NextAuthOptions = {
             }
           }
 
-          // Check if it's a new day — if so, reset the counter in DB
-          // This ensures the frontend sees 0 messages used even before the user sends
-          // Only reset if last_reset_date exists AND is a different day
-          // If last_reset_date is null, the user hasn't sent messages yet — don't reset
+          // Check if it's a new day — if so, show 0 to the frontend
+          // Do NOT write to DB here — let the RPC function handle all resets
+          // Writing here caused race conditions that reset the counter mid-day
           const isNewDay = lastResetStr !== null && currentDateStr !== lastResetStr;
 
-          if (isNewDay && user.messages_used_today > 0) {
-            // Reset count in DB so frontend reflects the new day
-            await supabase
-              .from('users')
-              .update({ messages_used_today: 0, last_reset_date: new Date().toISOString() })
-              .eq('id', token.id);
+          if (isNewDay) {
+            // It's a new day — show 0 to frontend, RPC will reset DB on first message
             session.user.messagesUsedToday = 0;
           } else {
             session.user.messagesUsedToday = user.messages_used_today;
