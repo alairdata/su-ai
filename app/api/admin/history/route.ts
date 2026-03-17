@@ -144,18 +144,17 @@ export async function GET(req: NextRequest) {
     chatUserMap.set(chat.id, chat.user_id);
   }
 
-  // Count messages per user in period using user_message_stats for accurate totals
+  // Count messages per user in period from actual messages (not all-time stats)
   const userMessageCounts: Map<string, number> = new Map();
-  const { data: userMsgStats } = await supabase
-    .from("user_message_stats")
-    .select("id, total_messages");
-
-  if (userMsgStats) {
-    for (const s of userMsgStats) {
-      if ((s.total_messages || 0) > 0) {
-        userMessageCounts.set(s.id, s.total_messages);
-      }
+  for (const msg of messages) {
+    let userId: string | null | undefined = null;
+    if (msg.chat_id?.startsWith("deleted_")) {
+      userId = msg.chat_id.replace("deleted_", "");
+    } else if (msg.chat_id) {
+      userId = chatUserMap.get(msg.chat_id);
     }
+    if (!userId) continue;
+    userMessageCounts.set(userId, (userMessageCounts.get(userId) || 0) + 1);
   }
 
   // Get top 10 users by message count
