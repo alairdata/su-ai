@@ -643,6 +643,25 @@ export default function AdminPage() {
   const drawForecast = () => {
     if (!computed) return;
     const { tip, grid, tickX, tickY } = chartConfig;
+    const crosshairPlugin = {
+      id: 'crosshair',
+      afterDraw(chart: any) {
+        if (chart.tooltip?._active?.length) {
+          const ctx = chart.ctx;
+          const x = chart.tooltip._active[0].element.x;
+          const topY = chart.scales.y.top;
+          const bottomY = chart.scales.y.bottom;
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(x, topY);
+          ctx.lineTo(x, bottomY);
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    };
     const scenarios: Record<Scenario, { label: string; color: string; data: number[] }> = {
       bear: {
         label: `Conservative (0.8% conv, 20 signups/wk)`,
