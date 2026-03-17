@@ -359,14 +359,37 @@ export default function AdminPage() {
 
     const labels = userTrend.map(d => d.label);
     const { tip, grid, tickX, tickY } = chartConfig;
+    const crosshairPlugin = {
+      id: 'crosshair',
+      afterDraw(chart: any) {
+        if (chart.tooltip?._active?.length) {
+          const ctx = chart.ctx;
+          const x = chart.tooltip._active[0].element.x;
+          const topY = chart.scales.y.top;
+          const bottomY = chart.scales.y.bottom;
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(x, topY);
+          ctx.lineTo(x, bottomY);
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    };
+    const baseInteraction = { mode: "index" as const, intersect: false };
     const baseScales = {
       x: { grid, ticks: tickX, border: { display: false } },
       y: { grid, ticks: tickY, border: { display: false } },
     };
     const baseOpts = {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: tip },
+      interaction: baseInteraction,
+      hover: { mode: "index" as const, intersect: false },
+      plugins: { legend: { display: false }, tooltip: { ...tip, mode: "index" as const, intersect: false } },
     };
+    const hoverPoint = (color: string) => ({ pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: color, pointHoverBorderWidth: 2, pointHoverBorderColor: "#fff" });
 
     // Growth chart
     createChart("growthChart", {
@@ -374,11 +397,12 @@ export default function AdminPage() {
       data: {
         labels,
         datasets: [
-          { label: "Users", data: userTrend.map(d => d.cumulative), borderColor: "#648FFF", tension: 0.4, fill: false, pointRadius: 0, borderWidth: 2 },
-          { label: "Messages", data: messageTrend.map(d => d.cumulative), borderColor: "#FFB000", tension: 0.4, fill: false, pointRadius: 0, borderWidth: 1.5, borderDash: [4, 3] },
+          { label: "Users", data: userTrend.map(d => d.cumulative), borderColor: "#648FFF", tension: 0.4, fill: false, borderWidth: 2, ...hoverPoint("#648FFF") },
+          { label: "Messages", data: messageTrend.map(d => d.cumulative), borderColor: "#FFB000", tension: 0.4, fill: false, borderWidth: 1.5, borderDash: [4, 3], ...hoverPoint("#FFB000") },
         ],
       },
       options: { ...baseOpts, scales: baseScales },
+      plugins: [crosshairPlugin],
     });
 
     // Signup chart (active vs ghost over time) - REAL DATA from insights API
@@ -388,11 +412,12 @@ export default function AdminPage() {
         data: {
           labels: insights.activeGhostTrend.map(d => d.label),
           datasets: [
-            { label: "Active", data: insights.activeGhostTrend.map(d => d.active), borderColor: "#009E73", backgroundColor: "rgba(0,158,115,0.08)", tension: 0.4, fill: true, pointRadius: 0, borderWidth: 2 },
-            { label: "Ghost", data: insights.activeGhostTrend.map(d => d.ghost), borderColor: "#999999", backgroundColor: "rgba(153,153,153,0.08)", tension: 0.4, fill: true, pointRadius: 0, borderWidth: 1.5, borderDash: [4, 3] },
+            { label: "Active", data: insights.activeGhostTrend.map(d => d.active), borderColor: "#009E73", backgroundColor: "rgba(0,158,115,0.08)", tension: 0.4, fill: true, borderWidth: 2, ...hoverPoint("#009E73") },
+            { label: "Ghost", data: insights.activeGhostTrend.map(d => d.ghost), borderColor: "#999999", backgroundColor: "rgba(153,153,153,0.08)", tension: 0.4, fill: true, borderWidth: 1.5, borderDash: [4, 3], ...hoverPoint("#999") },
           ],
         },
         options: { ...baseOpts, scales: { ...baseScales, y: { ...baseScales.y, min: 0 } } },
+        plugins: [crosshairPlugin],
       });
     }
 
@@ -402,11 +427,12 @@ export default function AdminPage() {
       data: {
         labels: activeUserTrend.map(d => d.label),
         datasets: [
-          { label: "Active Users", data: activeUserTrend.map(d => d.count), borderColor: "#FFB000", backgroundColor: "rgba(255,176,0,0.08)", tension: 0.4, fill: true, pointRadius: 0, borderWidth: 1.5 },
-          { label: "Signups", data: userTrend.map(d => d.count), borderColor: "#648FFF", backgroundColor: "transparent", tension: 0.4, fill: false, pointRadius: 0, borderWidth: 1.5, borderDash: [4, 3] },
+          { label: "Active Users", data: activeUserTrend.map(d => d.count), borderColor: "#FFB000", backgroundColor: "rgba(255,176,0,0.08)", tension: 0.4, fill: true, borderWidth: 1.5, ...hoverPoint("#FFB000") },
+          { label: "Signups", data: userTrend.map(d => d.count), borderColor: "#648FFF", backgroundColor: "transparent", tension: 0.4, fill: false, borderWidth: 1.5, borderDash: [4, 3], ...hoverPoint("#648FFF") },
         ],
       },
       options: { ...baseOpts, scales: { ...baseScales, y: { ...baseScales.y, min: 0 } } },
+      plugins: [crosshairPlugin],
     });
 
     // Distribution chart
