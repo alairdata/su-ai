@@ -182,8 +182,8 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  // Calculate message distribution (total messages per user, bucketed)
-  const messageDistribution: { bucket: string; count: number }[] = [];
+  // Calculate message distribution (total messages per user, bucketed with emails)
+  const messageDistribution: { bucket: string; count: number; users: { email: string; total: number }[] }[] = [];
   const bucketDefs: { label: string; min: number; max: number }[] = [
     { label: "0", min: 0, max: 0 },
     { label: "1", min: 1, max: 1 },
@@ -201,24 +201,32 @@ export async function GET(req: NextRequest) {
     { label: "91-100", min: 91, max: 100 },
     { label: "100+", min: 101, max: Infinity },
   ];
-  const bucketCounts = new Array(bucketDefs.length).fill(0);
+  const bucketUsers: { email: string; total: number }[][] = bucketDefs.map(() => []);
 
-  // Count users with 0 messages
+  // Build user ID → email map
+  const userEmailMap = new Map(allUsers.map(u => [u.id, u.email]));
+
+  // Users with 0 messages
   const usersWithMessages = new Set(userMessageCounts.keys());
-  const usersWithZero = allUsers.filter(u => !usersWithMessages.has(u.id)).length;
-  bucketCounts[0] = usersWithZero;
+  for (const u of allUsers) {
+    if (!usersWithMessages.has(u.id)) {
+      bucketUsers[0].push({ email: u.email, total: 0 });
+    }
+  }
 
-  for (const [, msgCount] of userMessageCounts.entries()) {
+  for (const [userId, msgCount] of userMessageCounts.entries()) {
+    const email = userEmailMap.get(userId) || 'unknown';
     for (let i = 0; i < bucketDefs.length; i++) {
       if (msgCount >= bucketDefs[i].min && msgCount <= bucketDefs[i].max) {
-        bucketCounts[i]++;
+        bucketUsers[i].push({ email, total: msgCount });
         break;
       }
     }
   }
 
   for (let i = 0; i < bucketDefs.length; i++) {
-    messageDistribution.push({ bucket: bucketDefs[i].label, count: bucketCounts[i] });
+    bucketUsers[i].sort((a, b) => b.total - a.total);
+    messageDistribution.push({ bucket: bucketDefs[i].label, count: bucketUsers[i].length, users: bucketUsers[i] });
   }
 
   // Group data by time period

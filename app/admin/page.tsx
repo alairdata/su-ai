@@ -38,7 +38,7 @@ interface Stats {
 
 interface TrendData { label: string; count: number; cumulative: number }
 interface TopUser { id: string; name: string; email: string; messageCount: number }
-interface MessageDistribution { bucket: string; count: number }
+interface MessageDistribution { bucket: string; count: number; users: { email: string; total: number }[] }
 
 interface InsightsData {
   sessionDepth: { sent1: number; sent3: number; sent5: number; sent10: number; sent20: number };
@@ -91,6 +91,7 @@ export default function AdminPage() {
   const [activeUserTrend, setActiveUserTrend] = useState<{ label: string; count: number }[]>([]);
   const [topUsers, setTopUsers] = useState<TopUser[]>([]);
   const [messageDistribution, setMessageDistribution] = useState<MessageDistribution[]>([]);
+  const [selectedBucket, setSelectedBucket] = useState<MessageDistribution | null>(null);
   const [chartLoading, setChartLoading] = useState(false);
 
   // Insights data (real from API)
@@ -451,11 +452,22 @@ export default function AdminPage() {
         labels: messageDistribution.map(d => d.bucket),
         datasets: [{
           label: "Users", data: messageDistribution.map(d => d.count),
-          backgroundColor: "rgba(100,143,255,0.3)", borderColor: "rgba(100,143,255,0.8)",
+          backgroundColor: messageDistribution.map((d) => selectedBucket?.bucket === d.bucket ? "rgba(100,143,255,0.7)" : "rgba(100,143,255,0.3)"),
+          borderColor: "rgba(100,143,255,0.8)",
           borderWidth: 1, borderRadius: 3, hoverBackgroundColor: "rgba(100,143,255,0.6)",
         }],
       },
-      options: { ...baseOpts, scales: { ...baseScales, y: { ...baseScales.y, min: 0 } } },
+      options: {
+        ...baseOpts,
+        onClick: (_e: any, elements: any[]) => {
+          if (elements.length > 0) {
+            const idx = elements[0].index;
+            const bucket = messageDistribution[idx];
+            setSelectedBucket(prev => prev?.bucket === bucket.bucket ? null : bucket);
+          }
+        },
+        scales: { ...baseScales, y: { ...baseScales.y, min: 0 } },
+      },
       plugins: [crosshairPlugin],
     });
 
@@ -554,7 +566,7 @@ export default function AdminPage() {
         });
       }
     }
-  }, [chartJsLoaded, userTrend, messageTrend, activeUserTrend, messageDistribution, stats, chartLoading, computed, users, insights, createChart, chartConfig]);
+  }, [chartJsLoaded, userTrend, messageTrend, activeUserTrend, messageDistribution, stats, chartLoading, computed, users, insights, createChart, chartConfig, selectedBucket]);
 
   // Draw finance charts when tab switches
   useEffect(() => {
@@ -903,11 +915,25 @@ export default function AdminPage() {
               {topUsers.length === 0 && <div style={{ color: "#55546a", textAlign: "center", padding: 20, fontSize: 12 }}>No data</div>}
             </div>
             <div className="cc" style={{ display: "flex", flexDirection: "column" }}>
-              <InfoKicker label="Daily Msg Distribution" title="Messages Per Session" body="How many messages users send in a single session." how="Distribution shows how deep users go." />
-              <div className="cc-title">Per session</div>
-              <div style={{ position: "relative", flex: 1, minHeight: 120 }}>
+              <InfoKicker label="Message Distribution" title="Total Messages Per User" body="How many total messages each user has sent, grouped into ranges." how="Each bar = number of users whose all-time message count falls in that range. Click a bar to see the users." />
+              <div className="cc-title">Total msgs per user</div>
+              <div style={{ position: "relative", flex: 1, minHeight: 120, cursor: "pointer" }}>
                 <canvas id="distChart" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
               </div>
+              {selectedBucket && selectedBucket.users.length > 0 && (
+                <div style={{ marginTop: 10, maxHeight: 200, overflowY: "auto", borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, color: "var(--text2)", fontWeight: 600 }}>{selectedBucket.bucket} msgs — {selectedBucket.users.length} users</span>
+                    <button onClick={() => setSelectedBucket(null)} style={{ background: "none", border: "none", color: "var(--text3)", cursor: "pointer", fontSize: 11 }}>close</button>
+                  </div>
+                  {selectedBucket.users.map((u, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 11, color: "var(--text2)", borderBottom: "1px solid var(--border)" }}>
+                      <span>{u.email}</span>
+                      <span style={{ color: "var(--text3)" }}>{u.total} msgs</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
