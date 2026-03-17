@@ -405,7 +405,12 @@ function calculateActiveUserTrend(
 
   // Count unique users per bucket
   for (const msg of messages) {
-    const userId = msg.chat_id ? chatUserMap.get(msg.chat_id) : null;
+    let userId: string | null | undefined = null;
+    if (msg.chat_id?.startsWith("deleted_")) {
+      userId = msg.chat_id.replace("deleted_", "");
+    } else if (msg.chat_id) {
+      userId = chatUserMap.get(msg.chat_id);
+    }
     if (!userId) continue;
     const key = getGroupKey(new Date(msg.created_at), groupBy);
     const users = bucketUsers.get(key);
