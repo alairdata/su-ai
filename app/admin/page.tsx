@@ -450,7 +450,7 @@ export default function AdminPage() {
       data: {
         labels: messageDistribution.map(d => d.bucket),
         datasets: [{
-          label: "Sessions", data: messageDistribution.map(d => d.count),
+          label: "Users", data: messageDistribution.map(d => d.count),
           backgroundColor: "rgba(100,143,255,0.3)", borderColor: "rgba(100,143,255,0.8)",
           borderWidth: 1, borderRadius: 3, hoverBackgroundColor: "rgba(100,143,255,0.6)",
         }],
