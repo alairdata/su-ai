@@ -391,17 +391,24 @@ export default function AdminPage() {
     };
     const hoverPoint = (color: string) => ({ pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: color, pointHoverBorderWidth: 2, pointHoverBorderColor: "#fff" });
 
-    // Growth chart
+    // Growth chart — dual Y axes
     createChart("growthChart", {
       type: "line",
       data: {
         labels,
         datasets: [
-          { label: "Users", data: userTrend.map(d => d.cumulative), borderColor: "#648FFF", tension: 0.4, fill: false, borderWidth: 2, ...hoverPoint("#648FFF") },
-          { label: "Messages", data: messageTrend.map(d => d.cumulative), borderColor: "#FFB000", tension: 0.4, fill: false, borderWidth: 1.5, borderDash: [4, 3], ...hoverPoint("#FFB000") },
+          { label: "Users", data: userTrend.map(d => d.cumulative), borderColor: "#648FFF", tension: 0.4, fill: false, borderWidth: 2, yAxisID: "yUsers", ...hoverPoint("#648FFF") },
+          { label: "Messages", data: messageTrend.map(d => d.cumulative), borderColor: "#FFB000", tension: 0.4, fill: false, borderWidth: 1.5, borderDash: [4, 3], yAxisID: "yMsgs", ...hoverPoint("#FFB000") },
         ],
       },
-      options: { ...baseOpts, scales: baseScales },
+      options: {
+        ...baseOpts,
+        scales: {
+          x: { grid, ticks: tickX, border: { display: false } },
+          yUsers: { type: "linear", position: "left", grid, ticks: { ...tickY, color: "#648FFF" }, border: { display: false }, title: { display: true, text: "Users", color: "#648FFF", font: { size: 10 } } },
+          yMsgs: { type: "linear", position: "right", grid: { drawOnChartArea: false }, ticks: { ...tickY, color: "#FFB000" }, border: { display: false }, title: { display: true, text: "Messages", color: "#FFB000", font: { size: 10 } } },
+        },
+      },
       plugins: [crosshairPlugin],
     });
 
