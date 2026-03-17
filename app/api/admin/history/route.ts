@@ -144,17 +144,18 @@ export async function GET(req: NextRequest) {
     chatUserMap.set(chat.id, chat.user_id);
   }
 
-  // Count messages per user in period from actual messages (not all-time stats)
+  // Count messages per user using user_message_stats for accurate totals
   const userMessageCounts: Map<string, number> = new Map();
-  for (const msg of messages) {
-    let userId: string | null | undefined = null;
-    if (msg.chat_id?.startsWith("deleted_")) {
-      userId = msg.chat_id.replace("deleted_", "");
-    } else if (msg.chat_id) {
-      userId = chatUserMap.get(msg.chat_id);
+  const { data: userMsgStats } = await supabase
+    .from("user_message_stats")
+    .select("id, total_messages");
+
+  if (userMsgStats) {
+    for (const s of userMsgStats) {
+      if ((s.total_messages || 0) > 0) {
+        userMessageCounts.set(s.id, s.total_messages);
+      }
     }
-    if (!userId) continue;
-    userMessageCounts.set(userId, (userMessageCounts.get(userId) || 0) + 1);
   }
 
   // Get top 10 users by message count
@@ -181,30 +182,43 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  // Calculate message distribution (0-10+ buckets based on messages per day in period)
-  const daysDiff = Math.max(1, Math.ceil((now.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)));
+  // Calculate message distribution (total messages per user, bucketed)
   const messageDistribution: { bucket: string; count: number }[] = [];
+  const bucketDefs: { label: string; min: number; max: number }[] = [
+    { label: "0", min: 0, max: 0 },
+    { label: "1", min: 1, max: 1 },
+    { label: "2", min: 2, max: 2 },
+    { label: "3-5", min: 3, max: 5 },
+    { label: "6-10", min: 6, max: 10 },
+    { label: "11-20", min: 11, max: 20 },
+    { label: "21-30", min: 21, max: 30 },
+    { label: "31-40", min: 31, max: 40 },
+    { label: "41-50", min: 41, max: 50 },
+    { label: "51-60", min: 51, max: 60 },
+    { label: "61-70", min: 61, max: 70 },
+    { label: "71-80", min: 71, max: 80 },
+    { label: "81-90", min: 81, max: 90 },
+    { label: "91-100", min: 91, max: 100 },
+    { label: "100+", min: 101, max: Infinity },
+  ];
+  const bucketCounts = new Array(bucketDefs.length).fill(0);
 
-  const buckets = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-  const bucketCounts = new Map<number, number>();
-  buckets.forEach(b => bucketCounts.set(b, 0));
-
-  for (const [, msgCount] of userMessageCounts.entries()) {
-    const avgPerDay = Math.round(msgCount / daysDiff);
-    const bucket = Math.min(avgPerDay, 10);
-    bucketCounts.set(bucket, (bucketCounts.get(bucket) || 0) + 1);
-  }
-
-  // Also count users with 0 messages
+  // Count users with 0 messages
   const usersWithMessages = new Set(userMessageCounts.keys());
   const usersWithZero = allUsers.filter(u => !usersWithMessages.has(u.id)).length;
-  bucketCounts.set(0, (bucketCounts.get(0) || 0) + usersWithZero);
+  bucketCounts[0] = usersWithZero;
 
-  for (const bucket of buckets) {
-    messageDistribution.push({
-      bucket: bucket === 10 ? '10+' : String(bucket),
-      count: bucketCounts.get(bucket) || 0
-    });
+  for (const [, msgCount] of userMessageCounts.entries()) {
+    for (let i = 0; i < bucketDefs.length; i++) {
+      if (msgCount >= bucketDefs[i].min && msgCount <= bucketDefs[i].max) {
+        bucketCounts[i]++;
+        break;
+      }
+    }
+  }
+
+  for (let i = 0; i < bucketDefs.length; i++) {
+    messageDistribution.push({ bucket: bucketDefs[i].label, count: bucketCounts[i] });
   }
 
   // Group data by time period
