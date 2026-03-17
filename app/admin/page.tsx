@@ -361,18 +361,20 @@ export default function AdminPage() {
     const { tip, grid, tickX, tickY } = chartConfig;
     const crosshairPlugin = {
       id: 'crosshair',
-      afterDraw(chart: any) {
-        if (chart.tooltip?._active?.length) {
+      afterDatasetsDraw(chart: any) {
+        const active = chart.getActiveElements();
+        if (active && active.length > 0) {
           const ctx = chart.ctx;
-          const x = chart.tooltip._active[0].element.x;
-          const topY = chart.scales.y.top;
-          const bottomY = chart.scales.y.bottom;
+          const x = active[0].element.x;
+          const yScale = chart.scales.y || chart.scales.yUsers || Object.values(chart.scales).find((s: any) => s.axis === 'y');
+          if (!yScale) return;
           ctx.save();
           ctx.beginPath();
-          ctx.moveTo(x, topY);
-          ctx.lineTo(x, bottomY);
+          ctx.moveTo(x, yScale.top);
+          ctx.lineTo(x, yScale.bottom);
           ctx.lineWidth = 1;
-          ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+          ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+          ctx.setLineDash([4, 3]);
           ctx.stroke();
           ctx.restore();
         }
@@ -389,7 +391,7 @@ export default function AdminPage() {
       hover: { mode: "index" as const, intersect: false },
       plugins: { legend: { display: false }, tooltip: { ...tip, mode: "index" as const, intersect: false } },
     };
-    const hoverPoint = (color: string) => ({ pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: color, pointHoverBorderWidth: 2, pointHoverBorderColor: "#fff" });
+    const hoverPoint = (color: string) => ({ pointRadius: 0, pointHitRadius: 20, pointHoverRadius: 6, pointHoverBackgroundColor: color, pointHoverBorderWidth: 2, pointHoverBorderColor: "#fff" });
 
     // Growth chart — dual Y axes
     createChart("growthChart", {
@@ -566,18 +568,20 @@ export default function AdminPage() {
     const { tip, grid, tickX, tickY } = chartConfig;
     const crosshairPlugin = {
       id: 'crosshair',
-      afterDraw(chart: any) {
-        if (chart.tooltip?._active?.length) {
+      afterDatasetsDraw(chart: any) {
+        const active = chart.getActiveElements();
+        if (active && active.length > 0) {
           const ctx = chart.ctx;
-          const x = chart.tooltip._active[0].element.x;
-          const topY = chart.scales.y.top;
-          const bottomY = chart.scales.y.bottom;
+          const x = active[0].element.x;
+          const yScale = chart.scales.y || chart.scales.yUsers || Object.values(chart.scales).find((s: any) => s.axis === 'y');
+          if (!yScale) return;
           ctx.save();
           ctx.beginPath();
-          ctx.moveTo(x, topY);
-          ctx.lineTo(x, bottomY);
+          ctx.moveTo(x, yScale.top);
+          ctx.lineTo(x, yScale.bottom);
           ctx.lineWidth = 1;
-          ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+          ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+          ctx.setLineDash([4, 3]);
           ctx.stroke();
           ctx.restore();
         }
@@ -590,7 +594,7 @@ export default function AdminPage() {
       hover: { mode: "index" as const, intersect: false },
       plugins: { legend: { display: false }, tooltip: { ...tip, mode: "index" as const, intersect: false } },
     };
-    const hoverPoint = (color: string) => ({ pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: color, pointHoverBorderWidth: 2, pointHoverBorderColor: "#fff" });
+    const hoverPoint = (color: string) => ({ pointRadius: 0, pointHitRadius: 20, pointHoverRadius: 6, pointHoverBackgroundColor: color, pointHoverBorderWidth: 2, pointHoverBorderColor: "#fff" });
 
     // MRR Trend - REAL DATA from insights API
     const mrrLabels = insights?.mrrHistory?.map(d => d.label) || ["Now"];
@@ -645,18 +649,20 @@ export default function AdminPage() {
     const { tip, grid, tickX, tickY } = chartConfig;
     const crosshairPlugin = {
       id: 'crosshair',
-      afterDraw(chart: any) {
-        if (chart.tooltip?._active?.length) {
+      afterDatasetsDraw(chart: any) {
+        const active = chart.getActiveElements();
+        if (active && active.length > 0) {
           const ctx = chart.ctx;
-          const x = chart.tooltip._active[0].element.x;
-          const topY = chart.scales.y.top;
-          const bottomY = chart.scales.y.bottom;
+          const x = active[0].element.x;
+          const yScale = chart.scales.y || chart.scales.yUsers || Object.values(chart.scales).find((s: any) => s.axis === 'y');
+          if (!yScale) return;
           ctx.save();
           ctx.beginPath();
-          ctx.moveTo(x, topY);
-          ctx.lineTo(x, bottomY);
+          ctx.moveTo(x, yScale.top);
+          ctx.lineTo(x, yScale.bottom);
           ctx.lineWidth = 1;
-          ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+          ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+          ctx.setLineDash([4, 3]);
           ctx.stroke();
           ctx.restore();
         }
@@ -681,7 +687,7 @@ export default function AdminPage() {
     };
     const s = scenarios[scenario];
 
-    const fHoverPoint = (color: string) => ({ pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: color, pointHoverBorderWidth: 2, pointHoverBorderColor: "#fff" });
+    const fHoverPoint = (color: string) => ({ pointRadius: 0, pointHitRadius: 20, pointHoverRadius: 6, pointHoverBackgroundColor: color, pointHoverBorderWidth: 2, pointHoverBorderColor: "#fff" });
     createChart("forecastChart", {
       type: "line",
       data: {
