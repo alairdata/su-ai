@@ -450,10 +450,11 @@ export default function AdminPage() {
         datasets: [{
           label: "Sessions", data: messageDistribution.map(d => d.count),
           backgroundColor: "rgba(100,143,255,0.3)", borderColor: "rgba(100,143,255,0.8)",
-          borderWidth: 1, borderRadius: 3,
+          borderWidth: 1, borderRadius: 3, hoverBackgroundColor: "rgba(100,143,255,0.6)",
         }],
       },
       options: { ...baseOpts, scales: { ...baseScales, y: { ...baseScales.y, min: 0 } } },
+      plugins: [crosshairPlugin],
     });
 
     // Donut chart
@@ -461,13 +462,14 @@ export default function AdminPage() {
       createChart("donutChart", {
         type: "doughnut",
         data: {
+          labels: ["Ghost (0 msgs)", "Free (1-9)", "Free (10+)", "Paid"],
           datasets: [{
             data: [computed.ghosts, computed.freeActiveCount, computed.freePowerCount, computed.paidCount],
             backgroundColor: ["#444", "#009E73", "#FFB000", "#648FFF"],
-            borderWidth: 0, hoverOffset: 4,
+            borderWidth: 0, hoverOffset: 8, hoverBorderWidth: 2, hoverBorderColor: "#fff",
           }],
         },
-        options: { responsive: true, maintainAspectRatio: false, cutout: "70%", plugins: { legend: { display: false }, tooltip: tip } },
+        options: { responsive: true, maintainAspectRatio: false, cutout: "70%", plugins: { legend: { display: false }, tooltip: { ...tip, callbacks: { label: (ctx: any) => ` ${ctx.label}: ${ctx.raw} users (${((ctx.raw / (stats?.totalUsers || 1)) * 100).toFixed(1)}%)` } } } },
       });
 
       // Session depth funnel - REAL DATA from insights API
@@ -479,7 +481,7 @@ export default function AdminPage() {
             datasets: [{
               label: "Users", data: [insights.sessionDepth.sent1, insights.sessionDepth.sent3, insights.sessionDepth.sent5, insights.sessionDepth.sent10, insights.sessionDepth.sent20],
               backgroundColor: ["rgba(100,143,255,0.7)", "rgba(100,143,255,0.6)", "rgba(100,143,255,0.5)", "rgba(100,143,255,0.4)", "rgba(100,143,255,0.3)"],
-              borderColor: "#648FFF", borderWidth: 1, borderRadius: 4,
+              borderColor: "#648FFF", borderWidth: 1, borderRadius: 4, hoverBackgroundColor: "rgba(100,143,255,0.9)",
             }],
           },
           options: {
@@ -502,10 +504,11 @@ export default function AdminPage() {
             datasets: [{
               label: "Ghosts", data: [gb.day0, gb.day1, gb.day2_3, gb.day4_7, gb.day8_14, gb.day15_30],
               backgroundColor: ["rgba(254,97,0,0.7)", "rgba(254,97,0,0.6)", "rgba(254,97,0,0.5)", "rgba(254,97,0,0.4)", "rgba(254,97,0,0.3)", "rgba(254,97,0,0.2)"],
-              borderColor: "#FE6100", borderWidth: 1, borderRadius: 4,
+              borderColor: "#FE6100", borderWidth: 1, borderRadius: 4, hoverBackgroundColor: "rgba(254,97,0,0.9)",
             }],
           },
           options: { ...baseOpts, scales: { ...baseScales, y: { ...baseScales.y, min: 0 } } },
+          plugins: [crosshairPlugin],
         });
       }
 
@@ -516,8 +519,8 @@ export default function AdminPage() {
           data: {
             labels: insights.dauMauData.map(d => d.label),
             datasets: [
-              { label: "DAU/MAU %", data: insights.dauMauData.map(d => d.ratio), borderColor: "#FFB000", backgroundColor: "rgba(255,176,0,0.08)", tension: 0.4, fill: true, pointRadius: 0, borderWidth: 2 },
-              { label: "Target (20%)", data: insights.dauMauData.map(() => 20), borderColor: "rgba(100,143,255,0.4)", borderDash: [6, 4], tension: 0, fill: false, pointRadius: 0, borderWidth: 1.5 },
+              { label: "DAU/MAU %", data: insights.dauMauData.map(d => d.ratio), borderColor: "#FFB000", backgroundColor: "rgba(255,176,0,0.08)", tension: 0.4, fill: true, borderWidth: 2, ...hoverPoint("#FFB000") },
+              { label: "Target (20%)", data: insights.dauMauData.map(() => 20), borderColor: "rgba(100,143,255,0.4)", borderDash: [6, 4], tension: 0, fill: false, pointRadius: 0, pointHoverRadius: 0, borderWidth: 1.5 },
             ],
           },
           options: {
@@ -527,6 +530,7 @@ export default function AdminPage() {
               y: { grid, ticks: { ...tickY, callback: (v: number) => v + "%" }, border: { display: false }, min: 0, max: 50 },
             },
           },
+          plugins: [crosshairPlugin],
         });
       }
 
@@ -541,7 +545,7 @@ export default function AdminPage() {
               label: "Users", data: [rf.daily, rf.twoThree, rf.weekly, rf.biweekly, rf.onceOnly],
               backgroundColor: ["rgba(0,158,115,0.8)", "rgba(0,158,115,0.6)", "rgba(0,158,115,0.4)", "rgba(255,176,0,0.4)", "rgba(254,97,0,0.4)"],
               borderColor: ["#009E73", "#009E73", "#009E73", "#FFB000", "#FE6100"],
-              borderWidth: 1, borderRadius: 4,
+              borderWidth: 1, borderRadius: 4, hoverBackgroundColor: "rgba(255,255,255,0.25)",
             }],
           },
           options: { ...baseOpts, scales: { ...baseScales, y: { ...baseScales.y, min: 0 } } },
@@ -560,10 +564,33 @@ export default function AdminPage() {
   const drawFinanceCharts = () => {
     if (!computed || !stats) return;
     const { tip, grid, tickX, tickY } = chartConfig;
+    const crosshairPlugin = {
+      id: 'crosshair',
+      afterDraw(chart: any) {
+        if (chart.tooltip?._active?.length) {
+          const ctx = chart.ctx;
+          const x = chart.tooltip._active[0].element.x;
+          const topY = chart.scales.y.top;
+          const bottomY = chart.scales.y.bottom;
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(x, topY);
+          ctx.lineTo(x, bottomY);
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    };
+    const baseInteraction = { mode: "index" as const, intersect: false };
     const baseOpts = {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: tip },
+      interaction: baseInteraction,
+      hover: { mode: "index" as const, intersect: false },
+      plugins: { legend: { display: false }, tooltip: { ...tip, mode: "index" as const, intersect: false } },
     };
+    const hoverPoint = (color: string) => ({ pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: color, pointHoverBorderWidth: 2, pointHoverBorderColor: "#fff" });
 
     // MRR Trend - REAL DATA from insights API
     const mrrLabels = insights?.mrrHistory?.map(d => d.label) || ["Now"];
@@ -575,7 +602,7 @@ export default function AdminPage() {
         labels: mrrLabels,
         datasets: [{
           label: "MRR", data: mrrData, borderColor: "#009E73", backgroundColor: "rgba(0,158,115,0.08)",
-          tension: 0.4, fill: true, pointRadius: 4, pointBackgroundColor: "#009E73", borderWidth: 2,
+          tension: 0.4, fill: true, borderWidth: 2, ...hoverPoint("#009E73"),
         }],
       },
       options: {
@@ -585,6 +612,7 @@ export default function AdminPage() {
           y: { grid: { color: "rgba(255,255,255,0.05)", drawTicks: false }, ticks: { ...tickY, callback: (v: number) => "$" + v }, border: { display: false }, min: 0 },
         },
       },
+      plugins: [crosshairPlugin],
     });
 
     // Funnel
@@ -596,7 +624,7 @@ export default function AdminPage() {
           data: [computed.funnel.signupCount, computed.funnel.oneMsg, computed.funnel.tenMsg, computed.funnel.paidCount],
           backgroundColor: ["rgba(100,143,255,0.3)", "rgba(255,176,0,0.3)", "rgba(255,176,0,0.5)", "rgba(0,158,115,0.6)"],
           borderColor: ["#648FFF", "#FFB000", "#FFB000", "#009E73"],
-          borderWidth: 1, borderRadius: 4,
+          borderWidth: 1, borderRadius: 4, hoverBackgroundColor: "rgba(255,255,255,0.25)",
         }],
       },
       options: {
@@ -634,23 +662,27 @@ export default function AdminPage() {
     };
     const s = scenarios[scenario];
 
+    const fHoverPoint = (color: string) => ({ pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: color, pointHoverBorderWidth: 2, pointHoverBorderColor: "#fff" });
     createChart("forecastChart", {
       type: "line",
       data: {
         labels: ["Now", "Mo 1", "Mo 2", "Mo 3", "Mo 4", "Mo 5", "Mo 6"],
         datasets: [
-          { label: "Projected MRR", data: s.data, borderColor: s.color, backgroundColor: s.color + "18", tension: 0.4, fill: true, pointRadius: 3, pointBackgroundColor: s.color, borderWidth: 2 },
-          { label: "$500 target", data: [500, 500, 500, 500, 500, 500, 500], borderColor: "rgba(255,255,255,0.15)", borderDash: [6, 4], fill: false, pointRadius: 0, borderWidth: 1 },
+          { label: "Projected MRR", data: s.data, borderColor: s.color, backgroundColor: s.color + "18", tension: 0.4, fill: true, borderWidth: 2, ...fHoverPoint(s.color) },
+          { label: "$500 target", data: [500, 500, 500, 500, 500, 500, 500], borderColor: "rgba(255,255,255,0.15)", borderDash: [6, 4], fill: false, pointRadius: 0, pointHoverRadius: 0, borderWidth: 1 },
         ],
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: tip },
+        interaction: { mode: "index" as const, intersect: false },
+        hover: { mode: "index" as const, intersect: false },
+        plugins: { legend: { display: false }, tooltip: { ...tip, mode: "index" as const, intersect: false } },
         scales: {
           x: { grid, ticks: tickX, border: { display: false } },
           y: { grid, ticks: { ...tickY, callback: (v: number) => "$" + v }, border: { display: false }, min: 0 },
         },
       },
+      plugins: [crosshairPlugin],
     });
   };
 
