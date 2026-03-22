@@ -25,9 +25,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            try {
+              var theme = localStorage.getItem('theme') || 'dark';
+              document.documentElement.setAttribute('data-theme', theme);
+            } catch(e) {}
+          })();
+        `}} />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Script id="microsoft-clarity" strategy="afterInteractive">
           {`
             (function(c,l,a,r,i,t,y){
@@ -39,6 +47,7 @@ export default function RootLayout({
         </Script>
       </head>
       <body className={inter.className} style={{ margin: 0, padding: 0, overflowX: 'hidden', width: '100%' }}>
+        <a href="#main-content" className="skip-link">Skip to main content</a>
         <Providers>
           <MixpanelInit />
           {children}

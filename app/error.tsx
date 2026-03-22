@@ -15,42 +15,41 @@ export default function Error({
       justifyContent: 'center',
       fontFamily: 'Inter, -apple-system, sans-serif',
       padding: '20px',
+      background: '#0C0C0E',
+      color: '#F0EDE8',
     }}>
-      <div style={{
-        textAlign: 'center',
-        maxWidth: '400px',
-      }}>
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🙈</div>
+      <div style={{ textAlign: 'center', maxWidth: '400px' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>😵</div>
         <h2 style={{
           fontSize: '20px',
           fontWeight: 600,
           marginBottom: '12px',
-          color: '#1a1a1a',
+          color: '#F0EDE8',
         }}>
-          Oops, something broke
+          Something went wrong
         </h2>
         <p style={{
-          color: '#666',
+          color: '#8A8690',
           marginBottom: '24px',
           fontSize: '14px',
           lineHeight: 1.5,
         }}>
-          Try refreshing or click below.
+          The app ran into an unexpected error. Tap below to try again.
         </p>
         <button
           onClick={() => reset()}
           style={{
-            padding: '10px 20px',
+            padding: '12px 28px',
             fontSize: '14px',
             fontWeight: 600,
-            background: '#1a1a1a',
-            color: '#fff',
+            background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+            color: '#0C0C0E',
             border: 'none',
-            borderRadius: '8px',
+            borderRadius: '12px',
             cursor: 'pointer',
           }}
         >
-          Try again
+          Try Again
         </button>
       </div>
     </div>

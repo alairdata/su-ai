@@ -13,7 +13,7 @@
   --border-active: rgba(255, 255, 255, 0.12);
   --text-primary: #F0EDE8;
   --text-secondary: #8A8690;
-  --text-muted: #5A5660;
+  --text-muted: #7A7680;
   --accent: #E8A04C;
   --accent-dim: rgba(232, 160, 76, 0.12);
   --accent-glow: rgba(232, 160, 76, 0.06);
@@ -1176,4 +1176,85 @@ select {
 @keyframes scaleIn {
   from { opacity: 0; transform: scale(0.92); }
   to { opacity: 1; transform: scale(1); }
+}
+
+/* ==========================================
+   Z-INDEX SCALE
+   ========================================== */
+/*
+  Sidebar: 100
+  Scroll button: 200
+  Modals/overlays: 300-400
+  Toast: 500
+  Onboarding: 600
+*/
+
+/* ==========================================
+   MOBILE RESPONSIVENESS
+   ========================================== */
+
+@media (max-width: 480px) {
+  .message-bubble {
+    max-width: 90%;
+  }
+
+  .main {
+    padding-inline: 10px;
+  }
+
+  .greeting-text {
+    font-size: 24px;
+  }
+
+  .input-card {
+    padding: 14px;
+    border-radius: 16px;
+  }
+}
+
+/* Sidebar slide on mobile */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: -280px;
+    top: 0;
+    bottom: 0;
+    z-index: 100;
+    transition: left 0.25s ease;
+  }
+
+  .sidebar.open {
+    left: 0;
+  }
+}
+
+/* ==========================================
+   ACCESSIBILITY
+   ========================================== */
+
+/* Focus indicators for keyboard navigation */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid #E8A04C;
+  outline-offset: 2px;
+}
+
+/* Skip to main content link (hidden until focused) */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #E8A04C;
+  color: #0C0C0E;
+  padding: 8px 16px;
+  z-index: 1000;
+  font-weight: 600;
+  border-radius: 0 0 8px 0;
+}
+
+.skip-link:focus {
+  top: 0;
 }

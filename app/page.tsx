@@ -182,7 +182,7 @@ const OnboardingScreen1 = ({ onNext, onSkip }: { onNext: () => void; onSkip: () 
                 <span key={d} style={{
                   width: '6px', height: '6px',
                   borderRadius: '50%',
-                  background: '#5A5660',
+                  background: '#7A7680',
                   animation: `onboardBounce 1.4s ${d * 0.2}s infinite`,
                   display: 'block',
                 }} />
@@ -213,7 +213,7 @@ const OnboardingScreen1 = ({ onNext, onSkip }: { onNext: () => void; onSkip: () 
             width: currentConvo === i ? '20px' : '6px',
             height: '6px',
             borderRadius: currentConvo === i ? '3px' : '50%',
-            background: currentConvo === i ? '#E8A04C' : '#5A5660',
+            background: currentConvo === i ? '#E8A04C' : '#7A7680',
             transition: 'all 0.3s ease',
           }} />
         ))}
@@ -236,7 +236,7 @@ const OnboardingScreen1 = ({ onNext, onSkip }: { onNext: () => void; onSkip: () 
         I&apos;m ready
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="13 17 18 12 13 7"/><line x1="6" y1="12" x2="18" y2="12"/></svg>
       </button>
-      <div onClick={onSkip} style={{ fontSize: '12px', color: '#5A5660', cursor: 'pointer', marginTop: '16px' }}>
+      <div onClick={onSkip} style={{ fontSize: '12px', color: '#7A7680', cursor: 'pointer', marginTop: '16px' }}>
         Skip intro
       </div>
     </div>
@@ -321,7 +321,7 @@ const OnboardingScreen2 = ({ onNext, onSkip }: { onNext: () => void; onSkip: () 
           fontWeight: 600,
           letterSpacing: '0.1em',
           textTransform: 'uppercase' as const,
-          color: '#5A5660',
+          color: '#7A7680',
           marginBottom: '16px',
         }}>YOUR DAILY MESSAGES</div>
 
@@ -338,7 +338,7 @@ const OnboardingScreen2 = ({ onNext, onSkip }: { onNext: () => void; onSkip: () 
           <span style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: '18px',
-            color: '#5A5660',
+            color: '#7A7680',
             fontWeight: 500,
           }}>free</span>
         </div>
@@ -411,7 +411,7 @@ const OnboardingScreen2 = ({ onNext, onSkip }: { onNext: () => void; onSkip: () 
       <div style={{
         marginTop: '12px',
         fontSize: '12px',
-        color: '#5A5660',
+        color: '#7A7680',
         opacity: showDaily ? 1 : 0,
         transition: 'opacity 0.5s ease',
       }}>
@@ -436,7 +436,7 @@ const OnboardingScreen2 = ({ onNext, onSkip }: { onNext: () => void; onSkip: () 
             Got it
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="13 17 18 12 13 7"/><line x1="6" y1="12" x2="18" y2="12"/></svg>
           </button>
-          <div onClick={onSkip} style={{ fontSize: '12px', color: '#5A5660', cursor: 'pointer', marginTop: '16px', textAlign: 'center' }}>
+          <div onClick={onSkip} style={{ fontSize: '12px', color: '#7A7680', cursor: 'pointer', marginTop: '16px', textAlign: 'center' }}>
             Skip
           </div>
         </div>
@@ -612,7 +612,7 @@ const OnboardingScreen3 = ({ onComplete }: { onComplete: () => void }) => {
             Let&apos;s go
             <BoltLogo size={16} />
           </button>
-          <div onClick={onComplete} style={{ fontSize: '12px', color: '#5A5660', cursor: 'pointer', marginTop: '16px', textAlign: 'center' }}>
+          <div onClick={onComplete} style={{ fontSize: '12px', color: '#7A7680', cursor: 'pointer', marginTop: '16px', textAlign: 'center' }}>
             Skip
           </div>
         </div>
@@ -661,6 +661,11 @@ function HomePage() {
     isDestructive?: boolean;
     isLoading?: boolean;
   }>({ show: false, title: '', message: '', confirmText: 'Confirm', onConfirm: () => {}, isLoading: false });
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
   const [selectedChatForActions, setSelectedChatForActions] = useState<{id: string, title: string} | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -1290,9 +1295,11 @@ function HomePage() {
       await navigator.clipboard.writeText(content);
       track(EVENTS.MESSAGE_COPIED);
       setCopiedMessageId(messageId);
+      showToast('Copied to clipboard');
       setTimeout(() => setCopiedMessageId(null), 2000);
     } catch (error) {
       console.error('Failed to copy:', error);
+      showToast('Failed to copy', 'error');
     }
   };
 
@@ -1513,6 +1520,7 @@ function HomePage() {
     if (!name || isAddingCharacter) return;
     if (chatCharacters.length >= 5) {
       track(EVENTS.CHARACTER_LIMIT_REACHED);
+      showConfirm('Character Limit', 'You can have a maximum of 5 characters per chat. Remove one to add a new one.', 'OK', () => {});
       return;
     }
 
@@ -1557,12 +1565,14 @@ function HomePage() {
       setChatCharacters(prev => [...prev, data.character]);
       track(EVENTS.CHARACTER_CREATED, { name, color: color.name });
       track(EVENTS.CHARACTER_MODAL_CLOSED, { action: 'added' });
+      showToast(`${name} added to chat`);
       setNewCharName('');
       setNewCharPersonality('');
       setSelectedColorIndex(0);
       setShowCharacterModal(false);
     } catch (err) {
       console.error('Failed to add character:', err);
+      showToast('Failed to add character', 'error');
     } finally {
       setIsAddingCharacter(false);
     }
@@ -1665,7 +1675,7 @@ function HomePage() {
         if (!uploadRes.ok) {
           const err = await uploadRes.json();
           track(EVENTS.FILE_UPLOAD_FAILED, { file_type: fileTypeToUpload, error_type: err.error || 'upload_error' });
-          alert(err.error || "Failed to upload file.");
+          showToast(err.error || "Failed to upload file.", 'error');
           setInput(messageToSend);
           setSelectedFile(fileToUpload);
           setSelectedFileType(fileTypeToUpload);
@@ -1683,7 +1693,7 @@ function HomePage() {
         track(EVENTS.FILE_UPLOADED, { file_type: uploadResult.fileType, file_size_kb: Math.round(fileToUpload.size / 1024) });
       } catch {
         track(EVENTS.FILE_UPLOAD_FAILED, { file_type: fileTypeToUpload, error_type: 'network_error' });
-        alert("Failed to upload file. Please try again.");
+        showToast("Failed to upload file. Please try again.", 'error');
         setInput(messageToSend);
         setSelectedFile(fileToUpload);
         setSelectedFileType(fileTypeToUpload);
@@ -2588,7 +2598,7 @@ function HomePage() {
         <div style={{
           position: 'fixed',
           inset: 0,
-          zIndex: 9999,
+          zIndex: 400,
           background: '#0C0C0E',
           display: 'flex',
           alignItems: 'center',
@@ -2616,7 +2626,7 @@ function HomePage() {
                 width: onboardingScreen === i ? '24px' : '8px',
                 height: '8px',
                 borderRadius: onboardingScreen === i ? '4px' : '50%',
-                background: onboardingScreen === i ? '#E8A04C' : (i < onboardingScreen ? '#E8A04C' : '#5A5660'),
+                background: onboardingScreen === i ? '#E8A04C' : (i < onboardingScreen ? '#E8A04C' : '#7A7680'),
                 opacity: onboardingScreen === i ? 1 : (i < onboardingScreen ? 0.5 : 0.3),
                 transition: 'all 0.3s ease',
               }} />
@@ -2648,7 +2658,7 @@ function HomePage() {
       {showDowntimeBanner && (
         <div style={{
           position: 'relative',
-          zIndex: 10000,
+          zIndex: 600,
           background: 'linear-gradient(90deg, #059669, #10B981)',
           color: '#fff',
           display: 'flex',
@@ -2811,7 +2821,7 @@ function HomePage() {
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, flex: 1 }}>
                               {chat.title}
                             </span>
-                            <span style={{ fontSize: '11px', color: theme === 'dark' ? '#5A5660' : '#9A9590', flexShrink: 0, whiteSpace: 'nowrap' as const }}>
+                            <span style={{ fontSize: '11px', color: theme === 'dark' ? '#7A7680' : '#9A9590', flexShrink: 0, whiteSpace: 'nowrap' as const }}>
                               {getRelativeTime(chat.created_at || new Date().toISOString())}
                             </span>
                             {isMobile && (
@@ -2870,7 +2880,7 @@ function HomePage() {
             <div style={{
               fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
               fontSize: 11,
-              color: theme === 'dark' ? '#5A5660' : '#9A9590',
+              color: theme === 'dark' ? '#7A7680' : '#9A9590',
               background: theme === 'dark' ? '#1A1A1E' : '#E4E3DF',
               padding: '4px 8px',
               borderRadius: '6px',
@@ -2943,7 +2953,7 @@ function HomePage() {
                   width: 34, height: 34, borderRadius: 8,
                   border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
                   background: 'transparent',
-                  color: theme === 'dark' ? '#5A5660' : '#9A9590',
+                  color: theme === 'dark' ? '#7A7680' : '#9A9590',
                   cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   marginRight: 4,
@@ -2970,7 +2980,7 @@ function HomePage() {
                     justifyContent: 'center',
                     fontSize: '14px',
                     background: theme === 'light' ? '#fff' : 'transparent',
-                    color: theme === 'light' ? '#D08A30' : (theme === 'dark' ? '#5A5660' : '#9A9590'),
+                    color: theme === 'light' ? '#D08A30' : (theme === 'dark' ? '#7A7680' : '#9A9590'),
                     transition: 'all 0.2s ease',
                     boxShadow: theme === 'light' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                   }}
@@ -3690,7 +3700,7 @@ function HomePage() {
           <div
             onClick={(e) => { if (e.target === e.currentTarget) setShowLimitModal(false); }}
             style={{
-              position: 'fixed', inset: 0, zIndex: 9999,
+              position: 'fixed', inset: 0, zIndex: 400,
               background: 'rgba(0,0,0,0.7)',
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
@@ -3731,7 +3741,7 @@ function HomePage() {
                     width: '28px', height: '28px', borderRadius: '8px',
                     background: theme === 'dark' ? '#18181C' : '#F0EFEC',
                     border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
-                    color: theme === 'dark' ? '#5A5660' : '#9A969F',
+                    color: theme === 'dark' ? '#7A7680' : '#9A969F',
                     fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     cursor: 'pointer', transition: 'all 0.2s',
                   }}
@@ -3770,23 +3780,23 @@ function HomePage() {
                       fontFamily: "'JetBrains Mono', monospace", fontSize: '28px', fontWeight: 700,
                       color: theme === 'dark' ? '#F0EDE8' : '#1A1A1C', display: 'block', lineHeight: 1, marginBottom: '4px',
                     }}>{String(h).padStart(2, '0')}</span>
-                    <span style={{ fontSize: '9px', color: theme === 'dark' ? '#5A5660' : '#9A969F', textTransform: 'uppercase' as const, letterSpacing: '0.1em', fontWeight: 600 }}>Hours</span>
+                    <span style={{ fontSize: '9px', color: theme === 'dark' ? '#7A7680' : '#9A969F', textTransform: 'uppercase' as const, letterSpacing: '0.1em', fontWeight: 600 }}>Hours</span>
                   </div>
-                  <span style={{ fontSize: '22px', color: theme === 'dark' ? '#5A5660' : '#9A969F', fontWeight: 700, margin: '0 2px', alignSelf: 'flex-start', marginTop: '4px' }}>:</span>
+                  <span style={{ fontSize: '22px', color: theme === 'dark' ? '#7A7680' : '#9A969F', fontWeight: 700, margin: '0 2px', alignSelf: 'flex-start', marginTop: '4px' }}>:</span>
                   <div style={{ textAlign: 'center' as const, minWidth: '52px' }}>
                     <span style={{
                       fontFamily: "'JetBrains Mono', monospace", fontSize: '28px', fontWeight: 700,
                       color: theme === 'dark' ? '#F0EDE8' : '#1A1A1C', display: 'block', lineHeight: 1, marginBottom: '4px',
                     }}>{String(m).padStart(2, '0')}</span>
-                    <span style={{ fontSize: '9px', color: theme === 'dark' ? '#5A5660' : '#9A969F', textTransform: 'uppercase' as const, letterSpacing: '0.1em', fontWeight: 600 }}>Min</span>
+                    <span style={{ fontSize: '9px', color: theme === 'dark' ? '#7A7680' : '#9A969F', textTransform: 'uppercase' as const, letterSpacing: '0.1em', fontWeight: 600 }}>Min</span>
                   </div>
-                  <span style={{ fontSize: '22px', color: theme === 'dark' ? '#5A5660' : '#9A969F', fontWeight: 700, margin: '0 2px', alignSelf: 'flex-start', marginTop: '4px' }}>:</span>
+                  <span style={{ fontSize: '22px', color: theme === 'dark' ? '#7A7680' : '#9A969F', fontWeight: 700, margin: '0 2px', alignSelf: 'flex-start', marginTop: '4px' }}>:</span>
                   <div style={{ textAlign: 'center' as const, minWidth: '52px' }}>
                     <span style={{
                       fontFamily: "'JetBrains Mono', monospace", fontSize: '28px', fontWeight: 700,
                       color: theme === 'dark' ? '#F0EDE8' : '#1A1A1C', display: 'block', lineHeight: 1, marginBottom: '4px',
                     }}>{String(s).padStart(2, '0')}</span>
-                    <span style={{ fontSize: '9px', color: theme === 'dark' ? '#5A5660' : '#9A969F', textTransform: 'uppercase' as const, letterSpacing: '0.1em', fontWeight: 600 }}>Sec</span>
+                    <span style={{ fontSize: '9px', color: theme === 'dark' ? '#7A7680' : '#9A969F', textTransform: 'uppercase' as const, letterSpacing: '0.1em', fontWeight: 600 }}>Sec</span>
                   </div>
                 </div>
 
@@ -3843,12 +3853,12 @@ function HomePage() {
                   onClick={() => setShowLimitModal(false)}
                   style={{
                     width: '100%', padding: '12px', border: 'none', borderRadius: '10px',
-                    background: 'transparent', color: theme === 'dark' ? '#5A5660' : '#9A969F',
+                    background: 'transparent', color: theme === 'dark' ? '#7A7680' : '#9A969F',
                     fontFamily: "'DM Sans', sans-serif", fontSize: '13px',
                     cursor: 'pointer', transition: 'all 0.2s',
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = theme === 'dark' ? '#8A8690' : '#6B6870'; e.currentTarget.style.background = theme === 'dark' ? '#18181C' : '#F0EFEC'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = theme === 'dark' ? '#5A5660' : '#9A969F'; e.currentTarget.style.background = 'transparent'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = theme === 'dark' ? '#7A7680' : '#9A969F'; e.currentTarget.style.background = 'transparent'; }}
                 >
                   I&apos;ll come back tomorrow
                 </button>
@@ -3873,7 +3883,7 @@ function HomePage() {
             background: theme === 'dark' ? '#141416' : '#ffffff',
             border: `1px solid ${theme === 'dark' ? '#1E1E22' : '#e5e5e5'}`,
             borderRadius: '20px',
-            zIndex: 10001,
+            zIndex: 400,
             padding: '32px 28px',
           }}>
             {/* Close button */}
@@ -3885,7 +3895,7 @@ function HomePage() {
                 right: '16px',
                 background: 'none',
                 border: 'none',
-                color: theme === 'dark' ? '#5A5660' : '#999',
+                color: theme === 'dark' ? '#7A7680' : '#999',
                 cursor: 'pointer',
                 padding: '4px',
               }}
@@ -3962,7 +3972,7 @@ function HomePage() {
                     }}>{feature.title}</div>
                     <div style={{
                       fontSize: '11px',
-                      color: theme === 'dark' ? '#5A5660' : '#888',
+                      color: theme === 'dark' ? '#7A7680' : '#888',
                       lineHeight: 1.4,
                     }}>{feature.desc}</div>
                   </div>
@@ -3992,7 +4002,7 @@ function HomePage() {
                 fontWeight: 700,
                 color: theme === 'dark' ? '#F0EDE8' : '#1a1a1a',
                 marginBottom: '4px',
-              }}>$9.99<span style={{ fontSize: '14px', fontWeight: 400, color: theme === 'dark' ? '#5A5660' : '#888' }}>/mo</span></div>
+              }}>$9.99<span style={{ fontSize: '14px', fontWeight: 400, color: theme === 'dark' ? '#7A7680' : '#888' }}>/mo</span></div>
               <div style={{
                 fontSize: '12px',
                 color: theme === 'dark' ? '#8A8690' : '#666',
@@ -4548,7 +4558,7 @@ function HomePage() {
                                   {memory.content}
                                 </span>
                                 <button
-                                  onClick={() => deleteMemoryItem(memory.id)}
+                                  onClick={() => showConfirm('Delete Memory', `Remove this memory: "${memory.content}"?`, 'Delete', () => deleteMemoryItem(memory.id), true)}
                                   title="Delete memory"
                                   style={{
                                     background: 'none',
@@ -4570,7 +4580,7 @@ function HomePage() {
                             ))}
                           </div>
                           <button
-                            onClick={clearAllMemories}
+                            onClick={() => showConfirm('Clear All Memories', 'Are you sure? This will permanently delete all your saved memories. This cannot be undone.', 'Clear All', clearAllMemories, true)}
                             style={{
                               background: 'none',
                               border: `1px solid ${theme === 'dark' ? '#333' : '#ddd'}`,
@@ -4782,7 +4792,7 @@ function HomePage() {
                   width: 32, height: 32, borderRadius: 8,
                   border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
                   background: 'transparent',
-                  color: theme === 'dark' ? '#5A5660' : '#9A9590',
+                  color: theme === 'dark' ? '#7A7680' : '#9A9590',
                   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 16,
                 }}
@@ -4795,12 +4805,12 @@ function HomePage() {
               borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: theme === 'dark' ? '#5A5660' : '#9A9590' }}>In this chat</span>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: theme === 'dark' ? '#5A5660' : '#9A9590' }}>{chatCharacters.length}/5</span>
+                <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: theme === 'dark' ? '#7A7680' : '#9A9590' }}>In this chat</span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: theme === 'dark' ? '#7A7680' : '#9A9590' }}>{chatCharacters.length}/5</span>
               </div>
 
               {chatCharacters.length === 0 ? (
-                <div style={{ padding: '12px 0', textAlign: 'center' as const, fontSize: 12, color: theme === 'dark' ? '#5A5660' : '#9A9590' }}>
+                <div style={{ padding: '12px 0', textAlign: 'center' as const, fontSize: 12, color: theme === 'dark' ? '#7A7680' : '#9A9590' }}>
                   No characters yet. Add one below.
                 </div>
               ) : (
@@ -4817,13 +4827,13 @@ function HomePage() {
                     }}>{char.name.substring(0, 2).toUpperCase()}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: char.color_fg }}>{char.name}</div>
-                      <div style={{ fontSize: 11, color: theme === 'dark' ? '#5A5660' : '#9A9590', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{char.personality || 'No description'}</div>
+                      <div style={{ fontSize: 11, color: theme === 'dark' ? '#7A7680' : '#9A9590', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{char.personality || 'No description'}</div>
                     </div>
                     <button
                       onClick={() => removeChatCharacter(char.id)}
                       style={{
                         width: 22, height: 22, borderRadius: 6, border: 'none',
-                        background: 'transparent', color: theme === 'dark' ? '#5A5660' : '#9A9590',
+                        background: 'transparent', color: theme === 'dark' ? '#7A7680' : '#9A9590',
                         cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
                       }}
                     >&times;</button>
@@ -4839,7 +4849,7 @@ function HomePage() {
               <div style={{ marginBottom: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: theme === 'dark' ? '#F0EDE8' : '#1A1918' }}>Name</span>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: theme === 'dark' ? '#5A5660' : '#9A9590' }}>{newCharName.length}/16</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: theme === 'dark' ? '#7A7680' : '#9A9590' }}>{newCharName.length}/16</span>
                 </div>
                 <input
                   type="text"
@@ -4860,7 +4870,7 @@ function HomePage() {
               <div style={{ marginBottom: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: theme === 'dark' ? '#F0EDE8' : '#1A1918' }}>Personality</span>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: theme === 'dark' ? '#5A5660' : '#9A9590' }}>{newCharPersonality.length}/300</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: theme === 'dark' ? '#7A7680' : '#9A9590' }}>{newCharPersonality.length}/300</span>
                 </div>
                 <textarea
                   value={newCharPersonality}
@@ -4876,7 +4886,7 @@ function HomePage() {
                     resize: 'none' as const, lineHeight: 1.5,
                   }}
                 />
-                <div style={{ fontSize: 11, color: theme === 'dark' ? '#5A5660' : '#9A9590', marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: theme === 'dark' ? '#7A7680' : '#9A9590', marginTop: 4 }}>
                   e.g. &quot;A tough love mentor who doesn&apos;t sugarcoat anything&quot;
                 </div>
               </div>
@@ -4912,7 +4922,7 @@ function HomePage() {
                   <div style={{
                     fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
                     textTransform: 'uppercase' as const,
-                    color: theme === 'dark' ? '#5A5660' : '#9A9590',
+                    color: theme === 'dark' ? '#7A7680' : '#9A9590',
                     marginBottom: 8,
                   }}>Preview</div>
 
@@ -5000,6 +5010,36 @@ function HomePage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast notification */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          zIndex: 10002,
+          padding: '12px 20px',
+          borderRadius: '12px',
+          fontSize: '14px',
+          fontWeight: 500,
+          background: toast.type === 'success' ? (theme === 'dark' ? '#1a3a1a' : '#e8f5e9')
+            : toast.type === 'error' ? (theme === 'dark' ? '#3a1a1a' : '#fbe9e7')
+            : (theme === 'dark' ? '#1a2a3a' : '#e3f2fd'),
+          color: toast.type === 'success' ? '#4caf50'
+            : toast.type === 'error' ? '#ef5350'
+            : '#42a5f5',
+          border: `1px solid ${toast.type === 'success' ? 'rgba(76,175,80,0.3)'
+            : toast.type === 'error' ? 'rgba(239,83,80,0.3)'
+            : 'rgba(66,165,245,0.3)'}`,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+          animation: 'fadeSlideIn 0.3s ease-out',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}>
+          {toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ'} {toast.message}
         </div>
       )}
 
@@ -5150,7 +5190,7 @@ function HomePage() {
                   Show me
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
-                <button onClick={dismissWhatsNew} style={{ fontSize: 12, color: '#5A5660', cursor: 'pointer', background: 'none', border: 'none', fontFamily: "'Inter', sans-serif" }}>
+                <button onClick={dismissWhatsNew} style={{ fontSize: 12, color: '#7A7680', cursor: 'pointer', background: 'none', border: 'none', fontFamily: "'Inter', sans-serif" }}>
                   Skip, I&apos;ll figure it out
                 </button>
               </div>
@@ -5207,7 +5247,7 @@ function HomePage() {
                   Next
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
-                <button onClick={dismissWhatsNew} style={{ fontSize: 12, color: '#5A5660', cursor: 'pointer', background: 'none', border: 'none', fontFamily: "'Inter', sans-serif" }}>Skip tutorial</button>
+                <button onClick={dismissWhatsNew} style={{ fontSize: 12, color: '#7A7680', cursor: 'pointer', background: 'none', border: 'none', fontFamily: "'Inter', sans-serif" }}>Skip tutorial</button>
               </div>
             </div>
 
@@ -5261,7 +5301,7 @@ function HomePage() {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#1A1A1E', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)', marginTop: 12 }}>
-                    <span style={{ fontSize: 11, flex: 1 }}><span style={{ color: '#E8A04C', fontWeight: 600 }}>@Sarah</span> <span style={{ color: '#5A5660' }}>what&apos;s your take?</span></span>
+                    <span style={{ fontSize: 11, flex: 1 }}><span style={{ color: '#E8A04C', fontWeight: 600 }}>@Sarah</span> <span style={{ color: '#7A7680' }}>what&apos;s your take?</span></span>
                     <div style={{ width: 24, height: 24, borderRadius: 6, background: 'linear-gradient(135deg, #E8A04C, #E8624C)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0C0C0E" strokeWidth="3"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                     </div>
@@ -5280,7 +5320,7 @@ function HomePage() {
                   Next
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
-                <button onClick={dismissWhatsNew} style={{ fontSize: 12, color: '#5A5660', cursor: 'pointer', background: 'none', border: 'none', fontFamily: "'Inter', sans-serif" }}>Skip tutorial</button>
+                <button onClick={dismissWhatsNew} style={{ fontSize: 12, color: '#7A7680', cursor: 'pointer', background: 'none', border: 'none', fontFamily: "'Inter', sans-serif" }}>Skip tutorial</button>
               </div>
             </div>
 
@@ -5310,24 +5350,24 @@ function HomePage() {
                     <div className="wn-summary-card">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#B388FF" strokeWidth="2" strokeLinecap="round" style={{ marginBottom: 6 }}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="17" y1="11" x2="23" y2="11"/></svg>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#F0EDE8', marginBottom: 2 }}>Characters</div>
-                      <div style={{ fontSize: 10, color: '#5A5660' }}>Person+ icon in header</div>
+                      <div style={{ fontSize: 10, color: '#7A7680' }}>Person+ icon in header</div>
                     </div>
                     <div className="wn-summary-card">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64D2FF" strokeWidth="2" strokeLinecap="round" style={{ marginBottom: 6 }}><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#F0EDE8', marginBottom: 2 }}>Files</div>
-                      <div style={{ fontSize: 10, color: '#5A5660' }}>Paperclip in input bar</div>
+                      <div style={{ fontSize: 10, color: '#7A7680' }}>Paperclip in input bar</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 10 }}>
                     <div className="wn-summary-card">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#69F0AE" strokeWidth="2" strokeLinecap="round" style={{ marginBottom: 6 }}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#F0EDE8', marginBottom: 2 }}>Images</div>
-                      <div style={{ fontSize: 10, color: '#5A5660' }}>Upload or paste</div>
+                      <div style={{ fontSize: 10, color: '#7A7680' }}>Upload or paste</div>
                     </div>
                     <div className="wn-summary-card">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF80AB" strokeWidth="2" strokeLinecap="round" style={{ marginBottom: 6 }}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#F0EDE8', marginBottom: 2 }}>Generate</div>
-                      <div style={{ fontSize: 10, color: '#5A5660' }}>Ask AI to create</div>
+                      <div style={{ fontSize: 10, color: '#7A7680' }}>Ask AI to create</div>
                     </div>
                   </div>
                 </div>
@@ -6167,9 +6207,10 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
   },
   scrollToBottomBtn: {
     position: 'absolute' as const,
-    bottom: '140px',
+    bottom: '160px',
     left: '50%',
     transform: 'translateX(-50%)',
+    zIndex: 200,
     width: '36px',
     height: '36px',
     borderRadius: '50%',
@@ -7134,7 +7175,7 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   collapseBtn: {
     ...lightStyles.collapseBtn,
     border: '1px solid rgba(255, 255, 255, 0.06)',
-    color: '#5A5660',
+    color: '#7A7680',
   },
   navText: {
     ...lightStyles.navText,
@@ -7284,11 +7325,11 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   attachBtn: {
     ...lightStyles.attachBtn,
-    color: '#5A5660',
+    color: '#7A7680',
   },
   inputHint: {
     ...lightStyles.inputHint,
-    color: '#5A5660',
+    color: '#7A7680',
   },
   textarea: {
     ...lightStyles.textarea,
@@ -7358,11 +7399,11 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   modalSectionTitle: {
     ...lightStyles.modalSectionTitle,
-    color: '#5A5660',
+    color: '#7A7680',
   },
   modalSubsectionTitle: {
     ...lightStyles.modalSubsectionTitle,
-    color: '#5A5660',
+    color: '#7A7680',
   },
   modalInfoRow: {
     ...lightStyles.modalInfoRow,
@@ -7386,7 +7427,7 @@ const darkStyles: { [key: string]: React.CSSProperties } = {
   },
   planDescription: {
     ...lightStyles.planDescription,
-    color: '#5A5660',
+    color: '#7A7680',
   },
   progressBarContainer: {
     ...lightStyles.progressBarContainer,
