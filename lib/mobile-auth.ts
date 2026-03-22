@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
+import { decode } from "next-auth/jwt";
 import { createClient } from "@supabase/supabase-js";
 import { isVipEmail } from "./plans";
 
@@ -75,12 +76,12 @@ export async function getSessionFromRequest(
 
   if (sessionToken) {
     try {
-      const { payload } = await jwtVerify(sessionToken, getSecret(), {
-        algorithms: ["HS256"],
+      const payload = await decode({
+        token: sessionToken,
+        secret: process.env.NEXTAUTH_SECRET!,
       });
       if (payload?.id || payload?.sub) {
         const userId = (payload.id || payload.sub) as string;
-        // Fetch fresh user data (same as mobile path below)
         return await fetchUserSession(userId);
       }
     } catch {
