@@ -21,19 +21,6 @@ const supabase = createClient(
 export async function POST(req: NextRequest) {
   const clientIP = getClientIP(req);
 
-  // Rate limit: 10 attempts per 15 minutes
-  const rateLimitResult = rateLimit(`mobile-auth:${clientIP}`, {
-    limit: 10,
-    windowSeconds: 900,
-  });
-
-  if (!rateLimitResult.success) {
-    return NextResponse.json(
-      { error: "Too many attempts. Please try again later." },
-      { status: 429, headers: rateLimitHeaders(rateLimitResult) }
-    );
-  }
-
   const body = await req.json().catch(() => null);
   if (!body) {
     return NextResponse.json(
@@ -43,6 +30,22 @@ export async function POST(req: NextRequest) {
   }
 
   const { action } = body;
+
+  // Separate rate limits for login vs token refresh
+  const isRefresh = action === "refresh";
+  const rateLimitResult = rateLimit(
+    isRefresh ? `mobile-refresh:${clientIP}` : `mobile-login:${clientIP}`,
+    isRefresh
+      ? { limit: 30, windowSeconds: 900 }   // 30 refreshes per 15 min
+      : { limit: 10, windowSeconds: 900 }    // 10 logins per 15 min
+  );
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please try again later." },
+      { status: 429, headers: rateLimitHeaders(rateLimitResult) }
+    );
+  }
 
   // --- LOGIN ---
   if (action === "login") {

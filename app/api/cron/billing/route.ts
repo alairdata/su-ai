@@ -8,12 +8,17 @@ import {
   usdToGhsPesewas,
   PlanType
 } from '@/lib/paystack';
-import { sendSubscriptionEmail } from '@/lib/email';
+import { sendSubscriptionEmail, sendPaymentFailedEmail } from '@/lib/email';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+// Retry configuration — 3 days total before downgrade
+const MAX_RETRY_ATTEMPTS = 2;
+const RETRY_INTERVALS_DAYS = [1, 1]; // Retry after 1 day, then 1 more day
+const GRACE_PERIOD_DAYS = 1; // 1 day after final retry before downgrade
 
 // Cron secret to prevent unauthorized access - REQUIRED
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -21,10 +26,41 @@ const CRON_SECRET = process.env.CRON_SECRET;
 // SECURITY: Track processed users to prevent duplicate charges in same run
 const processedUsersThisRun = new Set<string>();
 
-// SECURITY: Simple lock to prevent concurrent cron runs
-let cronRunning = false;
-let lastCronRun = 0;
-const MIN_CRON_INTERVAL = 5 * 60 * 1000; // 5 minutes minimum between runs
+const LOCK_ID = 'billing_cron';
+const MIN_CRON_INTERVAL_MINUTES = 5;
+
+// Acquire a database-level lock to prevent concurrent cron runs across instances
+async function acquireCronLock(): Promise<boolean> {
+  // Try to insert a lock row — if it already exists and is recent, another instance is running
+  const { data, error } = await supabase
+    .from('cron_locks')
+    .upsert(
+      { id: LOCK_ID, locked_at: new Date().toISOString(), locked_by: crypto.randomUUID() },
+      { onConflict: 'id' }
+    )
+    .select('locked_at')
+    .single();
+
+  if (error) {
+    // Table might not exist — fall back to allowing the run
+    console.warn('Cron lock table not available, proceeding without lock:', error.message);
+    return true;
+  }
+
+  // Check if the lock was set recently (another instance might have just grabbed it)
+  const lockedAt = new Date(data.locked_at);
+  const minutesAgo = (Date.now() - lockedAt.getTime()) / 60000;
+
+  // If lock is older than interval, it's stale — we grabbed it fresh via upsert
+  return minutesAgo < MIN_CRON_INTERVAL_MINUTES;
+}
+
+async function releaseCronLock(): Promise<void> {
+  await supabase
+    .from('cron_locks')
+    .delete()
+    .eq('id', LOCK_ID);
+}
 
 export async function GET(req: NextRequest) {
   // Verify cron secret (for Vercel Cron or external cron services)
@@ -37,21 +73,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // SECURITY: Prevent concurrent cron runs
-  if (cronRunning) {
-    console.warn('Cron billing: Already running, skipping duplicate execution');
+  // SECURITY: Acquire database lock to prevent concurrent runs across instances
+  const lockAcquired = await acquireCronLock();
+  if (!lockAcquired) {
+    console.warn('Cron billing: Another instance is running, skipping');
     return NextResponse.json({ error: 'Cron already running' }, { status: 409 });
   }
 
-  // SECURITY: Prevent too-frequent runs (idempotency window)
-  const now = Date.now();
-  if (now - lastCronRun < MIN_CRON_INTERVAL) {
-    console.warn('Cron billing: Too soon since last run, skipping');
-    return NextResponse.json({ error: 'Cron run too recent' }, { status: 429 });
-  }
-
-  cronRunning = true;
-  lastCronRun = now;
   processedUsersThisRun.clear();
 
   console.log('Starting billing cron job...');
@@ -69,12 +97,12 @@ export async function GET(req: NextRequest) {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Find all users whose billing period has ended
+    // Find all users whose billing period has ended OR who are past_due/grace_period
     const { data: users, error: fetchError } = await supabase
       .from('users')
-      .select('id, email, name, plan, subscription_status, current_period_end, paystack_authorization, paystack_customer_code, scheduled_plan')
+      .select('id, email, name, plan, subscription_status, current_period_end, paystack_authorization, paystack_customer_code, scheduled_plan, retry_count, last_retry_at, grace_period_end')
       .neq('plan', 'Free')
-      .lte('current_period_end', now.toISOString());
+      .or(`current_period_end.lte.${now.toISOString()},subscription_status.eq.past_due,subscription_status.eq.grace_period`);
 
     if (fetchError) {
       console.error('Failed to fetch users:', fetchError);
@@ -189,17 +217,99 @@ export async function GET(req: NextRequest) {
           continue;
         }
 
+        // Handle grace period expiry - downgrade to Free
+        if (user.subscription_status === 'grace_period') {
+          if (user.grace_period_end && new Date(user.grace_period_end) <= now) {
+            await supabase
+              .from('users')
+              .update({
+                plan: 'Free',
+                subscription_status: 'expired',
+                paystack_authorization: null,
+                current_period_end: null,
+                retry_count: 0,
+                last_retry_at: null,
+                grace_period_end: null,
+              })
+              .eq('id', user.id);
+
+            // Send downgrade email
+            if (user.email) {
+              try {
+                await sendSubscriptionEmail(
+                  user.email,
+                  user.name || 'there',
+                  'Free',
+                  'downgraded',
+                  undefined,
+                  user.id
+                );
+              } catch (emailError) {
+                console.error('Failed to send downgrade email:', emailError);
+              }
+            }
+
+            results.cancelled++;
+            console.log(`Grace period expired, downgraded user ${user.id} to Free`);
+          }
+          // Grace period not yet expired - skip
+          continue;
+        }
+
         // If no authorization, can't charge - mark as past_due
         if (!user.paystack_authorization) {
-          await supabase
-            .from('users')
-            .update({ subscription_status: 'past_due' })
-            .eq('id', user.id);
+          const retryCount = (user.retry_count || 0) + 1;
+          if (retryCount >= MAX_RETRY_ATTEMPTS) {
+            // All retries exhausted, enter grace period
+            const gracePeriodEnd = new Date();
+            gracePeriodEnd.setDate(gracePeriodEnd.getDate() + GRACE_PERIOD_DAYS);
+
+            await supabase
+              .from('users')
+              .update({
+                subscription_status: 'grace_period',
+                retry_count: retryCount,
+                last_retry_at: now.toISOString(),
+                grace_period_end: gracePeriodEnd.toISOString(),
+              })
+              .eq('id', user.id);
+          } else {
+            await supabase
+              .from('users')
+              .update({
+                subscription_status: 'past_due',
+                retry_count: retryCount,
+                last_retry_at: now.toISOString(),
+              })
+              .eq('id', user.id);
+          }
+
+          // Send payment failed email
+          if (user.email) {
+            try {
+              await sendPaymentFailedEmail(user.email, user.name || 'there', user.plan, Math.min(retryCount, MAX_RETRY_ATTEMPTS), MAX_RETRY_ATTEMPTS, user.id);
+            } catch (emailError) {
+              console.error('Failed to send payment failed email:', emailError);
+            }
+          }
 
           results.failed++;
           results.errors.push(`No authorization for user ${user.id}`);
           console.error('No authorization for user:', user.id);
           continue;
+        }
+
+        // For past_due users, check if it's time for a retry
+        if (user.subscription_status === 'past_due' && user.last_retry_at) {
+          const lastRetry = new Date(user.last_retry_at);
+          const retryIndex = Math.min((user.retry_count || 1) - 1, RETRY_INTERVALS_DAYS.length - 1);
+          const nextRetryDate = new Date(lastRetry);
+          nextRetryDate.setDate(nextRetryDate.getDate() + RETRY_INTERVALS_DAYS[retryIndex]);
+
+          if (now < nextRetryDate) {
+            // Not time to retry yet
+            continue;
+          }
         }
 
         // Charge the saved card for renewal
@@ -228,7 +338,7 @@ export async function GET(req: NextRequest) {
         });
 
         if (chargeResult.data.status === 'success') {
-          // Update subscription period
+          // Update subscription period and reset retry state
           const newPeriodEnd = getNextBillingDate();
 
           await supabase
@@ -236,23 +346,57 @@ export async function GET(req: NextRequest) {
             .update({
               subscription_status: 'active',
               current_period_end: newPeriodEnd.toISOString(),
+              retry_count: 0,
+              last_retry_at: null,
+              grace_period_end: null,
             })
             .eq('id', user.id);
 
           results.renewed++;
           console.log(`Renewed subscription for user: ${user.id}, new period end: ${newPeriodEnd.toISOString()}`);
         } else {
-          // Charge failed - mark as past_due
-          await supabase
-            .from('users')
-            .update({ subscription_status: 'past_due' })
-            .eq('id', user.id);
+          // Charge failed - increment retry count
+          const retryCount = (user.retry_count || 0) + 1;
+
+          if (retryCount >= MAX_RETRY_ATTEMPTS) {
+            // All retries exhausted, enter grace period
+            const gracePeriodEnd = new Date();
+            gracePeriodEnd.setDate(gracePeriodEnd.getDate() + GRACE_PERIOD_DAYS);
+
+            await supabase
+              .from('users')
+              .update({
+                subscription_status: 'grace_period',
+                retry_count: retryCount,
+                last_retry_at: now.toISOString(),
+                grace_period_end: gracePeriodEnd.toISOString(),
+              })
+              .eq('id', user.id);
+
+            console.log(`User ${user.id} entered grace period until ${gracePeriodEnd.toISOString()}`);
+          } else {
+            await supabase
+              .from('users')
+              .update({
+                subscription_status: 'past_due',
+                retry_count: retryCount,
+                last_retry_at: now.toISOString(),
+              })
+              .eq('id', user.id);
+          }
 
           results.failed++;
-          results.errors.push(`Charge failed for user ${user.id}`);
-          console.error('Charge failed for user:', user.id, chargeResult);
+          results.errors.push(`Charge failed for user ${user.id} (attempt ${retryCount}/${MAX_RETRY_ATTEMPTS})`);
+          console.error('Charge failed for user:', user.id, `attempt ${retryCount}/${MAX_RETRY_ATTEMPTS}`);
 
-          // TODO: Send payment failed email
+          // Send payment failed email
+          if (user.email) {
+            try {
+              await sendPaymentFailedEmail(user.email, user.name || 'there', user.plan, Math.min(retryCount, MAX_RETRY_ATTEMPTS), MAX_RETRY_ATTEMPTS, user.id);
+            } catch (emailError) {
+              console.error('Failed to send payment failed email:', emailError);
+            }
+          }
         }
       } catch (userError) {
         results.failed++;
@@ -272,7 +416,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Cron job failed' }, { status: 500 });
   } finally {
     // SECURITY: Always release lock
-    cronRunning = false;
+    await releaseCronLock();
     processedUsersThisRun.clear();
   }
 }

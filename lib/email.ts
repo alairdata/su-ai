@@ -206,7 +206,7 @@ export async function sendSubscriptionEmail(
       'Memory across conversations',
     ],
     Plus: [
-      '30x more than Free',
+      '60x more than Free',
       'Maximum memory &amp; context',
       'Priority access to new features',
       'All advanced models',
@@ -280,6 +280,105 @@ export async function sendSubscriptionEmail(
     return { success: true };
   } catch (error) {
     console.error('Failed to send subscription email:', error);
+    return { success: false, error };
+  }
+}
+
+export async function sendPaymentFailedEmail(
+  email: string,
+  name: string,
+  plan: string,
+  retryAttempt: number,
+  maxRetries: number,
+  userId?: string
+) {
+  const isLastAttempt = retryAttempt >= maxRetries;
+  const subject = isLastAttempt
+    ? 'Action required: Your subscription is about to expire'
+    : 'Heads up: Your payment failed';
+
+  const mainMessage = isLastAttempt
+    ? `We&apos;ve tried charging your card ${maxRetries} times for your ${plan} plan, but it keeps failing. Your subscription will be downgraded to the Free plan in 1 day unless you update your payment method.`
+    : `We tried to renew your ${plan} plan but your card was declined. We&apos;ll retry automatically, but you may want to check your card details.`;
+
+  const urgencyNote = isLastAttempt
+    ? `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);padding:14px 16px;border-radius:10px;margin-top:20px;font-size:13px;color:#8A8690;display:flex;align-items:flex-start;gap:10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div>
+          <strong style="color:#ef4444;font-weight:600;">Last notice</strong><br>
+          If we can&apos;t collect payment within 1 day, your plan will be downgraded to Free (5 messages/day).
+        </div>
+      </div>`
+    : `<div style="font-size:12px;color:#5A5660;text-align:center;margin-top:16px;">
+        Retry attempt ${retryAttempt} of ${maxRetries} &mdash; we&apos;ll try again tomorrow.
+      </div>`;
+
+  // Notify admins about payment failures
+  const adminEmails = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (adminEmails.length > 0) {
+    try {
+      await resend.emails.send({
+        from: 'So-UnFiltered AI <support@so-unfiltered-ai.com>',
+        to: adminEmails,
+        subject: `[Admin] Payment failed for ${email} (attempt ${retryAttempt}/${maxRetries})`,
+        html: `<p><strong>User:</strong> ${name} (${email})</p>
+               <p><strong>Plan:</strong> ${plan}</p>
+               <p><strong>Retry:</strong> ${retryAttempt} of ${maxRetries}${isLastAttempt ? ' — FINAL ATTEMPT, entering grace period' : ''}</p>
+               ${userId ? `<p><strong>User ID:</strong> ${userId}</p>` : ''}`,
+      });
+    } catch (adminEmailError) {
+      console.error('Failed to send admin payment alert:', adminEmailError);
+    }
+  }
+
+  try {
+    await resend.emails.send({
+      from: 'So-UnFiltered AI <support@so-unfiltered-ai.com>',
+      to: email,
+      subject: `So-UnFiltered AI — ${subject}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;margin:0;padding:0;background:#0C0C0E;color:#F0EDE8;">
+            <div style="max-width:560px;margin:0 auto;padding:48px 24px;">
+              ${EMAIL_HEADER}
+                <h1 style="font-size:28px;font-weight:800;letter-spacing:-0.04em;color:#F0EDE8;margin:0 0 4px;line-height:1.2;">Payment failed.</h1>
+              </div>
+
+              <div style="background:#141416;border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:32px;margin-bottom:24px;">
+                <div style="font-size:15px;color:#F0EDE8;margin-bottom:8px;font-weight:600;">Hey ${name},</div>
+                <div style="font-size:14px;color:#8A8690;margin-bottom:24px;line-height:1.6;">
+                  ${mainMessage}
+                </div>
+
+                <div style="text-align:center;margin:28px 0;">
+                  <a href="${process.env.NEXTAUTH_URL}/settings" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#E8A04C,#E8624C);color:#0C0C0E!important;text-decoration:none;border-radius:12px;font-weight:700;font-size:14px;">Update Payment Method</a>
+                </div>
+
+                <div style="height:1px;background:rgba(255,255,255,0.06);margin:24px 0;"></div>
+
+                ${urgencyNote}
+              </div>
+
+              ${EMAIL_FOOTER.replace('{{FOOTER_TEXT}}', 'Questions? Hit us at <a href="mailto:sounfilteredai@gmail.com" style="color:#8A8690;text-decoration:none;">sounfilteredai@gmail.com</a>')}
+            </div>
+          </body>
+        </html>
+      `,
+    });
+
+    if (userId) trackServerEvent(userId, EVENTS.EMAIL_SENT, { email_type: 'payment_failed', retry_attempt: retryAttempt });
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to send payment failed email:', error);
     return { success: false, error };
   }
 }

@@ -752,10 +752,8 @@ export function useChats() {
 
     // API call in background
     try {
-      const res = await fetch('/api/chats/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chatId }),
+      const res = await fetch(`/api/chats/delete?chatId=${chatId}`, {
+        method: 'DELETE',
       });
 
       if (!res.ok) {

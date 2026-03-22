@@ -9,22 +9,32 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function POST(req: NextRequest) {
+export async function DELETE(req: NextRequest) {
   const session = await getSessionFromRequest(req);
 
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
+  // Support both query param (?chatId=) and JSON body for backwards compatibility
+  let chatId: string | null = req.nextUrl.searchParams.get("chatId");
 
-  // Schema validation
-  const validation = validateInput(deleteChatSchema, body);
-  if (!validation.success) {
-    return NextResponse.json({ error: validation.error }, { status: 400 });
+  if (!chatId) {
+    try {
+      const body = await req.json();
+      const validation = validateInput(deleteChatSchema, body);
+      if (!validation.success) {
+        return NextResponse.json({ error: validation.error }, { status: 400 });
+      }
+      chatId = validation.data.chatId;
+    } catch {
+      return NextResponse.json({ error: "Missing chatId" }, { status: 400 });
+    }
   }
 
-  const { chatId } = validation.data;
+  if (!chatId) {
+    return NextResponse.json({ error: "Missing chatId" }, { status: 400 });
+  }
 
   // Fetch chat with messages before deleting
   const { data: chat } = await supabase

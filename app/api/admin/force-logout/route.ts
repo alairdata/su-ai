@@ -56,10 +56,17 @@ export async function POST(req: NextRequest) {
   }
 
   // All users logout (exclude admins)
-  const { error } = await supabase
+  // SECURITY: Use Supabase RPC or build the filter safely to avoid SQL injection
+  let query = supabase
     .from("users")
-    .update({ force_logout: true })
-    .not('email', 'in', `(${ADMIN_EMAILS.join(',')})`);
+    .update({ force_logout: true });
+
+  // Exclude each admin email individually to avoid string interpolation
+  for (const adminEmail of ADMIN_EMAILS) {
+    query = query.neq('email', adminEmail);
+  }
+
+  const { error } = await query;
 
   if (error) {
     console.error("Failed to force logout:", error);

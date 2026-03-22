@@ -1,5 +1,3 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { NextRequest } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
 import { createClient } from "@supabase/supabase-js";
@@ -43,7 +41,7 @@ export async function signMobileToken(
   return new SignJWT({ sub: userId, email })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("30d")
+    .setExpirationTime("7d")
     .sign(getSecret());
 }
 
@@ -69,10 +67,25 @@ export async function verifyMobileToken(
 export async function getSessionFromRequest(
   req: NextRequest
 ): Promise<MobileSession | null> {
-  // 1. Try cookie-based session first (web app — existing behavior)
-  const cookieSession = await getServerSession(authOptions);
-  if (cookieSession?.user?.id) {
-    return cookieSession as MobileSession;
+  // 1. Try cookie-based session first (web app)
+  // Read NextAuth JWT directly from cookie (works reliably in App Router)
+  const sessionToken =
+    req.cookies.get("__Secure-next-auth.session-token")?.value ||
+    req.cookies.get("next-auth.session-token")?.value;
+
+  if (sessionToken) {
+    try {
+      const { payload } = await jwtVerify(sessionToken, getSecret(), {
+        algorithms: ["HS256"],
+      });
+      if (payload?.id || payload?.sub) {
+        const userId = (payload.id || payload.sub) as string;
+        // Fetch fresh user data (same as mobile path below)
+        return await fetchUserSession(userId);
+      }
+    } catch {
+      // Invalid/expired cookie — fall through to Bearer token
+    }
   }
 
   // 2. Fall back to Bearer token (mobile app)
@@ -87,13 +100,20 @@ export async function getSessionFromRequest(
     return null;
   }
 
-  // Fetch fresh user data from database (same as NextAuth session callback)
+  return await fetchUserSession(payload.sub);
+}
+
+/**
+ * Fetch fresh user data from database and build session object.
+ * Shared by both cookie-based (web) and Bearer token (mobile) auth paths.
+ */
+async function fetchUserSession(userId: string): Promise<MobileSession | null> {
   const { data: user, error } = await supabase
     .from("users")
     .select(
       "id, email, name, plan, messages_used_today, total_messages, is_new_user, onboarding_complete, whats_new_seen, created_at, timezone, reset_timezone, last_reset_date, subscription_status, current_period_end, force_logout"
     )
-    .eq("id", payload.sub)
+    .eq("id", userId)
     .single();
 
   if (error || !user) {
@@ -115,7 +135,7 @@ export async function getSessionFromRequest(
     plan = "Plus";
   }
 
-  // Handle daily message reset (same logic as NextAuth session callback)
+  // Handle daily message reset
   let messagesUsedToday = user.messages_used_today;
   const resetTimezone = user.reset_timezone || user.timezone || "UTC";
   const now = new Date();

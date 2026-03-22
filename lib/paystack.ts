@@ -1,5 +1,7 @@
 // Paystack API Helper Functions
 
+import { createHmac } from 'crypto';
+
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY!;
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 
@@ -326,9 +328,7 @@ export function verifyWebhookSignature(
   payload: string,
   signature: string
 ): boolean {
-  const crypto = require('crypto');
-  const hash = crypto
-    .createHmac('sha512', process.env.PAYSTACK_SECRET_KEY!)
+  const hash = createHmac('sha512', process.env.PAYSTACK_SECRET_KEY!)
     .update(payload)
     .digest('hex');
   return hash === signature;

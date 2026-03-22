@@ -3,6 +3,7 @@ import { getSessionFromRequest } from '@/lib/mobile-auth';
 import { createClient } from '@supabase/supabase-js';
 import { verifyTransaction, getNextBillingDate, PLAN_CONFIG } from '@/lib/paystack';
 import { sendSubscriptionEmail } from '@/lib/email';
+import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from '@/lib/rate-limit';
 
 // SECURITY: Valid plans that can be purchased
 const VALID_PAID_PLANS = ['Pro', 'Plus'] as const;
@@ -21,6 +22,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
+      );
+    }
+
+    // Rate limiting - 10 verify attempts per 5 minutes
+    const clientIP = getClientIP(request);
+    const rateLimitKey = getUserIPKey(session.user.id, clientIP, 'payment-verify');
+    const rateLimitResult = rateLimit(rateLimitKey, RATE_LIMITS.payment);
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many verification attempts. Please try again later.' },
+        { status: 429, headers: rateLimitHeaders(rateLimitResult) }
       );
     }
 
@@ -95,34 +108,48 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // SECURITY: Check current plan to prevent double-upgrade race condition
+      const planTiers: Record<string, number> = { 'Free': 0, 'Pro': 1, 'Plus': 2 };
+      const { data: currentUser } = await supabase
+        .from('users')
+        .select('plan, subscription_status')
+        .eq('id', userId)
+        .single();
+
+      if (currentUser) {
+        const currentTier = planTiers[currentUser.plan] || 0;
+        const requestedTier = planTiers[plan] || 0;
+        if (requestedTier <= currentTier && currentUser.subscription_status === 'active') {
+          console.warn('Race condition prevented: user already on', currentUser.plan);
+          return NextResponse.json({
+            success: true,
+            plan: currentUser.plan,
+            message: 'Your plan is already active!',
+          });
+        }
+      }
+
       // Calculate next billing date (30 days from now)
       const currentPeriodEnd = getNextBillingDate();
 
       // SECURITY: Only save authorization if it's reusable
-      // Non-reusable authorizations will fail on recurring billing
       const isReusable = authorization?.reusable === true;
-      if (!isReusable) {
-        console.warn('SECURITY: Authorization is not reusable for user:', userId, '- recurring billing will fail');
-      }
 
-      // Update user's plan and save authorization for recurring billing
+      // SECURITY: Conditional update — only upgrade if plan hasn't changed (prevents race condition)
       const { error: updateError } = await supabase
         .from('users')
         .update({
           plan: plan,
-          subscription_status: 'active',
+          subscription_status: isReusable ? 'active' : 'non_renewing',
           current_period_end: currentPeriodEnd.toISOString(),
           // Paystack-specific fields
           paystack_customer_code: customer?.customer_code || null,
-          // SECURITY: Only save authorization if reusable
           paystack_authorization: isReusable ? (authorization?.authorization_code || null) : null,
           paystack_card_last4: authorization?.last4 || null,
           paystack_card_brand: authorization?.card_type || null,
-          // Clear any Stripe fields if migrating
-          stripe_customer_id: null,
-          stripe_subscription_id: null,
         })
-        .eq('id', userId);
+        .eq('id', userId)
+        .neq('plan', plan);
 
       if (updateError) {
         console.error('Failed to update user plan:', updateError);
@@ -162,7 +189,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         plan: plan,
-        message: 'Payment verified and plan updated!',
+        renewable: isReusable,
+        message: isReusable
+          ? 'Payment verified and plan updated!'
+          : 'Payment verified and plan updated! Note: Your card does not support automatic renewal. You will need to pay again when your plan expires.',
       });
     } else if (paystackResponse.data.status === 'abandoned') {
       return NextResponse.json({

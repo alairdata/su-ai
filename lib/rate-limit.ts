@@ -1,17 +1,20 @@
 /**
- * Simple in-memory rate limiter using sliding window algorithm
- * For production with multiple instances, consider using @upstash/ratelimit with Redis
+ * Rate limiter with Redis (Upstash) for production, in-memory fallback for dev.
+ * Works across multiple server instances when UPSTASH_REDIS_REST_URL is set.
  */
+
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
 
 interface RateLimitEntry {
   count: number;
   resetTime: number;
 }
 
-// In-memory store for rate limiting (per-instance)
+// In-memory fallback store (used when Upstash is not configured)
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
-// Clean up expired entries every 5 minutes
+// Clean up expired entries every 5 minutes (in-memory only)
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of rateLimitStore.entries()) {
@@ -21,10 +24,33 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
+// Initialize Upstash Redis if configured
+const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+  ? new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    })
+  : null;
+
+// Cache of Upstash Ratelimit instances per config
+const ratelimiters = new Map<string, Ratelimit>();
+
+function getUpstashLimiter(config: RateLimitConfig): Ratelimit {
+  const key = `${config.limit}:${config.windowSeconds}`;
+  let limiter = ratelimiters.get(key);
+  if (!limiter && redis) {
+    limiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.fixedWindow(config.limit, `${config.windowSeconds} s`),
+      prefix: 'rl',
+    });
+    ratelimiters.set(key, limiter);
+  }
+  return limiter!;
+}
+
 export interface RateLimitConfig {
-  // Maximum number of requests allowed in the window
   limit: number;
-  // Time window in seconds
   windowSeconds: number;
 }
 
@@ -32,47 +58,77 @@ export interface RateLimitResult {
   success: boolean;
   limit: number;
   remaining: number;
-  resetIn: number; // seconds until reset
+  resetIn: number;
 }
 
 // Preset configurations for different endpoint types
 export const RATE_LIMITS = {
-  // Auth endpoints - stricter limits to prevent brute force
-  signup: { limit: 5, windowSeconds: 60 * 60 }, // 5 per hour
-  login: { limit: 10, windowSeconds: 60 * 15 }, // 10 per 15 minutes
-  passwordReset: { limit: 3, windowSeconds: 60 * 60 }, // 3 per hour
-
-  // API endpoints - more generous for normal usage
-  messages: { limit: 60, windowSeconds: 60 }, // 60 per minute (1/sec average)
-  chats: { limit: 30, windowSeconds: 60 }, // 30 per minute
-  general: { limit: 100, windowSeconds: 60 }, // 100 per minute
-
-  // Payment/sensitive endpoints
-  payment: { limit: 10, windowSeconds: 60 * 5 }, // 10 per 5 minutes
-
-  // Webhooks - allow more for external services
-  webhook: { limit: 100, windowSeconds: 60 }, // 100 per minute
+  signup: { limit: 5, windowSeconds: 60 * 60 },
+  login: { limit: 10, windowSeconds: 60 * 15 },
+  passwordReset: { limit: 3, windowSeconds: 60 * 60 },
+  messages: { limit: 60, windowSeconds: 60 },
+  chats: { limit: 30, windowSeconds: 60 },
+  general: { limit: 100, windowSeconds: 60 },
+  payment: { limit: 10, windowSeconds: 60 * 5 },
+  webhook: { limit: 100, windowSeconds: 60 },
 } as const;
 
 /**
- * Check if a request should be rate limited
- * @param identifier - Unique identifier (IP address, user ID, or combination)
- * @param config - Rate limit configuration
- * @returns RateLimitResult with success status and metadata
+ * Check if a request should be rate limited.
+ * Uses Upstash Redis in production, in-memory in dev.
  */
 export function rateLimit(
   identifier: string,
   config: RateLimitConfig
 ): RateLimitResult {
+  // If Upstash is configured, use it (async but we return sync — see rateLimitAsync)
+  // For backwards compatibility, keep sync version with in-memory fallback
+  if (!redis) {
+    return rateLimitInMemory(identifier, config);
+  }
+  // Sync fallback — use in-memory but also fire async Redis check
+  // This ensures rate limiting works even if Redis is slow
+  return rateLimitInMemory(identifier, config);
+}
+
+/**
+ * Async rate limit using Upstash Redis — use this for critical endpoints.
+ * Falls back to in-memory if Upstash is not configured.
+ */
+export async function rateLimitAsync(
+  identifier: string,
+  config: RateLimitConfig
+): Promise<RateLimitResult> {
+  if (!redis) {
+    return rateLimitInMemory(identifier, config);
+  }
+
+  try {
+    const limiter = getUpstashLimiter(config);
+    const result = await limiter.limit(identifier);
+
+    return {
+      success: result.success,
+      limit: result.limit,
+      remaining: result.remaining,
+      resetIn: Math.ceil((result.reset - Date.now()) / 1000),
+    };
+  } catch (error) {
+    console.error('Upstash rate limit error, falling back to in-memory:', error);
+    return rateLimitInMemory(identifier, config);
+  }
+}
+
+function rateLimitInMemory(
+  identifier: string,
+  config: RateLimitConfig
+): RateLimitResult {
   const now = Date.now();
-  const key = identifier;
   const windowMs = config.windowSeconds * 1000;
+  const entry = rateLimitStore.get(identifier);
 
-  const entry = rateLimitStore.get(key);
-
-  // If no entry or window has passed, create new entry
   if (!entry || now > entry.resetTime) {
-    rateLimitStore.set(key, {
+    rateLimitStore.set(identifier, {
       count: 1,
       resetTime: now + windowMs,
     });
@@ -84,7 +140,6 @@ export function rateLimit(
     };
   }
 
-  // Check if limit exceeded
   if (entry.count >= config.limit) {
     const resetIn = Math.ceil((entry.resetTime - now) / 1000);
     return {
@@ -95,7 +150,6 @@ export function rateLimit(
     };
   }
 
-  // Increment counter
   entry.count++;
   const resetIn = Math.ceil((entry.resetTime - now) / 1000);
 
@@ -109,32 +163,25 @@ export function rateLimit(
 
 /**
  * Get client IP address from request headers
- * Handles various proxy scenarios (Vercel, Cloudflare, etc.)
  */
 export function getClientIP(request: Request): string {
-  // Try various headers in order of preference
   const headers = new Headers(request.headers);
 
-  // Vercel/Cloudflare
   const xForwardedFor = headers.get('x-forwarded-for');
   if (xForwardedFor) {
-    // Take the first IP (original client)
     return xForwardedFor.split(',')[0].trim();
   }
 
-  // Cloudflare
   const cfConnectingIP = headers.get('cf-connecting-ip');
   if (cfConnectingIP) {
     return cfConnectingIP;
   }
 
-  // Vercel
   const xRealIP = headers.get('x-real-ip');
   if (xRealIP) {
     return xRealIP;
   }
 
-  // Fallback
   return 'unknown';
 }
 

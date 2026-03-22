@@ -12,10 +12,6 @@ const requiredEnvVars = [
 
 const optionalEnvVars = [
   'ANTHROPIC_API_KEY',
-  'STRIPE_SECRET_KEY',
-  'STRIPE_WEBHOOK_SECRET',
-  'STRIPE_PRO_PRICE_ID',
-  'STRIPE_PLUS_PRICE_ID',
   'RESEND_API_KEY',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
@@ -48,10 +44,10 @@ export function validateEnv(): { valid: boolean; missing: string[] } {
 /**
  * Check if a specific feature's env vars are configured
  */
-export function isFeatureConfigured(feature: 'stripe' | 'email' | 'google' | 'github' | 'ai'): boolean {
+export function isFeatureConfigured(feature: 'paystack' | 'email' | 'google' | 'github' | 'ai'): boolean {
   switch (feature) {
-    case 'stripe':
-      return !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET);
+    case 'paystack':
+      return !!(process.env.PAYSTACK_SECRET_KEY);
     case 'email':
       return !!process.env.RESEND_API_KEY;
     case 'google':
@@ -87,8 +83,6 @@ export function sanitizeErrorForClient(error: unknown): string {
       'Chat not found',
       'User not found',
       'Missing price ID',
-      'STRIPE_',
-      'Stripe',
       'Exchange rate',
       'Paystack',
       'Payment',

@@ -43,6 +43,13 @@ export async function extractMemories(
   existingMemories: Memory[]
 ): Promise<void> {
   try {
+    // SECURITY: Cap total memories per user to prevent database bloat
+    const MAX_MEMORIES_PER_USER = 100;
+    if (existingMemories.length >= MAX_MEMORIES_PER_USER) {
+      console.log("[Memory] User hit memory cap:", userId);
+      return;
+    }
+
     const existingList = existingMemories.length > 0
       ? existingMemories.map((m) => `- ${m.content}`).join("\n")
       : "None yet.";

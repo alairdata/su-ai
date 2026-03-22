@@ -78,11 +78,14 @@ export async function POST(req: NextRequest) {
 
     // SECURITY: Increment session version to force logout on all devices
     // This invalidates all existing JWT sessions for this user
-    try {
-      await supabase.rpc('increment_session_version', { user_id_param: user.id });
-    } catch (rpcError) {
-      // If RPC doesn't exist yet, session invalidation won't work but password is still changed
-      console.warn('Session version increment failed - existing sessions may still be valid:', rpcError);
+    const { error: rpcError } = await supabase.rpc('increment_session_version', { user_id_param: user.id });
+
+    if (rpcError) {
+      console.error('CRITICAL: Session invalidation failed after password reset:', rpcError);
+      return NextResponse.json(
+        { error: 'Password was changed but we could not log out other devices. Please contact support.' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({

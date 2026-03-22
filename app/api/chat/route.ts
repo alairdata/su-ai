@@ -196,62 +196,50 @@ export async function POST(req: NextRequest) {
     const regenerateFromIndex: number | undefined = body.regenerateFromIndex;
     const editFromMessageIndex: number | undefined = body.editFromMessageIndex;
 
+    // Validate message content before deducting credits
+    if (!userMessage.trim() && !imageUrl && !fileUrl) {
+      return NextResponse.json(
+        { error: "No message provided." },
+        { status: 400 }
+      );
+    }
+
     // Images/files cost 2 messages, text costs 1
     const hasAttachment = !!(imageUrl || fileUrl);
     const messageCost = hasAttachment ? 2 : 1;
 
     // SECURITY: Atomic increment to prevent race condition
     // This increments AND returns the new count in one operation
-    const { data: incrementResult, error: incrementError } = await supabase
-      .rpc('increment_messages_used_today', {
-        user_id_param: session.user.id,
-        daily_limit: dailyLimit
-      });
-
-    // If increment failed or limit exceeded, reject the request
-    if (incrementError) {
-      console.error("Failed to increment message count:", incrementError);
-      return NextResponse.json(
-        { error: "Unable to verify message limit. Please try again." },
-        { status: 500 }
-      );
-    }
-
-    if (incrementResult === false) {
-      // RPC returned false = limit exceeded
-      return NextResponse.json(
-        {
-          error: `Daily message limit reached (${dailyLimit} messages). Please upgrade your plan for more messages.`,
-          limitReached: true,
-          plan: userPlan,
-          limit: dailyLimit
-        },
-        { status: 429 }
-      );
-    }
-
-    // If attachment, deduct the extra message credit (first one already deducted above)
-    if (messageCost > 1) {
-      const { data: extraResult } = await supabase
+    // For attachments (cost 2), deduct all credits before proceeding
+    for (let i = 0; i < messageCost; i++) {
+      const { data: incrementResult, error: incrementError } = await supabase
         .rpc('increment_messages_used_today', {
           user_id_param: session.user.id,
           daily_limit: dailyLimit
         });
-      // If second deduction fails (hit limit), still allow the request
-      // since we already deducted 1 — just log it
-      if (extraResult === false) {
-        console.log("Image extra deduction hit limit, proceeding with 1 credit");
+
+      if (incrementError) {
+        console.error("Failed to increment message count:", incrementError);
+        return NextResponse.json(
+          { error: "Unable to verify message limit. Please try again." },
+          { status: 500 }
+        );
+      }
+
+      if (incrementResult === false) {
+        return NextResponse.json(
+          {
+            error: `Daily message limit reached (${dailyLimit} messages).${hasAttachment ? ' Image messages cost 2 credits.' : ''} Please upgrade your plan for more messages.`,
+            limitReached: true,
+            plan: userPlan,
+            limit: dailyLimit
+          },
+          { status: 429 }
+        );
       }
     }
 
     // Message count incremented atomically above
-
-    if (!userMessage.trim()) {
-      return NextResponse.json(
-        { error: "No message provided." },
-        { status: 400 }
-      );
-    }
 
     // SECURITY: Validate message length to prevent oversized requests
     const MAX_MESSAGE_LENGTH = 32000;

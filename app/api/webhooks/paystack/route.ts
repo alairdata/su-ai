@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyWebhookSignature, getNextBillingDate } from '@/lib/paystack';
-import { sendSubscriptionEmail } from '@/lib/email';
+import { sendSubscriptionEmail, sendPaymentFailedEmail } from '@/lib/email';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,6 +35,12 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.text();
+
+  if (!body || body.trim().length === 0) {
+    console.error('Empty webhook body received');
+    return NextResponse.json({ error: 'Empty body' }, { status: 400 });
+  }
+
   const signature = req.headers.get('x-paystack-signature');
 
   if (!signature) {
@@ -156,6 +162,10 @@ async function handleChargeSuccess(data: {
           paystack_authorization: authorization?.authorization_code || null,
           paystack_card_last4: authorization?.last4 || null,
           paystack_card_brand: authorization?.card_type || null,
+          // Reset retry state on successful charge
+          retry_count: 0,
+          last_retry_at: null,
+          grace_period_end: null,
         })
         .eq('id', user.id);
 
@@ -167,17 +177,25 @@ async function handleChargeSuccess(data: {
   // New subscription charge
   const { userId, plan } = metadata;
 
+  // SECURITY: Validate plan type before saving
+  const VALID_PLANS = ['Pro', 'Plus'];
+  if (plan && !VALID_PLANS.includes(plan)) {
+    console.error('SECURITY: Invalid plan in webhook metadata:', plan);
+    return;
+  }
+
   if (plan) {
     const currentPeriodEnd = getNextBillingDate();
+    const isReusable = authorization?.reusable === true;
 
     const { error } = await supabase
       .from('users')
       .update({
         plan: plan,
-        subscription_status: 'active',
+        subscription_status: isReusable ? 'active' : 'non_renewing',
         current_period_end: currentPeriodEnd.toISOString(),
         paystack_customer_code: customer?.customer_code || null,
-        paystack_authorization: authorization?.authorization_code || null,
+        paystack_authorization: isReusable ? (authorization?.authorization_code || null) : null,
         paystack_card_last4: authorization?.last4 || null,
         paystack_card_brand: authorization?.card_type || null,
       })
@@ -245,15 +263,40 @@ async function handleChargeFailed(data: {
     return;
   }
 
-  // Mark subscription as past_due
+  // Get current user state for retry tracking
+  const { data: userData } = await supabase
+    .from('users')
+    .select('name, email, plan, retry_count')
+    .eq('id', userId)
+    .single();
+
+  const retryCount = (userData?.retry_count || 0) + 1;
+
+  // Mark subscription as past_due with retry tracking
   await supabase
     .from('users')
     .update({
       subscription_status: 'past_due',
+      retry_count: retryCount,
+      last_retry_at: new Date().toISOString(),
     })
     .eq('id', userId);
 
-  console.log('Marked user as past_due:', userId);
+  console.log('Marked user as past_due:', userId, `retry ${retryCount}`);
 
-  // TODO: Send payment failed email
+  // Send payment failed email
+  if (userData?.email) {
+    try {
+      await sendPaymentFailedEmail(
+        userData.email,
+        userData.name || 'there',
+        userData.plan || 'Pro',
+        retryCount,
+        3,
+        userId
+      );
+    } catch (emailError) {
+      console.error('Failed to send payment failed email:', emailError);
+    }
+  }
 }

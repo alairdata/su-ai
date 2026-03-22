@@ -4,6 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcrypt';
+import { isVipEmail } from '@/lib/plans';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,12 +48,6 @@ setInterval(() => {
   }
 }, 30 * 60 * 1000);
 
-// VIP emails that get free Plus access (comma-separated in env var)
-// Example: VIP_EMAILS=admin@example.com,vip@example.com
-const VIP_EMAILS = (process.env.VIP_EMAILS || '')
-  .split(',')
-  .map(email => email.trim().toLowerCase())
-  .filter(email => email.length > 0);
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -297,8 +292,7 @@ export const authOptions: NextAuthOptions = {
           session.user.totalMessages = user.total_messages || 0;
 
           // VIP override: Give Plus access to special email addresses
-          const userEmail = session.user.email?.toLowerCase();
-          if (userEmail && VIP_EMAILS.includes(userEmail)) {
+          if (isVipEmail(session.user.email)) {
             session.user.plan = 'Plus';
           }
 
