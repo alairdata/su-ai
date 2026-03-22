@@ -383,6 +383,67 @@ export async function sendPaymentFailedEmail(
   }
 }
 
+export async function sendAbandonedPaymentEmail(
+  email: string,
+  name: string,
+  plan: string,
+  userId?: string
+) {
+  try {
+    await resend.emails.send({
+      from: 'So-UnFiltered AI <support@so-unfiltered-ai.com>',
+      to: email,
+      subject: `So-UnFiltered AI — You were so close to upgrading!`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;margin:0;padding:0;background:#0C0C0E;color:#F0EDE8;">
+            <div style="max-width:560px;margin:0 auto;padding:48px 24px;">
+              ${EMAIL_HEADER}
+                <h1 style="font-size:28px;font-weight:800;letter-spacing:-0.04em;color:#F0EDE8;margin:0 0 4px;line-height:1.2;">You were so close.</h1>
+              </div>
+
+              <div style="background:#141416;border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:32px;margin-bottom:24px;">
+                <div style="font-size:15px;color:#F0EDE8;margin-bottom:8px;font-weight:600;">Hey ${name},</div>
+                <div style="font-size:14px;color:#8A8690;margin-bottom:24px;line-height:1.6;">
+                  You started upgrading to the <strong style="color:#E8A04C;">${plan} plan</strong> but didn&apos;t finish. No worries &mdash; your upgrade is still waiting for you.
+                </div>
+
+                <div style="background:#0C0C0E;border:1px solid rgba(232,160,76,0.15);border-radius:14px;padding:24px;text-align:center;margin:24px 0;">
+                  <div style="font-size:14px;color:#8A8690;line-height:1.6;">
+                    With <strong style="color:#F0EDE8;">${plan}</strong> you get:<br>
+                    <span style="color:#E8A04C;">${plan === 'Plus' ? '300' : '100'} messages/day</span> instead of 5
+                  </div>
+                </div>
+
+                <div style="text-align:center;margin:28px 0;">
+                  <a href="${process.env.NEXTAUTH_URL}/settings" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#E8A04C,#E8624C);color:#0C0C0E!important;text-decoration:none;border-radius:12px;font-weight:700;font-size:14px;">Complete Your Upgrade</a>
+                </div>
+
+                <div style="font-size:12px;color:#5A5660;text-align:center;margin-top:16px;">
+                  Having trouble paying? Reply to this email and we&apos;ll help.
+                </div>
+              </div>
+
+              ${EMAIL_FOOTER.replace('{{FOOTER_TEXT}}', 'You&apos;re receiving this because you started an upgrade on So-UnFiltered AI.')}
+            </div>
+          </body>
+        </html>
+      `,
+    });
+
+    if (userId) trackServerEvent(userId, EVENTS.EMAIL_SENT, { email_type: 'abandoned_payment', plan });
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to send abandoned payment email:', error);
+    return { success: false, error };
+  }
+}
+
 export async function sendFollowUpEmail(
   email: string,
   name: string,
