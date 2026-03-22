@@ -23,10 +23,10 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   // Block features you don't use
   response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  // CSP — allow your own domain + inline styles (needed for Tailwind)
+  // CSP — allow your own domain + all required services
   response.headers.set(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://api.paystack.co https://*.supabase.co; frame-src 'self' https://checkout.paystack.com; frame-ancestors 'none';"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.clarity.ms https://cdn.mxpnl.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.paystack.co https://*.supabase.co https://api.anthropic.com https://*.mixpanel.com https://*.clarity.ms https://api-js.mixpanel.com; frame-src 'self' https://checkout.paystack.com; frame-ancestors 'none';"
   );
   return response;
 }
