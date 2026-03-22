@@ -6222,7 +6222,6 @@ const lightStyles: { [key: string]: React.CSSProperties } = {
     alignItems: 'center',
     justifyContent: 'center',
     color: '#6B6660',
-    zIndex: 10,
     transition: 'all 0.2s ease',
   },
   emptyState: {
