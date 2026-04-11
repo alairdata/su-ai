@@ -96,6 +96,8 @@ export default function AdminPage() {
 
   // Insights data (real from API)
   const [insights, setInsights] = useState<InsightsData | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState(false);
 
   // Sorting & pagination
   const [sortField, setSortField] = useState<string | null>(null);
@@ -104,6 +106,11 @@ export default function AdminPage() {
 
   // Chart refs
   const chartRefs = useRef<Record<string, any>>({});
+
+  // ── Chart.js availability check (handles cached script on back-navigation) ──
+  useEffect(() => {
+    if ((window as any).Chart) setChartJsLoaded(true);
+  }, []);
 
   // ── Auth ──
   useEffect(() => {
@@ -171,14 +178,21 @@ export default function AdminPage() {
   };
 
   const fetchInsights = async () => {
+    setInsightsLoading(true);
+    setInsightsError(false);
     try {
       const res = await fetch("/api/admin/insights");
       if (res.ok) {
         const data = await res.json();
         setInsights(data);
+      } else {
+        setInsightsError(true);
       }
     } catch (err) {
       console.error("Failed to fetch insights:", err);
+      setInsightsError(true);
+    } finally {
+      setInsightsLoading(false);
     }
   };
 
@@ -776,7 +790,7 @@ export default function AdminPage() {
       <style>{adminCSS}</style>
       <Script
         src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"
-        onLoad={() => setChartJsLoaded(true)}
+        onReady={() => setChartJsLoaded(true)}
       />
 
       {/* TOPBAR */}
@@ -853,7 +867,11 @@ export default function AdminPage() {
                 <span style={{ fontSize: 13, color: "#009E73", fontWeight: 600 }}>{computed?.activeCount || 0} active</span>
                 <span style={{ fontSize: 13, color: "#999", fontWeight: 600 }}>{computed?.ghosts || 0} ghost</span>
               </div>
-              <div style={{ position: "relative", height: 200 }}><canvas id="signupChart" /></div>
+              <div style={{ position: "relative", height: 200 }}>
+                <canvas id="signupChart" />
+                {insightsLoading && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ display: "inline-block", width: 16, height: 16, border: "2px solid #648FFF", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /></div>}
+                {insightsError && !insightsLoading && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#55546a", fontSize: 12 }}>Failed to load</div>}
+              </div>
             </div>
           </div>
 
@@ -949,6 +967,8 @@ export default function AdminPage() {
               <div className="cc-title" style={{ marginBottom: 14 }}>How far users go in session 1</div>
               <div style={{ position: "relative", flex: 1, minHeight: 220 }}>
                 <canvas id="sessionDepthChart" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+                {insightsLoading && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ display: "inline-block", width: 16, height: 16, border: "2px solid #648FFF", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /></div>}
+                {insightsError && !insightsLoading && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#55546a", fontSize: 12 }}>Failed to load</div>}
               </div>
             </div>
             <div className="cc" style={{ display: "flex", flexDirection: "column" }}>
@@ -956,6 +976,8 @@ export default function AdminPage() {
               <div className="cc-title" style={{ marginBottom: 14 }}>How often active users come back</div>
               <div style={{ position: "relative", flex: 1, minHeight: 220 }}>
                 <canvas id="returnFreqChart" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+                {insightsLoading && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ display: "inline-block", width: 16, height: 16, border: "2px solid #648FFF", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /></div>}
+                {insightsError && !insightsLoading && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#55546a", fontSize: 12 }}>Failed to load</div>}
               </div>
             </div>
           </div>
@@ -970,6 +992,8 @@ export default function AdminPage() {
               </div>
               <div style={{ position: "relative", flex: 1, minHeight: 220 }}>
                 <canvas id="ghostChart" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+                {insightsLoading && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ display: "inline-block", width: 16, height: 16, border: "2px solid #648FFF", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /></div>}
+                {insightsError && !insightsLoading && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#55546a", fontSize: 12 }}>Failed to load</div>}
               </div>
             </div>
             <div className="cc" style={{ display: "flex", flexDirection: "column" }}>
@@ -981,6 +1005,8 @@ export default function AdminPage() {
               </div>
               <div style={{ position: "relative", flex: 1, minHeight: 220 }}>
                 <canvas id="dauMauChart" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+                {insightsLoading && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ display: "inline-block", width: 16, height: 16, border: "2px solid #648FFF", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /></div>}
+                {insightsError && !insightsLoading && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#55546a", fontSize: 12 }}>Failed to load</div>}
               </div>
             </div>
           </div>

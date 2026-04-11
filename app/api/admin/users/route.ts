@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
   // SECURITY: Limit results to prevent DOS and data exposure
   const url = new URL(req.url);
   const limitParam = url.searchParams.get('limit');
-  const limit = Math.min(parseInt(limitParam || '500'), 500); // Max 500 users
+  const limit = Math.min(Math.max(1, parseInt(limitParam || '500') || 500), 500); // Max 500 users
 
   // SECURITY: Don't expose original_name to prevent PII leakage
   const { data: users, error } = await supabase
@@ -87,6 +87,7 @@ export async function GET(req: NextRequest) {
   );
 
   // Get active days per user (unique days with at least one message in active chats)
+  // Fetch all chats for these users in one paginated bulk query
   const allChats: { id: string; user_id: string }[] = [];
   let chatOffset = 0;
   const chatPageSize = 1000;
@@ -102,37 +103,41 @@ export async function GET(req: NextRequest) {
     chatOffset += chatPageSize;
   }
 
-  const userChatIds = new Map<string, string[]>();
+  // Build chatId → userId map
+  const chatToUser = new Map<string, string>();
   for (const chat of allChats) {
-    const existing = userChatIds.get(chat.user_id) || [];
-    existing.push(chat.id);
-    userChatIds.set(chat.user_id, existing);
+    chatToUser.set(chat.id, chat.user_id);
   }
 
-  const activeDaysMap = new Map<string, number>();
-  for (const [userId, chatIds] of userChatIds.entries()) {
-    if (chatIds.length === 0) continue;
-    const allUserMessages: { created_at: string }[] = [];
+  // Single bulk query for all messages across all chats — avoids N+1
+  const allChatIds = allChats.map(c => c.id);
+  const userActiveDays = new Map<string, Set<string>>();
+
+  if (allChatIds.length > 0) {
     let msgOffset = 0;
     const msgPageSize = 1000;
     while (true) {
       const { data: msgPage } = await supabase
         .from("messages")
-        .select("created_at")
-        .in("chat_id", chatIds)
+        .select("chat_id, created_at")
+        .in("chat_id", allChatIds)
         .eq("role", "user")
         .range(msgOffset, msgOffset + msgPageSize - 1);
       if (!msgPage || msgPage.length === 0) break;
-      allUserMessages.push(...msgPage);
+      for (const msg of msgPage) {
+        const userId = chatToUser.get(msg.chat_id);
+        if (!userId) continue;
+        if (!userActiveDays.has(userId)) userActiveDays.set(userId, new Set());
+        userActiveDays.get(userId)!.add(new Date(msg.created_at).toISOString().split('T')[0]);
+      }
       if (msgPage.length < msgPageSize) break;
       msgOffset += msgPageSize;
     }
-    if (allUserMessages.length > 0) {
-      const uniqueDays = new Set(
-        allUserMessages.map(m => new Date(m.created_at).toISOString().split('T')[0])
-      );
-      activeDaysMap.set(userId, uniqueDays.size);
-    }
+  }
+
+  const activeDaysMap = new Map<string, number>();
+  for (const [userId, days] of userActiveDays.entries()) {
+    activeDaysMap.set(userId, days.size);
   }
 
   // Add total_messages, days_active (since joined), and active_days (with messages) to each user

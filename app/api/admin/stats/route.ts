@@ -17,6 +17,10 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
 
 function isAdmin(email: string | null | undefined): boolean {
   if (!email) return false;
+  if (ADMIN_EMAILS.length === 0) {
+    console.error('SECURITY: ADMIN_EMAILS not configured!');
+    return false;
+  }
   return ADMIN_EMAILS.includes(email.toLowerCase());
 }
 

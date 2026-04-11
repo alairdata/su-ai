@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/mobile-auth";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimit, getClientIP, rateLimitHeaders } from "@/lib/rate-limit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,14 +15,25 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
 
 function isAdmin(email: string | null | undefined): boolean {
   if (!email) return false;
+  if (ADMIN_EMAILS.length === 0) {
+    console.error('SECURITY: ADMIN_EMAILS not configured!');
+    return false;
+  }
   return ADMIN_EMAILS.includes(email.toLowerCase());
 }
+
+const ADMIN_RATE_LIMIT = { limit: 30, windowSeconds: 60 };
 
 // GET - Deeper insight analytics (real data)
 export async function GET(req: NextRequest) {
   const session = await getSessionFromRequest(req);
   if (!session?.user?.email || !isAdmin(session.user.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rateLimitResult = rateLimit(`admin-insights:${session.user.id}:${getClientIP(req)}`, ADMIN_RATE_LIMIT);
+  if (!rateLimitResult.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: rateLimitHeaders(rateLimitResult) });
   }
 
   try {
@@ -32,11 +44,23 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: true });
     const users = allUsers || [];
 
-    // ── Fetch all chats with user_id ──
-    const { data: allChats } = await supabase
-      .from("chats")
-      .select("id, user_id, created_at");
-    const chats = allChats || [];
+    // ── Fetch all chats with user_id (paginated) ──
+    const allChatsList: { id: string; user_id: string; created_at: string }[] = [];
+    {
+      let offset = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data: page } = await supabase
+          .from("chats")
+          .select("id, user_id, created_at")
+          .range(offset, offset + pageSize - 1);
+        if (!page || page.length === 0) break;
+        allChatsList.push(...page);
+        if (page.length < pageSize) break;
+        offset += pageSize;
+      }
+    }
+    const chats = allChatsList;
     const chatUserMap = new Map<string, string>();
     const chatCreatedMap = new Map<string, string>();
     for (const c of chats) {
@@ -44,13 +68,25 @@ export async function GET(req: NextRequest) {
       chatCreatedMap.set(c.id, c.created_at);
     }
 
-    // ── Fetch all user messages with chat_id ──
-    const { data: allMessages } = await supabase
-      .from("messages")
-      .select("id, chat_id, created_at")
-      .eq("role", "user")
-      .order("created_at", { ascending: true });
-    const messages = allMessages || [];
+    // ── Fetch all user messages with chat_id (paginated to bypass 1000-row default) ──
+    const allMessagesList: { id: string; chat_id: string; created_at: string }[] = [];
+    {
+      let offset = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data: page } = await supabase
+          .from("messages")
+          .select("id, chat_id, created_at")
+          .eq("role", "user")
+          .order("created_at", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (!page || page.length === 0) break;
+        allMessagesList.push(...page);
+        if (page.length < pageSize) break;
+        offset += pageSize;
+      }
+    }
+    const messages = allMessagesList;
 
     // ── Fetch deleted chat messages ──
     const { data: deletedChats } = await supabase

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/mobile-auth";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimit, getClientIP, rateLimitHeaders } from "@/lib/rate-limit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,8 +20,14 @@ const DATA_START_DATE = new Date('2026-01-28T00:00:00.000Z');
 
 function isAdmin(email: string | null | undefined): boolean {
   if (!email) return false;
+  if (ADMIN_EMAILS.length === 0) {
+    console.error('SECURITY: ADMIN_EMAILS not configured!');
+    return false;
+  }
   return ADMIN_EMAILS.includes(email.toLowerCase());
 }
+
+const ADMIN_RATE_LIMIT = { limit: 30, windowSeconds: 60 };
 
 // GET - Get historical data for charts
 export async function GET(req: NextRequest) {
@@ -28,6 +35,11 @@ export async function GET(req: NextRequest) {
 
   if (!session?.user?.email || !isAdmin(session.user.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rateLimitResult = rateLimit(`admin-history:${session.user.id}:${getClientIP(req)}`, ADMIN_RATE_LIMIT);
+  if (!rateLimitResult.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: rateLimitHeaders(rateLimitResult) });
   }
 
   const { searchParams } = new URL(req.url);
@@ -98,15 +110,19 @@ export async function GET(req: NextRequest) {
     .gte("created_at", startDate.toISOString())
     .order("created_at", { ascending: true });
 
-  let messages: { created_at: string; chat_id?: string }[] = messagesData || [];
-  if (messagesError) console.error("Messages error:", messagesError);
+  if (messagesError) {
+    console.error("Messages error:", messagesError);
+    return NextResponse.json({ error: "Failed to fetch messages" }, { status: 500 });
+  }
+  const messages: { created_at: string; chat_id?: string }[] = messagesData || [];
 
-  // Fetch ALL messages for cumulative count
+  // Fetch ALL messages for cumulative count (from fixed start date only)
   // ONLY count user messages, not assistant responses
   const { data: allMessagesData } = await supabase
     .from("messages")
     .select("created_at")
     .eq("role", "user")
+    .gte("created_at", DATA_START_DATE.toISOString())
     .order("created_at", { ascending: true });
   let allMessages: { created_at: string }[] = allMessagesData || [];
 
@@ -135,11 +151,12 @@ export async function GET(req: NextRequest) {
   allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-  // Build chat_id → user_id map for active user tracking
+  // Build chat_id → user_id map for active user tracking (only chats within period)
   const chatUserMap = new Map<string, string>();
   const { data: chatMappings } = await supabase
     .from("chats")
-    .select("id, user_id");
+    .select("id, user_id")
+    .gte("created_at", startDate.toISOString());
   for (const chat of (chatMappings || [])) {
     chatUserMap.set(chat.id, chat.user_id);
   }

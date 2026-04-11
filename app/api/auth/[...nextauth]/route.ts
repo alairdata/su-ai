@@ -296,11 +296,13 @@ export const authOptions: NextAuthOptions = {
             session.user.plan = 'Plus';
           }
 
-          // Get actual message count for today directly from the database
-          // This is the single source of truth — no more timezone gymnastics in JS
-          const { data: todayCount } = await supabase
-            .rpc('get_messages_used_today', { user_id_param: token.id });
-          session.user.messagesUsedToday = todayCount || 0;
+          // Compute today's message count from data already fetched above.
+          // Check last_reset_date to handle stale counters (new day = 0).
+          const todayStr = new Date().toISOString().split('T')[0];
+          const resetDateStr = user.last_reset_date
+            ? new Date(user.last_reset_date).toISOString().split('T')[0]
+            : null;
+          session.user.messagesUsedToday = resetDateStr === todayStr ? (user.messages_used_today || 0) : 0;
         }
       }
       return session;
