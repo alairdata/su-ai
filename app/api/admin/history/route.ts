@@ -101,12 +101,10 @@ export async function GET(req: NextRequest) {
 
   const allUsers = allUsersRaw || [];
 
-  // Fetch messages for message trend (within period)
-  // ONLY count user messages, not assistant responses
+  // Fetch messages for message trend (within period) — all roles (user + AI)
   const { data: messagesData, error: messagesError } = await supabase
     .from("messages")
     .select("created_at, chat_id")
-    .eq("role", "user")
     .gte("created_at", startDate.toISOString())
     .order("created_at", { ascending: true });
 
@@ -116,12 +114,10 @@ export async function GET(req: NextRequest) {
   }
   const messages: { created_at: string; chat_id?: string }[] = messagesData || [];
 
-  // Fetch ALL messages for cumulative count (from fixed start date only)
-  // ONLY count user messages, not assistant responses
+  // Fetch ALL messages for cumulative count (from fixed start date only) — all roles
   const { data: allMessagesData } = await supabase
     .from("messages")
     .select("created_at")
-    .eq("role", "user")
     .gte("created_at", DATA_START_DATE.toISOString())
     .order("created_at", { ascending: true });
   let allMessages: { created_at: string }[] = allMessagesData || [];
@@ -134,7 +130,7 @@ export async function GET(req: NextRequest) {
       for (const chat of deletedChats) {
         const msgs = Array.isArray(chat.messages) ? chat.messages : [];
         for (const m of msgs) {
-          if (m.role === "user" && m.created_at) {
+          if (m.created_at) {
             allMessages.push({ created_at: m.created_at });
             if (new Date(m.created_at) >= startDate) {
               messages.push({ created_at: m.created_at, chat_id: `deleted_${chat.user_id}` });
