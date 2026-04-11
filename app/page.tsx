@@ -640,7 +640,6 @@ function HomePage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingScreen, setOnboardingScreen] = useState(1);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
-  const [showDowntimeBanner, setShowDowntimeBanner] = useState(true);
   const [whatsNewScreen, setWhatsNewScreen] = useState(1);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showImageGenModal, setShowImageGenModal] = useState(false);
@@ -2655,50 +2654,7 @@ function HomePage() {
         </div>
       )}
 
-      {showDowntimeBanner && (
-        <div style={{
-          position: 'relative',
-          zIndex: 600,
-          background: 'linear-gradient(90deg, #059669, #10B981)',
-          color: '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '10px 40px 10px 16px',
-          fontSize: '14px',
-          fontWeight: 500,
-          fontFamily: "'Inter', sans-serif",
-          textAlign: 'center' as const,
-          flexShrink: 0,
-        }}>
-          <span>System operations restored — All services are back online</span>
-          <button
-            onClick={() => setShowDowntimeBanner(false)}
-            style={{
-              position: 'absolute',
-              right: 12,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              background: 'none',
-              border: 'none',
-              color: '#fff',
-              cursor: 'pointer',
-              padding: 4,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            title="Dismiss"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-      )}
-
-      <div style={{ ...currentStyles.app, height: showDowntimeBanner ? 'calc(100dvh - 40px)' : '100dvh' }}>
+      <div style={{ ...currentStyles.app, height: '100dvh' }}>
         {isMobile && sidebarOpen && (
           <div
             style={currentStyles.mobileOverlay}
@@ -2712,7 +2668,7 @@ function HomePage() {
           ...(isMobile ? {
             position: 'fixed' as const,
             left: sidebarOpen ? 0 : '-280px',
-            top: showDowntimeBanner ? 40 : 0,
+            top: 0,
             bottom: 0,
             zIndex: 1000,
             width: '280px',
