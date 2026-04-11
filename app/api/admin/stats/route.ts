@@ -89,6 +89,11 @@ export async function GET(req: NextRequest) {
     totalAllMessages += s.total_messages || 0;
   }
 
+  // Count ALL messages (user + AI) from the messages table
+  const { count: totalMessagesAllRoles } = await supabase
+    .from("messages")
+    .select("*", { count: "exact", head: true });
+
   const avgMessagesPerUser = users.length > 0
     ? Math.round((totalAllMessages / users.length) * 10) / 10
     : 0;
@@ -109,6 +114,7 @@ export async function GET(req: NextRequest) {
     totalMessages: totalUndeletedMessages,
     deletedMessages: totalDeletedMessages,
     allTimeMessages: totalAllMessages,
+    totalMessagesAllRoles: totalMessagesAllRoles || 0,
   };
 
   return NextResponse.json({ stats });

@@ -34,6 +34,7 @@ interface Stats {
   totalMessages: number;
   deletedMessages: number;
   allTimeMessages: number;
+  totalMessagesAllRoles: number;
 }
 
 interface TrendData { label: string; count: number; cumulative: number }
@@ -830,6 +831,7 @@ export default function AdminPage() {
             <div className="stat-grid">
               <div className="sc"><div className="sc-label">TOTAL USERS</div><div className="sc-val">{hasFilter ? filteredStats.totalUsers : stats.totalUsers}</div><div className="sc-sub">{hasFilter ? "filtered" : "all-time signups"}</div></div>
               <div className="sc"><div className="sc-label">TOTAL MESSAGES</div><div className="sc-val">{hasFilter ? filteredStats.totalMsgs.toLocaleString() : stats.allTimeMessages.toLocaleString()}</div><div className="sc-sub">{hasFilter ? "from filtered users" : <><span className="g">{stats.totalMessages.toLocaleString()}</span> active{stats.deletedMessages > 0 ? ` · ${stats.deletedMessages.toLocaleString()} deleted` : ""}</>}</div></div>
+              <div className="sc"><div className="sc-label">TOTAL INTERACTIONS</div><div className="sc-val">{stats.totalMessagesAllRoles.toLocaleString()}</div><div className="sc-sub">user + AI messages combined</div></div>
               <div className="sc"><div className="sc-label">MESSAGES TODAY</div><div className="sc-val">{hasFilter ? filteredStats.todayMsgs : stats.totalMessagesToday}</div><div className="sc-sub">new messages sent today</div></div>
               <div className="sc"><div className="sc-label">MSG / ACTIVE USER</div><div className="sc-val">{hasFilter ? filteredStats.avgPerActive.toFixed(1) : (computed?.avgSessionDepth.toFixed(1) || "0")}</div><div className="sc-sub">avg per user w/ 1+ msg</div></div>
               <div className="sc"><div className="sc-label">MSG / USER</div><div className="sc-val">{hasFilter ? filteredStats.avgPerUser.toFixed(1) : stats.avgMessagesPerUser.toFixed(1)}</div><div className="sc-sub">{hasFilter ? "filtered avg" : "all-time incl. ghosts"}</div></div>
