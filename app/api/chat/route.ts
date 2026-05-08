@@ -242,7 +242,7 @@ export async function POST(req: NextRequest) {
     // Message count incremented atomically above
 
     // SECURITY: Validate message length to prevent oversized requests
-    const MAX_MESSAGE_LENGTH = 32000;
+    const MAX_MESSAGE_LENGTH = 5000;
     if (userMessage.length > MAX_MESSAGE_LENGTH) {
       return NextResponse.json(
         { error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters allowed.` },
@@ -325,10 +325,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Paid users get expanded context window
+    // Context window scales with plan
     const hasMemoryAccess = userPlan !== 'Free';
-    const MAX_HISTORY = hasMemoryAccess ? 20 : 10;
-    const RECENT_RAW = hasMemoryAccess ? 6 : 4;
+    const MAX_HISTORY = userPlan === 'Plus' ? 20 : userPlan === 'Pro' ? 10 : 3;
+    const RECENT_RAW = userPlan === 'Plus' ? 8 : userPlan === 'Pro' ? 4 : 2;
     const historyMessages = allMessages.slice(-MAX_HISTORY);
 
     let apiMessages: Anthropic.MessageParam[];
