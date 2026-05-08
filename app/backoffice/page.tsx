@@ -1097,6 +1097,7 @@ export default function BackofficePage() {
                           <div className="act-row">
                             <select value={u.plan} onChange={e => updatePlan(u.id, e.target.value)} disabled={updatingUser === u.id} className="act" style={{ cursor: "pointer", background: "#18181f", color: "#9896a8", border: "1px solid #333340", borderRadius: 4, fontSize: 9, padding: "3px 6px" }}>
                               <option value="Free">Free</option>
+                              <option value="Special">Special</option>
                               <option value="Pro">Pro</option>
                               <option value="Plus">Plus</option>
                             </select>
@@ -1113,6 +1114,21 @@ export default function BackofficePage() {
                                 else showToast("Failed: " + (data.error || "Unknown error"), "r");
                               } catch { showToast("Failed to force logout user", "r"); }
                             }}>Logout</button>
+                            <button className="act out" onClick={async () => {
+                              if (!confirm(`Reset daily message count for ${u.name}?`)) return;
+                              try {
+                                const res = await fetch("/api/admin/reset-messages", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ userId: u.id }),
+                                });
+                                const data = await res.json();
+                                if (data.success) {
+                                  showToast(`${u.name}'s messages reset.`, "r");
+                                  setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, messages_used_today: 0 } : usr));
+                                } else showToast("Failed: " + (data.error || "Unknown error"), "r");
+                              } catch { showToast("Failed to reset message count", "r"); }
+                            }}>Reset Msgs</button>
                           </div>
                         </td>
                       </tr>

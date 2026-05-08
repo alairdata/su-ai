@@ -9,12 +9,26 @@ export const VIP_EMAILS = (process.env.VIP_EMAILS || '')
   .map(email => email.trim().toLowerCase())
   .filter(email => email.length > 0);
 
+// Special access emails that get 10 messages/day (comma-separated in env var)
+export const SPECIAL_EMAILS = (process.env.SPECIAL_EMAILS || '')
+  .split(',')
+  .map(email => email.trim().toLowerCase())
+  .filter(email => email.length > 0);
+
 /**
  * Check if an email is a VIP (gets free Plus access)
  */
 export function isVipEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   return VIP_EMAILS.includes(email.toLowerCase());
+}
+
+/**
+ * Check if an email has special access (gets 10 messages/day)
+ */
+export function isSpecialEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return SPECIAL_EMAILS.includes(email.toLowerCase());
 }
 
 /**
@@ -27,6 +41,10 @@ export function getEffectivePlan(
   // VIP emails always get Plus
   if (isVipEmail(email)) {
     return 'Plus';
+  }
+  // Special emails get the Special plan (10 msgs/day)
+  if (isSpecialEmail(email)) {
+    return 'Special';
   }
   return dbPlan || 'Free';
 }

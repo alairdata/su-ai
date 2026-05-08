@@ -3,8 +3,9 @@
 
 export const PLAN_LIMITS: Record<string, number> = {
   'Free': 5,
+  'Special': 10,
   'Pro': 100,
   'Plus': 300
 };
 
-export type PlanType = 'Free' | 'Pro' | 'Plus';
+export type PlanType = 'Free' | 'Special' | 'Pro' | 'Plus';

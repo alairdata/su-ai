@@ -18,6 +18,7 @@ const optionalEnvVars = [
   'GITHUB_CLIENT_ID',
   'GITHUB_CLIENT_SECRET',
   'VIP_EMAILS',
+  'SPECIAL_EMAILS',
 ] as const;
 
 /**
