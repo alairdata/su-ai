@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/mobile-auth";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimit, getClientIP, rateLimitHeaders } from "@/lib/rate-limit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,12 +19,19 @@ function isAdmin(email: string | null | undefined): boolean {
   return ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
+const ADMIN_RATE_LIMIT = { limit: 10, windowSeconds: 60 };
+
 // POST - Force logout users (all or single user by userId)
 export async function POST(req: NextRequest) {
   const session = await getSessionFromRequest(req);
 
   if (!session?.user?.email || !isAdmin(session.user.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rateLimitResult = rateLimit(`admin-force-logout:${session.user.id}:${getClientIP(req)}`, ADMIN_RATE_LIMIT);
+  if (!rateLimitResult.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: rateLimitHeaders(rateLimitResult) });
   }
 
   const body = await req.json().catch(() => ({}));

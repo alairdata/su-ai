@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/mobile-auth";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimit, getClientIP, rateLimitHeaders } from "@/lib/rate-limit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,6 +24,8 @@ function isAdmin(email: string | null | undefined): boolean {
   return ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
+const ADMIN_RATE_LIMIT = { limit: 20, windowSeconds: 60 };
+
 // POST - Update a user's plan (with audit logging)
 export async function POST(req: NextRequest) {
   const session = await getSessionFromRequest(req);
@@ -30,6 +33,11 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.email || !isAdmin(session.user.email)) {
     console.error('Admin plan update: Unauthorized attempt by', session?.user?.email || 'unknown');
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rateLimitResult = rateLimit(`admin-update-plan:${session.user.id}:${getClientIP(req)}`, ADMIN_RATE_LIMIT);
+  if (!rateLimitResult.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: rateLimitHeaders(rateLimitResult) });
   }
 
   const { userId, plan } = await req.json();
@@ -55,7 +63,11 @@ export async function POST(req: NextRequest) {
     .eq("id", userId)
     .single();
 
-  const previousPlan = targetUser?.plan || 'Unknown';
+  if (!targetUser) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  const previousPlan = targetUser.plan || 'Unknown';
 
   const { error } = await supabase
     .from("users")
