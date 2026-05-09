@@ -142,6 +142,8 @@ export async function POST(request: NextRequest) {
           plan: plan,
           subscription_status: isReusable ? 'active' : 'non_renewing',
           current_period_end: currentPeriodEnd.toISOString(),
+          subscription_started_at: new Date().toISOString(),
+          last_paid_plan: plan,
           // Paystack-specific fields
           paystack_customer_code: customer?.customer_code || null,
           paystack_authorization: isReusable ? (authorization?.authorization_code || null) : null,
@@ -150,6 +152,16 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', userId)
         .neq('plan', plan);
+
+      if (!updateError) {
+        const prevPlan = currentUser?.plan || 'Free';
+        await supabase.from('subscription_events').insert({
+          user_id: userId,
+          event_type: prevPlan === 'Free' ? 'subscribed' : 'upgraded',
+          plan,
+          amount_usd: plan === 'Pro' ? 4.99 : 9.99,
+        });
+      }
 
       if (updateError) {
         console.error('Failed to update user plan:', updateError);

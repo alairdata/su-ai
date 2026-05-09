@@ -324,38 +324,49 @@ export async function GET(req: NextRequest) {
       : "0";
 
     // ── 6. MRR HISTORY ──
-    // Track when users got paid plans by looking at current paid users
-    // Since we don't have subscription history, estimate from user created_at + plan
-    const paidUsers = users.filter(u => u.plan !== "Free");
+    // Use subscription_events for accurate history (survives cancellations/expirations)
+    const { data: subEvents } = await supabase
+      .from("subscription_events")
+      .select("user_id, event_type, plan, amount_usd, created_at")
+      .order("created_at", { ascending: true });
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const mrrHistory: { label: string; mrr: number }[] = [];
 
-    // Generate weekly MRR points
-    const mrrStart = new Date(earliestSignup);
-    mrrStart.setHours(0, 0, 0, 0);
+    if (subEvents && subEvents.length > 0) {
+      // Build a map of user_id → current plan at each point in time
+      const mrrStart = new Date(subEvents[0].created_at);
+      mrrStart.setHours(0, 0, 0, 0);
+      const mrrCurrent = new Date(mrrStart);
 
-    const mrrCurrent = new Date(mrrStart);
-    while (mrrCurrent <= now) {
-      let mrr = 0;
-      for (const pu of paidUsers) {
-        const signedUp = new Date(pu.created_at);
-        if (signedUp <= mrrCurrent) {
-          mrr += pu.plan === "Pro" ? 4.99 : pu.plan === "Plus" ? 9.99 : 0;
+      while (mrrCurrent <= now) {
+        // Replay events up to this point to determine active subscriptions
+        const activeByUser = new Map<string, string>(); // user_id → plan
+        for (const ev of subEvents) {
+          if (new Date(ev.created_at) > mrrCurrent) break;
+          if (ev.event_type === 'subscribed' || ev.event_type === 'upgraded' || ev.event_type === 'renewed') {
+            activeByUser.set(ev.user_id, ev.plan);
+          } else if (ev.event_type === 'cancelled' || ev.event_type === 'expired' || ev.event_type === 'downgraded') {
+            activeByUser.delete(ev.user_id);
+          }
         }
+
+        let mrr = 0;
+        for (const plan of activeByUser.values()) {
+          mrr += plan === 'Pro' ? 4.99 : plan === 'Plus' ? 9.99 : 0;
+        }
+
+        const label = `${monthNames[mrrCurrent.getMonth()]} ${mrrCurrent.getDate()}`;
+        mrrHistory.push({ label, mrr: Math.round(mrr * 100) / 100 });
+        mrrCurrent.setDate(mrrCurrent.getDate() + 7);
       }
-
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const label = `${monthNames[mrrCurrent.getMonth()]} ${mrrCurrent.getDate()}`;
-      mrrHistory.push({ label, mrr: Math.round(mrr * 100) / 100 });
-
-      mrrCurrent.setDate(mrrCurrent.getDate() + 7);
-    }
-
-    // Add current point
-    let currentMRR = 0;
-    for (const pu of paidUsers) {
-      currentMRR += pu.plan === "Pro" ? 4.99 : pu.plan === "Plus" ? 9.99 : 0;
-    }
-    if (mrrHistory.length === 0 || mrrHistory[mrrHistory.length - 1].mrr !== currentMRR) {
+    } else {
+      // No events yet — fall back to current paid users
+      const paidUsers = users.filter(u => u.plan !== "Free");
+      let currentMRR = 0;
+      for (const pu of paidUsers) {
+        currentMRR += pu.plan === "Pro" ? 4.99 : pu.plan === "Plus" ? 9.99 : 0;
+      }
       mrrHistory.push({ label: "Now", mrr: Math.round(currentMRR * 100) / 100 });
     }
 

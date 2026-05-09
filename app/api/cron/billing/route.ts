@@ -142,9 +142,17 @@ export async function GET(req: NextRequest) {
               plan: 'Free',
               subscription_status: 'canceled',
               paystack_authorization: null,
-              current_period_end: null,
+              last_paid_plan: user.plan,
+              // Keep current_period_end — needed for MRR history
             })
             .eq('id', user.id);
+
+          await supabase.from('subscription_events').insert({
+            user_id: user.id,
+            event_type: 'cancelled',
+            plan: user.plan,
+            amount_usd: user.plan === 'Pro' ? 4.99 : 9.99,
+          });
 
           // Send cancellation complete email
           if (user.email) {
@@ -226,12 +234,20 @@ export async function GET(req: NextRequest) {
                 plan: 'Free',
                 subscription_status: 'expired',
                 paystack_authorization: null,
-                current_period_end: null,
+                last_paid_plan: user.plan,
+                // Keep current_period_end — needed for MRR history
                 retry_count: 0,
                 last_retry_at: null,
                 grace_period_end: null,
               })
               .eq('id', user.id);
+
+            await supabase.from('subscription_events').insert({
+              user_id: user.id,
+              event_type: 'expired',
+              plan: user.plan,
+              amount_usd: user.plan === 'Pro' ? 4.99 : 9.99,
+            });
 
             // Send downgrade email
             if (user.email) {
@@ -351,6 +367,13 @@ export async function GET(req: NextRequest) {
               grace_period_end: null,
             })
             .eq('id', user.id);
+
+          await supabase.from('subscription_events').insert({
+            user_id: user.id,
+            event_type: 'renewed',
+            plan: user.plan,
+            amount_usd: user.plan === 'Pro' ? 4.99 : 9.99,
+          });
 
           results.renewed++;
           console.log(`Renewed subscription for user: ${user.id}, new period end: ${newPeriodEnd.toISOString()}`);
