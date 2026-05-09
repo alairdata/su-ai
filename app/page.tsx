@@ -776,10 +776,10 @@ function HomePage() {
     }
   }, [searchParams]);
 
-  // Check if user is new (OAuth first-time user)
+  // Silently dismiss welcome flag for new users — onboarding handles the flow
   useEffect(() => {
     if (session?.user && session.user.isNewUser) {
-      setShowWelcome(true);
+      fetch('/api/user/dismiss-welcome', { method: 'POST' }).catch(() => {});
     }
   }, [session]);
 
