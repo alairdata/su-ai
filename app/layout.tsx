@@ -27,15 +27,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: `
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <Script id="theme-init" strategy="beforeInteractive">{`
           (function() {
             try {
               var theme = localStorage.getItem('theme') || 'dark';
               document.documentElement.setAttribute('data-theme', theme);
             } catch(e) {}
           })();
-        `}} />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        `}</Script>
         <Script id="microsoft-clarity" strategy="afterInteractive">
           {`
             (function(c,l,a,r,i,t,y){
