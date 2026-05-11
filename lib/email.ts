@@ -444,6 +444,204 @@ export async function sendAbandonedPaymentEmail(
   }
 }
 
+export async function sendWelcomeEmail(
+  email: string,
+  name: string,
+  userId?: string
+) {
+  try {
+    await resend.emails.send({
+      from: 'So-UnFiltered AI <support@so-unfiltered-ai.com>',
+      to: email,
+      subject: "You're in. Let's go.",
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;margin:0;padding:0;background:#0C0C0E;color:#F0EDE8;">
+            <div style="max-width:560px;margin:0 auto;padding:48px 24px;">
+              ${EMAIL_HEADER}
+                <h1 style="font-size:28px;font-weight:800;letter-spacing:-0.04em;color:#F0EDE8;margin:0 0 4px;line-height:1.2;">Welcome to the unfiltered side.</h1>
+              </div>
+
+              <div style="background:#141416;border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:32px;margin-bottom:24px;">
+                <div style="font-size:15px;color:#F0EDE8;margin-bottom:8px;font-weight:600;">Hey ${name},</div>
+                <div style="font-size:14px;color:#8A8690;margin-bottom:24px;line-height:1.6;">
+                  You&apos;re verified and ready to go. No corporate AI speak. No &quot;I can&apos;t help with that.&quot; Just straight answers.
+                </div>
+
+                <div style="background:#0C0C0E;border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:20px;margin:0 0 24px;">
+                  <div style="font-size:11px;color:#5A5660;margin-bottom:12px;letter-spacing:0.05em;text-transform:uppercase;">Not sure where to start? Try one of these:</div>
+                  ${[
+                    'Am I overthinking this?',
+                    'Give me the honest truth about [my situation].',
+                    'What would you do if you were me?',
+                  ].map(p => `
+                  <div style="padding:10px 14px;border-radius:10px;background:#141416;border:1px solid rgba(255,255,255,0.06);font-size:13px;color:#8A8690;margin-bottom:8px;font-style:italic;">
+                    &ldquo;${p}&rdquo;
+                  </div>`).join('')}
+                </div>
+
+                <div style="font-size:13px;color:#5A5660;margin-bottom:24px;">
+                  You&apos;re on the <strong style="color:#F0EDE8;">Free plan</strong> — 5 messages per day. Upgrade anytime if you need more.
+                </div>
+
+                <div style="text-align:center;">
+                  <a href="${process.env.NEXTAUTH_URL}" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#E8A04C,#E8624C);color:#0C0C0E!important;text-decoration:none;border-radius:12px;font-weight:700;font-size:14px;">Start Your First Chat</a>
+                </div>
+              </div>
+
+              ${EMAIL_FOOTER.replace('{{FOOTER_TEXT}}', 'Questions? Hit us at <a href="mailto:support@so-unfiltered-ai.com" style="color:#8A8690;text-decoration:none;">support@so-unfiltered-ai.com</a>')}
+            </div>
+          </body>
+        </html>
+      `,
+    });
+
+    if (userId) trackServerEvent(userId, EVENTS.EMAIL_SENT, { email_type: 'welcome' });
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to send welcome email:', error);
+    return { success: false, error };
+  }
+}
+
+export async function sendUpgradeNudgeEmail(
+  email: string,
+  name: string,
+  totalMessages: number,
+  userId?: string
+) {
+  try {
+    await resend.emails.send({
+      from: 'So-UnFiltered AI <support@so-unfiltered-ai.com>',
+      to: email,
+      subject: "You keep coming back. We noticed.",
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;margin:0;padding:0;background:#0C0C0E;color:#F0EDE8;">
+            <div style="max-width:560px;margin:0 auto;padding:48px 24px;">
+              ${EMAIL_HEADER}
+                <h1 style="font-size:28px;font-weight:800;letter-spacing:-0.04em;color:#F0EDE8;margin:0 0 4px;line-height:1.2;">5 a day isn&apos;t enough for you.</h1>
+              </div>
+
+              <div style="background:#141416;border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:32px;margin-bottom:24px;">
+                <div style="font-size:15px;color:#F0EDE8;margin-bottom:8px;font-weight:600;">Hey ${name},</div>
+                <div style="font-size:14px;color:#8A8690;margin-bottom:24px;line-height:1.6;">
+                  You&apos;ve sent <strong style="color:#F0EDE8;">${totalMessages} messages</strong> this week on the Free plan. That&apos;s a 5-per-day cap — and you keep hitting it and coming back.
+                  <br><br>
+                  That tells us you&apos;re actually using this. So here&apos;s the deal:
+                </div>
+
+                <div style="background:#0C0C0E;border:1px solid rgba(232,160,76,0.2);border-radius:14px;padding:24px;margin:0 0 24px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <div style="text-align:center;flex:1;">
+                      <div style="font-size:11px;color:#5A5660;margin-bottom:4px;letter-spacing:0.05em;text-transform:uppercase;">Free</div>
+                      <div style="font-size:28px;font-weight:800;color:#5A5660;">5</div>
+                      <div style="font-size:11px;color:#5A5660;">msgs/day</div>
+                    </div>
+                    <div style="font-size:20px;color:#3A3640;">→</div>
+                    <div style="text-align:center;flex:1;">
+                      <div style="font-size:11px;color:#E8A04C;margin-bottom:4px;letter-spacing:0.05em;text-transform:uppercase;">Pro</div>
+                      <div style="font-size:28px;font-weight:800;background:linear-gradient(135deg,#E8A04C,#E8624C);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">100</div>
+                      <div style="font-size:11px;color:#8A8690;">msgs/day &mdash; $4.99/mo</div>
+                    </div>
+                  </div>
+                  <div style="height:1px;background:rgba(255,255,255,0.06);margin:16px 0;"></div>
+                  <div style="font-size:12px;color:#5A5660;text-align:center;">That&apos;s 20&times; more room. Same unfiltered answers.</div>
+                </div>
+
+                <div style="text-align:center;">
+                  <a href="${process.env.NEXTAUTH_URL}/settings" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#E8A04C,#E8624C);color:#0C0C0E!important;text-decoration:none;border-radius:12px;font-weight:700;font-size:14px;">Upgrade to Pro</a>
+                </div>
+              </div>
+
+              ${EMAIL_FOOTER.replace('{{FOOTER_TEXT}}', 'You&apos;re receiving this because you&apos;ve been active on So-UnFiltered AI.')}
+            </div>
+          </body>
+        </html>
+      `,
+    });
+
+    if (userId) trackServerEvent(userId, EVENTS.EMAIL_SENT, { email_type: 'upgrade_nudge' });
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to send upgrade nudge email:', error);
+    return { success: false, error };
+  }
+}
+
+export async function sendCheckInEmail(
+  email: string,
+  name: string,
+  userId?: string
+) {
+  try {
+    await resend.emails.send({
+      from: 'So-UnFiltered AI <support@so-unfiltered-ai.com>',
+      to: email,
+      subject: "Hey — you still around?",
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;margin:0;padding:0;background:#0C0C0E;color:#F0EDE8;">
+            <div style="max-width:560px;margin:0 auto;padding:48px 24px;">
+              ${EMAIL_HEADER}
+                <h1 style="font-size:28px;font-weight:800;letter-spacing:-0.04em;color:#F0EDE8;margin:0 0 4px;line-height:1.2;">It&apos;s been a week.</h1>
+              </div>
+
+              <div style="background:#141416;border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:32px;margin-bottom:24px;">
+                <div style="font-size:15px;color:#F0EDE8;margin-bottom:8px;font-weight:600;">Hey ${name},</div>
+                <div style="font-size:14px;color:#8A8690;margin-bottom:24px;line-height:1.6;">
+                  You signed up a week ago and never said a word. No judgment — maybe the timing wasn&apos;t right, or you just weren&apos;t sure where to start.
+                  <br><br>
+                  But if now&apos;s a better time: we&apos;re still here. Same as always — no filter, no fluff.
+                </div>
+
+                <div style="background:#0C0C0E;border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:20px;margin:0 0 24px;">
+                  <div style="font-size:13px;color:#8A8690;line-height:1.6;text-align:center;">
+                    You still have <strong style="color:#E8A04C;">5 free messages</strong> waiting every day.<br>
+                    <span style="font-size:12px;color:#5A5660;">They reset at midnight. Use them whenever you&apos;re ready.</span>
+                  </div>
+                </div>
+
+                <div style="text-align:center;">
+                  <a href="${process.env.NEXTAUTH_URL}" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#E8A04C,#E8624C);color:#0C0C0E!important;text-decoration:none;border-radius:12px;font-weight:700;font-size:14px;">Come Back</a>
+                </div>
+              </div>
+
+              <div style="text-align:center;font-size:12px;color:#5A5660;padding:0 20px;">
+                You&apos;re receiving this because you signed up for So-UnFiltered AI.
+                <div style="margin-top:12px;font-size:11px;color:#3A3640;">
+                  <a href="#" style="color:#3A3640;text-decoration:none;">Unsubscribe</a> &middot; <a href="https://sounfilteredai.com" style="color:#3A3640;text-decoration:none;">So-UnFiltered AI</a> &middot; Accra, Ghana
+                </div>
+              </div>
+            </div>
+          </body>
+        </html>
+      `,
+    });
+
+    if (userId) trackServerEvent(userId, EVENTS.EMAIL_SENT, { email_type: 'check_in' });
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to send check-in email:', error);
+    return { success: false, error };
+  }
+}
+
 export async function sendFollowUpEmail(
   email: string,
   name: string,

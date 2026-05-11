@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { rateLimit, getClientIP } from '@/lib/rate-limit';
+import { sendWelcomeEmail } from '@/lib/email';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Now create user - token is consumed, safe from race condition
-    const { error: createError } = await supabase
+    const { data: newUser, error: createError } = await supabase
       .from('users')
       .insert([
         {
@@ -90,7 +91,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/?error=verification-failed', request.url));
     }
 
-    // User created successfully - pending user already deleted above
+    // Fire welcome email — non-blocking
+    sendWelcomeEmail(deletedUser.email, deletedUser.name, newUser?.id).catch(console.error);
 
     // Redirect to login with success message
     return NextResponse.redirect(new URL('/?verified=true', request.url));
