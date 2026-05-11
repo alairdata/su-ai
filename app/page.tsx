@@ -936,10 +936,10 @@ function HomePage() {
   // Auto-show limit modal when user hits daily limit
   const canSend = canSendMessage();
   useEffect(() => {
-    if (!canSend && isChatsLoaded && session?.user) {
+    if (!canSend && session?.user) {
       setShowLimitModal(true);
     }
-  }, [canSend, isChatsLoaded, session?.user]);
+  }, [canSend, session?.user]);
 
   // Live countdown timer for limit modal
   useEffect(() => {

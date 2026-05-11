@@ -296,13 +296,15 @@ export const authOptions: NextAuthOptions = {
             session.user.plan = 'Plus';
           }
 
-          // Compute today's message count from data already fetched above.
-          // Check last_reset_date to handle stale counters (new day = 0).
+          // Compute today's message count.
+          // Only treat counter as stale if last_reset_date is explicitly a PREVIOUS day.
+          // null last_reset_date = user never sent a message = counter is 0 anyway.
           const todayStr = new Date().toISOString().split('T')[0];
           const resetDateStr = user.last_reset_date
-            ? new Date(user.last_reset_date).toISOString().split('T')[0]
+            ? user.last_reset_date.toString().slice(0, 10)
             : null;
-          session.user.messagesUsedToday = resetDateStr === todayStr ? (user.messages_used_today || 0) : 0;
+          const isStale = resetDateStr !== null && resetDateStr !== todayStr;
+          session.user.messagesUsedToday = isStale ? 0 : (user.messages_used_today || 0);
         }
       }
       return session;

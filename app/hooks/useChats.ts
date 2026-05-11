@@ -87,8 +87,6 @@ export function useChats() {
 
   useEffect(() => {
     if (userId && userId !== lastUserIdRef.current) {
-      // Reset local counter so it falls back to session value from DB
-      setLocalMessagesUsed(null);
       // Clear stored chat when switching accounts
       if (lastUserIdRef.current !== null) {
         setStoredChatId(null);
@@ -97,6 +95,13 @@ export function useChats() {
       lastUserIdRef.current = userId;
     }
   }, [userId]);
+
+  // Seed localMessagesUsed from session on load so the null fallback never shows a stale 0
+  useEffect(() => {
+    if (session?.user?.messagesUsedToday !== undefined && localMessagesUsed === null) {
+      setLocalMessagesUsed(session.user.messagesUsedToday);
+    }
+  }, [session?.user?.id, session?.user?.messagesUsedToday]);
 
 
   // Load chats from API when user logs in
