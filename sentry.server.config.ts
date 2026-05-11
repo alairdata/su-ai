@@ -1,21 +1,9 @@
-// Sentry server configuration - only runs if @sentry/nextjs is installed
-try {
-  const Sentry = require("@sentry/nextjs");
+import * as Sentry from "@sentry/nextjs";
 
-  Sentry.init({
-    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+Sentry.init({
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  environment: process.env.NODE_ENV,
+  enabled: process.env.NODE_ENV === "production",
 
-    // Performance Monitoring
-    tracesSampleRate: 0.1, // Capture 10% of transactions
-
-    // Set environment
-    environment: process.env.NODE_ENV,
-
-    // Only send errors in production
-    enabled: process.env.NODE_ENV === "production",
-  });
-} catch {
-  // Sentry not installed - continue without it
-}
-
-export {};
+  tracesSampleRate: 0.1,
+});
