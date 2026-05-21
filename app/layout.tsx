@@ -56,11 +56,16 @@ export default function RootLayout({
           fontWeight: 600,
           fontSize: '14px',
           letterSpacing: '0.01em',
-          zIndex: 9999,
-          position: 'relative',
+          zIndex: 99999,
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          width: '100%',
         }}>
           ⚠️ System Downtime — Operations will resume soon
         </div>
+        <div style={{ height: '41px' }} />
         <Providers>
           <MixpanelInit />
           {children}
