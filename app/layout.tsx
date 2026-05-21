@@ -59,7 +59,7 @@ export default function RootLayout({
           zIndex: 9999,
           position: 'relative',
         }}>
-          ⚠️ System Downtime — Options will resume soon
+          ⚠️ System Downtime — Operations will resume soon
         </div>
         <Providers>
           <MixpanelInit />
