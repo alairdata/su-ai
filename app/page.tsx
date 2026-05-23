@@ -913,6 +913,77 @@ function HomePage() {
   }, [currentChatId]);
 
   const messages = currentChat?.messages ?? [];
+
+  // ── TEXTING-STYLE BUBBLE REVEAL ──
+  // Paragraphs reveal one at a time with a typing pause between each.
+  // Queue-based: each \n\n adds one slot; slots drain one per timer fire.
+  // Continues draining even after streaming ends so remaining bubbles still sequence in.
+  const [revealedParaCount, setRevealedParaCount] = useState(1);
+  const revealStateRef = useRef<{
+    prevTotalParas: number;
+    pendingReveals: number;
+    timer: ReturnType<typeof setTimeout> | null;
+    streamingDone: boolean;
+  }>({ prevTotalParas: 1, pendingReveals: 0, timer: null, streamingDone: false });
+  const wasLoadingRef = useRef(false);
+
+  const scheduleNextReveal = useRef<(() => void) | undefined>(undefined);
+  scheduleNextReveal.current = () => {
+    const s = revealStateRef.current;
+    if (s.pendingReveals <= 0 || s.timer) return;
+    // Shorter delay once streaming is done (content already ready, just pacing the reveal)
+    const delay = s.streamingDone ? 700 : 1800;
+    s.timer = setTimeout(() => {
+      s.timer = null;
+      s.pendingReveals = Math.max(0, s.pendingReveals - 1);
+      setRevealedParaCount(prev => prev + 1);
+      scheduleNextReveal.current?.();
+    }, delay);
+  };
+
+  // Content of the last assistant message (drives the timing effect)
+  const lastAssistantContent = chatLoading
+    ? (messages.slice().reverse().find(m => m.role === 'assistant')?.content ?? '')
+    : '';
+
+  useEffect(() => {
+    const s = revealStateRef.current;
+
+    if (chatLoading && !wasLoadingRef.current) {
+      // Streaming just started — full reset
+      setRevealedParaCount(1);
+      s.prevTotalParas = 1;
+      s.pendingReveals = 0;
+      s.streamingDone = false;
+      if (s.timer) { clearTimeout(s.timer); s.timer = null; }
+    }
+    wasLoadingRef.current = chatLoading;
+
+    if (!chatLoading) {
+      // Streaming done — mark it so remaining reveals use shorter delay
+      s.streamingDone = true;
+      if (s.pendingReveals === 0) {
+        // Nothing queued — show everything right away
+        setRevealedParaCount(9999);
+      } else {
+        // Kick the queue with the shorter post-stream delay
+        if (s.timer) { clearTimeout(s.timer); s.timer = null; }
+        scheduleNextReveal.current?.();
+      }
+      return;
+    }
+
+    if (!lastAssistantContent) return;
+
+    const totalParas = lastAssistantContent.split(/\n\n+/).filter(p => p.trim()).length;
+    if (totalParas > s.prevTotalParas) {
+      s.pendingReveals += totalParas - s.prevTotalParas;
+      s.prevTotalParas = totalParas;
+      scheduleNextReveal.current?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastAssistantContent, chatLoading]);
+
   // Don't show greeting while chats are loading (prevents flash when restoring from localStorage)
   // Also don't show if we're waiting for a stored chat to load
   const isWaitingForStoredChat = currentChatId && !currentChat;
@@ -2549,7 +2620,7 @@ function HomePage() {
             gap: '8px',
             zIndex: 10,
           }}>
-            {[1, 2, 3].map(i => (
+            {[1, 3].map(i => (
               <div key={i} style={{
                 width: onboardingScreen === i ? '24px' : '8px',
                 height: '8px',
@@ -2563,15 +2634,8 @@ function HomePage() {
 
           {onboardingScreen === 1 && (
             <OnboardingScreen1
-              onNext={() => { track(EVENTS.ONBOARDING_SCREEN_VIEWED, { screen_number: 2 }); setOnboardingScreen(2); }}
-              onSkip={() => completeOnboarding(1)}
-            />
-          )}
-
-          {onboardingScreen === 2 && (
-            <OnboardingScreen2
               onNext={() => { track(EVENTS.ONBOARDING_SCREEN_VIEWED, { screen_number: 3 }); setOnboardingScreen(3); }}
-              onSkip={() => completeOnboarding(2)}
+              onSkip={() => completeOnboarding(1)}
             />
           )}
 
@@ -3183,44 +3247,78 @@ function HomePage() {
                                       color: m.character_color_fg || '#B388FF',
                                     }}>Character</span>
                                   </div>
-                                  <div
-                                    className="message-bubble"
-                                    style={{
-                                      padding: '12px 16px', borderRadius: '16px 16px 16px 4px',
-                                      fontSize: 14, lineHeight: 1.6,
-                                      background: m.character_color_bg_light || 'rgba(179,136,255,0.06)',
-                                      border: `1px solid ${m.character_color_border || 'rgba(179,136,255,0.2)'}`,
-                                      color: theme === 'dark' ? '#F0EDE8' : '#1A1918',
-                                    }}
-                                  >
-                                    <div style={currentStyles.messageText}>
-                                      <ReactMarkdown
-                                        components={{
-                                          p: ({ children }) => <p style={{ margin: '0 0 0.75em 0', display: 'block' }}>{children}</p>,
+                                  <>
+                                    {m.content.split(/\n\n+/).filter(p => p.trim()).map((para, pi) => (
+                                      <div
+                                        key={pi}
+                                        className={`message-bubble${isLastAssistant ? ' bubble-pop-in' : ''}`}
+                                        style={{
+                                          padding: '12px 16px', borderRadius: '16px 16px 16px 4px',
+                                          fontSize: 14, lineHeight: 1.6,
+                                          background: m.character_color_bg_light || 'rgba(179,136,255,0.06)',
+                                          border: `1px solid ${m.character_color_border || 'rgba(179,136,255,0.2)'}`,
+                                          color: theme === 'dark' ? '#F0EDE8' : '#1A1918',
                                         }}
                                       >
-                                        {m.content}
-                                      </ReactMarkdown>
-                                    </div>
-                                  </div>
+                                        <div style={currentStyles.messageText}>
+                                          <ReactMarkdown
+                                            components={{
+                                              p: ({ children }) => <p style={{ margin: '0 0 0.75em 0', display: 'block' }}>{children}</p>,
+                                            }}
+                                          >
+                                            {para}
+                                          </ReactMarkdown>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </>
                                 </div>
                               </div>
                             ) : (
-                              /* NORMAL AI MESSAGE */
-                              <div
-                                className="message-bubble"
-                                style={currentStyles.messageBubbleAssistant}
-                              >
-                                <div style={currentStyles.messageText}>
-                                  <ReactMarkdown
-                                    components={{
-                                      p: ({ children }) => <p style={{ margin: '0 0 0.75em 0', display: 'block' }}>{children}</p>,
-                                    }}
-                                  >
-                                    {m.content}
-                                  </ReactMarkdown>
-                                </div>
-                              </div>
+                              /* NORMAL AI MESSAGE — each paragraph is its own bubble, revealed one by one */
+                              (() => {
+                                const allParas = m.content.split(/\n\n+/).filter(p => p.trim());
+                                // Keep slicing until all are revealed — continues even after streaming ends
+                                const visibleParas = isLastAssistant
+                                  ? allParas.slice(0, revealedParaCount)
+                                  : allParas;
+                                // Show typing dots whenever there are still hidden paragraphs
+                                const hasPendingPara = isLastAssistant && revealedParaCount < allParas.length;
+                                return (
+                                  <>
+                                    {visibleParas.map((para, pi) => (
+                                      <div
+                                        key={pi}
+                                        className="message-bubble bubble-pop-in"
+                                        style={currentStyles.messageBubbleAssistant}
+                                      >
+                                        <div style={currentStyles.messageText}>
+                                          <ReactMarkdown
+                                            components={{
+                                              p: ({ children }) => <p style={{ margin: '0 0 0.75em 0', display: 'block' }}>{children}</p>,
+                                            }}
+                                          >
+                                            {para}
+                                          </ReactMarkdown>
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {hasPendingPara && (
+                                      <div className="typing-bubble-wrapper">
+                                        <div className="typing-bubble">
+                                          <span className="typing-dot" />
+                                          <span className="typing-dot" />
+                                          <span className="typing-dot" />
+                                        </div>
+                                        <div className="typing-bubble-tail">
+                                          <div className="tail-circle tail-circle-1" />
+                                          <div className="tail-circle tail-circle-2" />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()
                             )
                           ) : (!isSearching && isLastAssistant) ? (
                             /* Typing indicator bubble - only for the LAST assistant message and only when not searching */
@@ -3236,8 +3334,9 @@ function HomePage() {
                               </div>
                             </div>
                           ) : null}
-                          {/* Show action buttons for all assistant messages (except pre-search finalized ones) */}
-                          {m.content && !m.isFinalized && (
+                          {/* Show action buttons only after ALL bubbles are revealed */}
+                          {m.content && !m.isFinalized && !chatLoading &&
+                            (!isLastAssistant || revealedParaCount >= m.content.split(/\n\n+/).filter(p => p.trim()).length) && (
                             <div style={currentStyles.messageActions}>
                               {/* Copy button */}
                               <button
