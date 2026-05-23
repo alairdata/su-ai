@@ -2179,7 +2179,7 @@ function HomePage() {
                 ? "Reset your password"
                 : authMode === "signin"
                   ? "Welcome back"
-                  : "Create your account"}
+                  : "No going back from here."}
             </p>
           </div>
 
@@ -2199,13 +2199,13 @@ function HomePage() {
                 </div>
                 <div style={currentStyles.emailIconRing} className="email-ring-animate" />
               </div>
-              <h2 style={currentStyles.checkEmailTitle}>Check your email</h2>
+              <h2 style={currentStyles.checkEmailTitle}>We sent you a link.</h2>
               <p style={currentStyles.checkEmailText}>
-                We&apos;ve sent a verification link to
+                Most people check their email and never come back.
               </p>
               <p style={currentStyles.checkEmailAddress}>{signupEmail}</p>
               <p style={currentStyles.checkEmailSubtext}>
-                Click the link in the email to verify your account. If you don&apos;t see it, check your spam folder.
+                Don&apos;t be most people. (Check spam if you don&apos;t see it.)
               </p>
               <button
                 onClick={() => {
@@ -2215,7 +2215,7 @@ function HomePage() {
                 style={currentStyles.authBtn}
                 className="auth-btn-ripple"
               >
-                Back to Sign In
+                Going to check now
               </button>
             </div>
           ) : showResetEmailSent ? (
