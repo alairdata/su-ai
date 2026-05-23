@@ -2570,12 +2570,12 @@ function HomePage() {
               </div>
               <div style={currentStyles.emailIconRing} className="email-ring-animate" />
             </div>
-            <h2 style={currentStyles.checkEmailTitle}>No going back now.</h2>
+            <h2 style={currentStyles.checkEmailTitle}>Account created. Now the real work starts.</h2>
             <p style={currentStyles.checkEmailText}>
-              You signed up for honesty.
+              Most people won&apos;t make it past the first honest conversation.
             </p>
             <p style={currentStyles.checkEmailSubtext}>
-              Don&apos;t waste it asking it to write your bio.
+              Let&apos;s see if you&apos;re different.
             </p>
             <button
               onClick={handleDismissWelcome}
