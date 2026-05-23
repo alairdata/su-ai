@@ -2570,19 +2570,19 @@ function HomePage() {
               </div>
               <div style={currentStyles.emailIconRing} className="email-ring-animate" />
             </div>
-            <h2 style={currentStyles.checkEmailTitle}>Welcome to So UnFiltered AI!</h2>
+            <h2 style={currentStyles.checkEmailTitle}>No going back now.</h2>
             <p style={currentStyles.checkEmailText}>
-              Your account has been created successfully.
+              You signed up for honesty.
             </p>
             <p style={currentStyles.checkEmailSubtext}>
-              You&apos;re all set! Start chatting with our AI assistant and explore unlimited possibilities.
+              Don&apos;t waste it asking it to write your bio.
             </p>
             <button
               onClick={handleDismissWelcome}
               style={currentStyles.authBtn}
               className="auth-btn-ripple"
             >
-              Get Started
+              I&apos;m ready
             </button>
           </div>
         </div>
