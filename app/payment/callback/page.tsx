@@ -9,109 +9,108 @@ function PaymentCallbackContent() {
   const searchParams = useSearchParams();
   const { update: updateSession } = useSession();
   const [status, setStatus] = useState<'verifying' | 'success' | 'error'>('verifying');
-  const [message, setMessage] = useState('Verifying your payment...');
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const verifyPayment = async () => {
-      // Paystack sends back reference and trxref as query parameters
-      let reference = searchParams.get('reference') || searchParams.get('trxref');
+    const provider = searchParams.get('provider');
+    if (provider === 'lemonsqueezy') {
+      handleLemonSqueezy();
+    } else {
+      handlePaystack();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-      // Also check sessionStorage (for cases where URL params are lost)
-      if (!reference && typeof window !== 'undefined') {
-        reference = sessionStorage.getItem('paystack_reference');
-        if (reference) {
-          sessionStorage.removeItem('paystack_reference');
-        }
-      }
+  const handleLemonSqueezy = async () => {
+    // LS processes payment server-side via webhook — no client verify call needed.
+    // Give the webhook a moment to fire, then refresh session.
+    setMessage("You're in. Confirming your subscription...");
+    await new Promise(r => setTimeout(r, 2500));
+    await updateSession();
+    setStatus('success');
+    setMessage("You're in. Welcome to the real thing.");
+    setTimeout(() => router.push('/'), 2000);
+  };
 
-      if (!reference) {
+  const handlePaystack = async () => {
+    setMessage('Verifying your payment...');
+    let reference = searchParams.get('reference') || searchParams.get('trxref');
+
+    if (!reference && typeof window !== 'undefined') {
+      reference = sessionStorage.getItem('paystack_reference');
+      if (reference) sessionStorage.removeItem('paystack_reference');
+    }
+
+    if (!reference) {
+      setStatus('error');
+      setMessage('Invalid payment reference.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/payment/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reference }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        await updateSession();
+        setStatus('success');
+        setMessage(`You're on ${data.plan} now. Let's go.`);
+        setTimeout(() => router.push('/'), 2500);
+      } else {
         setStatus('error');
-        setMessage('Invalid payment reference');
-        return;
+        setMessage(data.error || data.message || 'Payment verification failed.');
       }
-
-      try {
-        const res = await fetch('/api/payment/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reference }),
-        });
-
-        const data = await res.json();
-
-        if (data.success) {
-          setStatus('success');
-          setMessage(`Welcome to ${data.plan}! Your plan has been upgraded.`);
-          await updateSession();
-          setTimeout(() => {
-            router.push('/');
-          }, 2500);
-        } else if (data.status === 'pending' || data.status === 'abandoned') {
-          setStatus('error');
-          setMessage(data.message || 'Payment was not completed');
-        } else {
-          setStatus('error');
-          setMessage(data.error || data.message || 'Payment verification failed');
-        }
-      } catch {
-        setStatus('error');
-        setMessage('Failed to verify payment');
-      }
-    };
-
-    verifyPayment();
-  }, [searchParams, router, updateSession]);
+    } catch {
+      setStatus('error');
+      setMessage('Failed to verify payment. If you were charged, contact support.');
+    }
+  };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
+    <div style={s.container}>
+      <div style={s.card}>
+
         {status === 'verifying' && (
           <>
-            <div style={styles.spinner}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
-                <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round">
-                  <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/>
-                </path>
-              </svg>
+            <div style={s.iconWrap}>
+              <div style={s.spinner} />
             </div>
-            <h2 style={styles.title}>{message}</h2>
+            <h2 style={s.title}>{message || 'One sec...'}</h2>
           </>
         )}
 
         {status === 'success' && (
           <>
-            <div style={styles.success}>
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div style={s.iconWrap}>
+              <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#E8A04C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                 <polyline points="22 4 12 14.01 9 11.01"/>
               </svg>
             </div>
-            <h2 style={styles.title}>Payment Successful!</h2>
-            <p style={styles.message}>{message}</p>
-            <p style={styles.redirect}>Redirecting you back...</p>
+            <h2 style={s.title}>{message}</h2>
+            <p style={s.sub}>Taking you back...</p>
           </>
         )}
 
         {status === 'error' && (
           <>
-            <div style={styles.error}>
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div style={s.iconWrap}>
+              <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/>
                 <line x1="15" y1="9" x2="9" y2="15"/>
                 <line x1="9" y1="9" x2="15" y2="15"/>
               </svg>
             </div>
-            <h2 style={styles.title}>Payment Failed</h2>
-            <p style={styles.message}>{message}</p>
-            <button
-              onClick={() => router.push('/')}
-              style={styles.button}
-            >
-              Go Back
-            </button>
+            <h2 style={s.title}>Something went wrong.</h2>
+            <p style={s.sub}>{message}</p>
+            <button onClick={() => router.push('/')} style={s.btn}>Go back</button>
           </>
         )}
+
       </div>
     </div>
   );
@@ -120,17 +119,10 @@ function PaymentCallbackContent() {
 export default function PaymentCallback() {
   return (
     <Suspense fallback={
-      <div style={styles.container}>
-        <div style={styles.card}>
-          <div style={styles.spinner}>
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
-              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round">
-                <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/>
-              </path>
-            </svg>
-          </div>
-          <h2 style={styles.title}>Loading...</h2>
+      <div style={s.container}>
+        <div style={s.card}>
+          <div style={s.iconWrap}><div style={s.spinner} /></div>
+          <h2 style={s.title}>One sec...</h2>
         </div>
       </div>
     }>
@@ -139,62 +131,58 @@ export default function PaymentCallback() {
   );
 }
 
-const styles: { [key: string]: React.CSSProperties } = {
+const s: { [key: string]: React.CSSProperties } = {
   container: {
     minHeight: '100vh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#f9f9f9',
+    background: '#0C0C0E',
     padding: '24px',
   },
   card: {
-    maxWidth: '500px',
+    maxWidth: '420px',
     width: '100%',
-    padding: '48px',
-    background: 'white',
-    borderRadius: '16px',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+    padding: '48px 36px',
+    background: '#111114',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '24px',
     textAlign: 'center',
+    boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+  },
+  iconWrap: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginBottom: '24px',
   },
   spinner: {
-    marginBottom: '24px',
-    display: 'flex',
-    justifyContent: 'center',
-  },
-  success: {
-    marginBottom: '24px',
-    display: 'flex',
-    justifyContent: 'center',
-  },
-  error: {
-    marginBottom: '24px',
-    display: 'flex',
-    justifyContent: 'center',
+    width: '48px',
+    height: '48px',
+    border: '3px solid rgba(255,255,255,0.06)',
+    borderTopColor: '#E8A04C',
+    borderRadius: '50%',
+    animation: 'spin 0.8s linear infinite',
   },
   title: {
-    fontSize: '24px',
-    fontWeight: 700,
-    marginBottom: '16px',
-    color: '#000',
+    fontSize: '22px',
+    fontWeight: 800,
+    color: '#F0EDE8',
+    margin: '0 0 8px',
+    letterSpacing: '-0.03em',
   },
-  message: {
-    fontSize: '16px',
-    color: '#666',
-    marginBottom: '16px',
-  },
-  redirect: {
+  sub: {
     fontSize: '14px',
-    color: '#999',
+    color: '#7A7680',
+    margin: '0 0 24px',
   },
-  button: {
-    padding: '12px 32px',
-    background: 'linear-gradient(135deg, #1a1a1a 0%, #3d3d3d 100%)',
-    color: 'white',
+  btn: {
+    padding: '12px 28px',
+    background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+    color: '#0C0C0E',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '12px',
     fontSize: '14px',
-    fontWeight: 600,
+    fontWeight: 700,
     cursor: 'pointer',
   },
 };

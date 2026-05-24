@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/mobile-auth';
 import { createClient } from '@supabase/supabase-js';
-import {
-  initializeTransaction,
-  PLAN_CONFIG,
-  usdToGhsPesewas,
-  generateReference,
-  PlanType
-} from '@/lib/paystack';
+import { initializeTransaction, PLAN_CONFIG as PAYSTACK_PLAN_CONFIG, usdToGhsPesewas, generateReference } from '@/lib/paystack';
+import { createCheckout } from '@/lib/lemonsqueezy';
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from '@/lib/rate-limit';
 import { initializePaymentSchema, validateInput } from '@/lib/validations';
 import { sanitizeErrorForClient } from '@/lib/env';
@@ -16,6 +11,8 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+const PAYMENT_PROVIDER = process.env.PAYMENT_PROVIDER || 'paystack'; // 'paystack' | 'lemonsqueezy'
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,24 +35,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-
-    // Schema validation
     const validation = validateInput(initializePaymentSchema, body);
     if (!validation.success) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     const { plan } = validation.data;
-    const planConfig = PLAN_CONFIG[plan as PlanType];
-
-    if (!planConfig) {
-      return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
-    }
-
     const userId = session.user.id;
     const email = session.user.email;
 
-    // SECURITY: Verify user's current plan from database
+    // Verify user exists and check current plan
     const { data: dbUser, error: userError } = await supabase
       .from('users')
       .select('plan, subscription_status')
@@ -66,47 +55,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Prevent payment for same or lower tier plan
-    const planTiers: Record<string, number> = { 'Free': 0, 'Pro': 1, 'Plus': 2 };
+    const planTiers: Record<string, number> = { Free: 0, Pro: 1, Plus: 2 };
     const currentTier = planTiers[dbUser.plan] || 0;
     const requestedTier = planTiers[plan] || 0;
 
     if (requestedTier <= currentTier && dbUser.subscription_status === 'active') {
       return NextResponse.json(
-        { error: `You already have ${dbUser.plan} plan or higher. Cannot downgrade via payment.` },
+        { error: `You already have ${dbUser.plan} plan or higher.` },
         { status: 400 }
       );
     }
 
-    // Convert USD price to GHS pesewas (live rate)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.so-unfiltered-ai.com';
+
+    // ── Lemon Squeezy ──────────────────────────────────────────────
+    if (PAYMENT_PROVIDER === 'lemonsqueezy') {
+      const checkoutUrl = await createCheckout({
+        plan,
+        email,
+        userId,
+        successUrl: `${baseUrl}/payment/callback?provider=lemonsqueezy`,
+      });
+
+      return NextResponse.json({ success: true, authorization_url: checkoutUrl });
+    }
+
+    // ── Paystack (default) ─────────────────────────────────────────
+    const planConfig = PAYSTACK_PLAN_CONFIG[plan as keyof typeof PAYSTACK_PLAN_CONFIG];
+    if (!planConfig) {
+      return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
+    }
+
     const amountInPesewas = await usdToGhsPesewas(planConfig.priceUSD);
     const reference = generateReference(`${plan.toLowerCase()}_${userId.slice(0, 8)}`);
 
-    // Get the base URL for callback
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.so-unfiltered-ai.com';
-
-    // Initialize Paystack transaction with both card and mobile money
     const paystackResponse = await initializeTransaction({
       email,
       amount: amountInPesewas,
       reference,
       callback_url: `${baseUrl}/payment/callback`,
       channels: ['card', 'mobile_money'],
-      metadata: {
-        userId,
-        plan,
-        priceUSD: planConfig.priceUSD,
-      },
+      metadata: { userId, plan, priceUSD: planConfig.priceUSD },
     });
 
-    console.log('Paystack transaction initialized:', {
-      reference,
-      plan,
-      userId,
-      amountPesewas: amountInPesewas,
-    });
-
-    // Return authorization URL for redirect
     return NextResponse.json({
       success: true,
       reference: paystackResponse.data.reference,
@@ -115,9 +106,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Payment initialization error:', error);
-    return NextResponse.json(
-      { error: sanitizeErrorForClient(error) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: sanitizeErrorForClient(error) }, { status: 500 });
   }
 }
