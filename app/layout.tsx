@@ -49,8 +49,8 @@ export default function RootLayout({
       <body className={inter.className} style={{ margin: 0, padding: 0, overflowX: 'hidden', width: '100%' }}>
         <a href="#main-content" className="skip-link">Skip to main content</a>
         <div style={{
-          background: '#f59e0b',
-          color: '#1a1a1a',
+          background: '#16a34a',
+          color: '#ffffff',
           textAlign: 'center',
           padding: '10px 16px',
           fontWeight: 600,
@@ -63,7 +63,7 @@ export default function RootLayout({
           right: 0,
           width: '100%',
         }}>
-          ⚠️ System Downtime — Operations will resume soon
+          ✅ All systems operational
         </div>
         <div style={{ height: '41px' }} />
         <Providers>
