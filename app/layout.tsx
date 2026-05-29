@@ -48,24 +48,6 @@ export default function RootLayout({
       </head>
       <body className={inter.className} style={{ margin: 0, padding: 0, overflowX: 'hidden', width: '100%' }}>
         <a href="#main-content" className="skip-link">Skip to main content</a>
-        <div style={{
-          background: '#16a34a',
-          color: '#ffffff',
-          textAlign: 'center',
-          padding: '10px 16px',
-          fontWeight: 600,
-          fontSize: '14px',
-          letterSpacing: '0.01em',
-          zIndex: 99999,
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-        }}>
-          ✅ All systems operational
-        </div>
-        <div style={{ height: '41px' }} />
         <Providers>
           <MixpanelInit />
           {children}
