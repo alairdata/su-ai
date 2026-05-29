@@ -52,18 +52,32 @@ const setStoredChatId = (chatId: string | null) => {
   }
 };
 
+// Module-level cache so chats survive navigation and remounts
+let _chatsCache: Chat[] = [];
+let _chatsCacheLoaded = false;
+
 export function useChats() {
   const { data: session } = useSession();
-  const [chats, setChats] = useState<Chat[]>([]);
+  const [chats, setChats] = useState<Chat[]>(() => _chatsCache);
+
+  // Keep module-level cache in sync so navigating back never causes a blank screen
+  const setChatsAndCache = useCallback((updater: Chat[] | ((prev: Chat[]) => Chat[])) => {
+    setChats(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      _chatsCache = next;
+      return next;
+    });
+  }, []);
   // Initialize from localStorage immediately to avoid flash
   const [currentChatId, setCurrentChatIdState] = useState<string | null>(() => getStoredChatId());
   const [isLoading, setIsLoading] = useState(false);
-  const [isChatsLoaded, setIsChatsLoaded] = useState(false);
+  const [isChatsLoaded, setIsChatsLoaded] = useState(() => _chatsCacheLoaded);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [localMessagesUsed, setLocalMessagesUsed] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const previousMessageCountRef = useRef(0);
+  const previousParaCountRef = useRef(0);
   // Track pending chat ID during temp->real ID transition
   const pendingChatIdRef = useRef<string | null>(null);
   // AbortController for canceling ongoing requests
@@ -116,7 +130,9 @@ export function useChats() {
         const data = await res.json();
         // Only show chats that have messages
         const chatsWithMessages = (data.chats || []).filter((chat: Chat) => chat.messages && chat.messages.length > 0);
-        setChats(chatsWithMessages);
+        _chatsCache = chatsWithMessages;
+        _chatsCacheLoaded = true;
+        setChatsAndCache(chatsWithMessages);
 
         // Validate stored chat ID still exists (clear if chat was deleted)
         const storedChatId = getStoredChatId();
@@ -133,7 +149,7 @@ export function useChats() {
     loadChats();
   }, [session, isChatsLoaded]);
 
-  // Smart auto-scroll: only when message count increases
+  // Smart auto-scroll: scroll when message count increases OR when a new paragraph bubble appears
   useEffect(() => {
     const chat = chats.find(c => c.id === currentChatId || c.id === pendingChatIdRef.current);
     const currentMessageCount = chat?.messages.length || 0;
@@ -141,9 +157,20 @@ export function useChats() {
     if (currentMessageCount > previousMessageCountRef.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-
     previousMessageCountRef.current = currentMessageCount;
-  }, [chats, currentChatId]);
+
+    // Scroll down when streaming message gains a new paragraph bubble
+    if (isLoading) {
+      const lastAssistant = chat?.messages.slice().reverse().find(m => m.role === 'assistant');
+      const paraCount = (lastAssistant?.content || '').split(/\n\n+/).filter(p => p.trim()).length;
+      if (paraCount > previousParaCountRef.current) {
+        previousParaCountRef.current = paraCount;
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
+    } else {
+      previousParaCountRef.current = 0;
+    }
+  }, [chats, currentChatId, isLoading]);
 
   // Find current chat - check both currentChatId and pendingChatIdRef for ID transitions
   const currentChat = currentChatId
@@ -261,7 +288,7 @@ export function useChats() {
         created_at: data.chat.created_at || new Date().toISOString(),
         messages: [],
       };
-      setChats(prev => {
+      setChatsAndCache(prev => {
         // Prevent duplicates if chat already exists from a concurrent fetch
         if (prev.some(c => c.id === data.chat.id)) return prev;
         return [newChat, ...prev];
@@ -339,12 +366,12 @@ export function useChats() {
         created_at: new Date().toISOString(),
       };
       // Add chat FIRST, then set currentChatId to avoid race condition
-      setChats(prev => [newChat, ...prev]);
+      setChatsAndCache(prev => [newChat, ...prev]);
       setCurrentChatId(activeChatId!);
     } else {
       // Add both messages to existing chat immediately
       // Check both IDs for robustness during any potential ID transitions
-      setChats(prev =>
+      setChatsAndCache(prev =>
         prev.map(c =>
           (c.id === activeChatId || c.id === pendingChatIdRef.current)
             ? { ...c, messages: [...c.messages, optimisticMessage, assistantMessage] }
@@ -400,7 +427,7 @@ export function useChats() {
         }
         realChatId = newChatId;
         // Update the optimistic chat ID with real ID
-        setChats(prev => prev.map(c =>
+        setChatsAndCache(prev => prev.map(c =>
           c.id === activeChatId ? { ...c, id: realChatId } : c
         ));
         setCurrentChatId(realChatId);
@@ -479,7 +506,7 @@ export function useChats() {
               if (data.characterInfo) {
                 receivedCharacterInfo = { name: data.characterInfo.name };
                 const ci = data.characterInfo;
-                setChats(prev =>
+                setChatsAndCache(prev =>
                   prev.map(c =>
                     (c.id === realChatId || c.id === activeChatId)
                       ? {
@@ -506,7 +533,7 @@ export function useChats() {
 
               // Handle finalizeMessage - mark current message as finalized (no action buttons)
               if (data.finalizeMessage) {
-                setChats(prev =>
+                setChatsAndCache(prev =>
                   prev.map(c =>
                     (c.id === realChatId || c.id === activeChatId)
                       ? {
@@ -533,7 +560,7 @@ export function useChats() {
                 };
                 assistantMessageId = newAssistantId;
                 streamedContent = '';
-                setChats(prev =>
+                setChatsAndCache(prev =>
                   prev.map(c =>
                     (c.id === realChatId || c.id === activeChatId)
                       ? { ...c, messages: [...c.messages, newAssistantMessage] }
@@ -548,7 +575,7 @@ export function useChats() {
                 // Update assistant message content in real-time
                 // Check both activeChatId and realChatId in case ID update hasn't propagated
                 const contentToSet = streamedContent; // Capture in closure to avoid race conditions
-                setChats(prev =>
+                setChatsAndCache(prev =>
                   prev.map(c =>
                     (c.id === realChatId || c.id === activeChatId)
                       ? {
@@ -568,7 +595,7 @@ export function useChats() {
               if (data.title) {
                 // Update chat title
                 // Check both IDs in case update hasn't propagated
-                setChats(prev =>
+                setChatsAndCache(prev =>
                   prev.map(c =>
                     (c.id === realChatId || c.id === activeChatId)
                       ? { ...c, title: data.title }
@@ -640,7 +667,7 @@ export function useChats() {
             const chatData = await chatRes.json();
             if (chatData.chat?.messages) {
               // Check both IDs in case update hasn't propagated
-              setChats(prev =>
+              setChatsAndCache(prev =>
                 prev.map(c =>
                   (c.id === realChatId || c.id === activeChatId)
                     ? { ...c, id: realChatId, messages: chatData.chat.messages, title: chatData.chat.title || c.title }
@@ -671,7 +698,7 @@ export function useChats() {
         setLocalMessagesUsed(prev => (prev ?? session?.user?.messagesUsedToday ?? 0) + messageCost);
         // Remove empty assistant message if no content was streamed
         if (!streamedContent) {
-          setChats(prev => prev.map(c =>
+          setChatsAndCache(prev => prev.map(c =>
             (c.id === activeChatId || c.id === realChatId)
               ? { ...c, messages: c.messages.filter(m => m.id !== assistantMessageId) }
               : c
@@ -685,7 +712,7 @@ export function useChats() {
         error_type: error instanceof Error ? error.message.slice(0, 100) : 'unknown',
       });
       // Instead of removing messages, show an error state that allows retry
-      setChats(prev => {
+      setChatsAndCache(prev => {
         return prev.map(c =>
           (c.id === activeChatId || c.id === realChatId)
             ? {
@@ -721,7 +748,7 @@ export function useChats() {
   const renameChat = async (chatId: string, newTitle: string) => {
     // Optimistic update - instant UI feedback
     const previousChats = [...chats];
-    setChats(prev =>
+    setChatsAndCache(prev =>
       prev.map(c =>
         c.id === chatId ? { ...c, title: newTitle } : c
       )
@@ -737,11 +764,11 @@ export function useChats() {
 
       if (!res.ok) {
         // Revert on failure
-        setChats(previousChats);
+        setChatsAndCache(previousChats);
       }
     } catch (error) {
       console.error('Failed to rename chat:', error);
-      setChats(previousChats);
+      setChatsAndCache(previousChats);
     }
   };
 
@@ -750,7 +777,7 @@ export function useChats() {
     const previousChats = [...chats];
     const wasCurrentChat = currentChatId === chatId;
 
-    setChats(prev => prev.filter(c => c.id !== chatId));
+    setChatsAndCache(prev => prev.filter(c => c.id !== chatId));
     if (wasCurrentChat) {
       setCurrentChatId(null);
     }
@@ -763,7 +790,7 @@ export function useChats() {
 
       if (!res.ok) {
         // Revert on failure
-        setChats(previousChats);
+        setChatsAndCache(previousChats);
         if (wasCurrentChat) {
           setCurrentChatId(chatId);
         }
@@ -772,7 +799,7 @@ export function useChats() {
       }
     } catch (error) {
       console.error('Failed to delete chat:', error);
-      setChats(previousChats);
+      setChatsAndCache(previousChats);
       if (wasCurrentChat) {
         setCurrentChatId(chatId);
       }
@@ -814,7 +841,7 @@ export function useChats() {
     };
 
     // Update chat with truncated messages + new user message + assistant placeholder
-    setChats(prev =>
+    setChatsAndCache(prev =>
       prev.map(c =>
         c.id === currentChatId
           ? { ...c, messages: [...messagesBeforeEdit, newUserMessage, assistantMessage] }
@@ -886,7 +913,7 @@ export function useChats() {
 
               // Handle finalizeMessage - mark current message as finalized (no action buttons)
               if (data.finalizeMessage) {
-                setChats(prev =>
+                setChatsAndCache(prev =>
                   prev.map(c =>
                     c.id === currentChatId
                       ? {
@@ -913,7 +940,7 @@ export function useChats() {
                 };
                 assistantMessageId = newAssistantId;
                 streamedContent = '';
-                setChats(prev =>
+                setChatsAndCache(prev =>
                   prev.map(c =>
                     c.id === currentChatId
                       ? { ...c, messages: [...c.messages, newAssistantMessage] }
@@ -926,7 +953,7 @@ export function useChats() {
                 streamedContent += data.text;
                 editChunkCount++;
                 const contentToSet = streamedContent; // Capture in closure to avoid race conditions
-                setChats(prev =>
+                setChatsAndCache(prev =>
                   prev.map(c =>
                     c.id === currentChatId
                       ? {
@@ -981,7 +1008,7 @@ export function useChats() {
         // Backend already counted this message, so update frontend count
         setLocalMessagesUsed(prev => (prev ?? session?.user?.messagesUsedToday ?? 0) + 1);
         if (!streamedContent) {
-          setChats(prev => prev.map(c =>
+          setChatsAndCache(prev => prev.map(c =>
             c.id === currentChatId
               ? { ...c, messages: c.messages.filter(m => m.id !== assistantMessageId) }
               : c
@@ -995,7 +1022,7 @@ export function useChats() {
         error_type: error instanceof Error ? error.message.slice(0, 100) : 'unknown',
       });
       // Instead of removing messages, show an error state that allows retry
-      setChats(prev =>
+      setChatsAndCache(prev =>
         prev.map(c =>
           c.id === currentChatId
             ? {
@@ -1047,7 +1074,7 @@ export function useChats() {
     };
 
     // Update chat with messages up to user + new assistant placeholder
-    setChats(prev =>
+    setChatsAndCache(prev =>
       prev.map(c =>
         c.id === currentChatId
           ? { ...c, messages: [...messagesUpToUser, assistantMessage] }
@@ -1120,7 +1147,7 @@ export function useChats() {
 
               // Handle finalizeMessage - mark current message as finalized (no action buttons)
               if (data.finalizeMessage) {
-                setChats(prev =>
+                setChatsAndCache(prev =>
                   prev.map(c =>
                     c.id === currentChatId
                       ? {
@@ -1147,7 +1174,7 @@ export function useChats() {
                 };
                 assistantMessageId = newAssistantId;
                 streamedContent = '';
-                setChats(prev =>
+                setChatsAndCache(prev =>
                   prev.map(c =>
                     c.id === currentChatId
                       ? { ...c, messages: [...c.messages, newAssistantMessage] }
@@ -1160,7 +1187,7 @@ export function useChats() {
                 streamedContent += data.text;
                 regenChunkCount++;
                 const contentToSet = streamedContent; // Capture in closure to avoid race conditions
-                setChats(prev =>
+                setChatsAndCache(prev =>
                   prev.map(c =>
                     c.id === currentChatId
                       ? {
@@ -1217,7 +1244,7 @@ export function useChats() {
         // Backend already counted this message, so update frontend count
         setLocalMessagesUsed(prev => (prev ?? session?.user?.messagesUsedToday ?? 0) + 1);
         if (!streamedContent) {
-          setChats(prev => prev.map(c =>
+          setChatsAndCache(prev => prev.map(c =>
             c.id === currentChatId
               ? { ...c, messages: c.messages.filter(m => m.id !== assistantMessageId) }
               : c
@@ -1231,7 +1258,7 @@ export function useChats() {
         error_type: error instanceof Error ? error.message.slice(0, 100) : 'unknown',
       });
       // Instead of removing messages, show an error state that allows retry
-      setChats(prev =>
+      setChatsAndCache(prev =>
         prev.map(c =>
           c.id === currentChatId
             ? {

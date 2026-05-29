@@ -5,7 +5,7 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import { useChats } from "./hooks/useChats";
 import { useTheme } from "./hooks/useTheme";
 import { useMemories } from "./hooks/useMemories";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { track, EVENTS } from "@/lib/analytics";
 import dynamic from "next/dynamic";
@@ -615,6 +615,7 @@ function HomePage() {
   const { theme, toggleTheme } = useTheme();
   const { memories, isLoading: isMemoriesLoading, plan: memoryPlan, fetchMemories, deleteMemory: deleteMemoryItem, clearAll: clearAllMemories } = useMemories();
   const searchParams = useSearchParams();
+  const router = useRouter();
   
   const [authMode, setAuthMode] = useState<AuthMode>("signin");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -630,6 +631,16 @@ function HomePage() {
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [whatsNewScreen, setWhatsNewScreen] = useState(1);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [userPoints, setUserPoints] = useState<number | null>(null);
+  const [checkinLoading, setCheckinLoading] = useState(false);
+  const [checkinDone, setCheckinDone] = useState(false);
+  const [showRedeemModal, setShowRedeemModal] = useState(false);
+  const [redeemLoading, setRedeemLoading] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [supportMessage, setSupportMessage] = useState('');
+  const [supportSending, setSupportSending] = useState(false);
+  const [supportSent, setSupportSent] = useState(false);
   const [showImageGenModal, setShowImageGenModal] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [limitCountdown, setLimitCountdown] = useState({ h: 0, m: 0, s: 0 });
@@ -648,10 +659,12 @@ function HomePage() {
     isDestructive?: boolean;
     isLoading?: boolean;
   }>({ show: false, title: '', message: '', confirmText: 'Confirm', onConfirm: () => {}, isLoading: false });
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info'; onClick?: () => void } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success', onClick?: () => void) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, type, onClick });
+    toastTimerRef.current = setTimeout(() => setToast(null), onClick ? 6000 : 3000);
   }, []);
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
   const [selectedChatForActions, setSelectedChatForActions] = useState<{id: string, title: string} | null>(null);
@@ -661,7 +674,7 @@ function HomePage() {
   const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
   const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1136,6 +1149,15 @@ function HomePage() {
       fetchMemories();
     }
   }, [showAccountModal, session, fetchMemories]);
+
+  // Fetch user points on load
+  useEffect(() => {
+    if (!session?.user) return;
+    fetch('/api/checkin', { method: 'GET' }).then(r => r.json()).then(d => {
+      if (typeof d.points === 'number') setUserPoints(d.points);
+      if (d.already_checked_in) setCheckinDone(true);
+    }).catch(() => {});
+  }, [session?.user?.id]);
 
   // Update user's timezone
   const updateTimezone = async (newTimezone: string) => {
@@ -1671,12 +1693,22 @@ function HomePage() {
     }
   }, []);
 
+  const checkinNudgedRef = useRef(false);
+
   const handleSend = async () => {
     if (!canSendMessage()) {
       setShowLimitModal(true);
       return;
     }
     if ((!input.trim() && !selectedFile) || chatLoading) return;
+
+    // Nudge check-in after first message of the session if not yet checked in
+    if (!checkinDone && !checkinNudgedRef.current) {
+      checkinNudgedRef.current = true;
+      setTimeout(() => {
+        showToast('🔥 Check in today for +10 pts', 'info', () => setShowRedeemModal(true));
+      }, 1500);
+    }
 
     // Clear typing/abandon tracking on send
     typingStartedRef.current = false;
@@ -2694,7 +2726,7 @@ function HomePage() {
               </button>
             </div>
 
-            <div style={{ padding: '12px 16px 8px' }}>
+            <div style={{ padding: '12px 16px 8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button
                 style={currentStyles.newChatBtn}
                 onClick={() => {
@@ -2714,7 +2746,39 @@ function HomePage() {
                 </svg>
                 New conversation
               </button>
+
+              {session?.user?.plan === 'Free' && (
+                <button
+                  onMouseEnter={() => router.prefetch('/checkout')}
+                  onClick={() => router.push('/checkout')}
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #E8A04C, #E8624C)',
+                    border: 'none',
+                    color: '#0C0C0E',
+                    fontFamily: 'Inter, sans-serif',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    letterSpacing: '-0.01em',
+                    transition: 'all 0.25s ease',
+                    opacity: 1,
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 100 100" fill="none">
+                    <path d="M56 4L30 48H50L28 96L74 44H52L72 4Z" fill="#0C0C0E"/>
+                  </svg>
+                  Upgrade
+                </button>
+              )}
             </div>
+
 
             {/* Chat groups */}
             <div style={currentStyles.recentsList}>
@@ -2759,7 +2823,7 @@ function HomePage() {
                             style={{
                               ...currentStyles.recentItem,
                               ...(chat.id === currentChatId ? currentStyles.recentItemActive : {}),
-                              ...(isMobile ? { paddingRight: '48px' } : {}),
+                              ...(isMobile ? { padding: '10px 48px 10px 12px' } : {}),
                               display: 'flex',
                               justifyContent: 'space-between',
                               alignItems: 'center',
@@ -2801,7 +2865,58 @@ function HomePage() {
             </div>
           </div>
 
-          <div style={currentStyles.sidebarFooter} onClick={() => setShowAccountModal(true)}>
+          <div style={{ position: 'relative' }}>
+          {showProfileMenu && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 200 }} onClick={() => setShowProfileMenu(false)} />
+              <div style={{
+                position: 'absolute', bottom: '100%', left: '12px', right: '12px', marginBottom: '8px',
+                background: theme === 'dark' ? '#1A1A1E' : '#FFFFFF',
+                border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                borderRadius: '14px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                overflow: 'hidden', zIndex: 201,
+              }}>
+                {/* User header */}
+                <div style={{ padding: '14px 16px 10px', borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: theme === 'dark' ? '#F0EDE8' : '#1A1918' }}>{session?.user?.name}</div>
+                  <div style={{ fontSize: '12px', color: theme === 'dark' ? '#7A7680' : '#9A9590', marginTop: '2px' }}>{session?.user?.email}</div>
+                </div>
+                {/* Menu items */}
+                {[
+                  { label: 'Settings', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>, onClick: () => { setShowProfileMenu(false); setShowAccountModal(true); } },
+                  { label: 'Check in', icon: <span style={{ fontSize: '14px' }}>🔥</span>, onClick: () => { setShowProfileMenu(false); setShowRedeemModal(true); } },
+                  ...(session?.user?.plan !== 'Plus' ? [{ label: 'Upgrade plan', icon: <svg width="15" height="15" viewBox="0 0 100 100" fill="none"><path d="M56 4L30 48H50L28 96L74 44H52L72 4Z" fill={theme === 'dark' ? '#E8A04C' : '#D08A30'}/></svg>, onClick: () => { setShowProfileMenu(false); router.push('/checkout'); }, accent: true }] : []),
+                  { label: 'Contact support', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>, onClick: () => { setShowProfileMenu(false); setShowSupportModal(true); } },
+                ].map((item: { label: string; icon: React.ReactNode; onClick: () => void; accent?: boolean }) => (
+                  <button key={item.label} onClick={item.onClick} style={{
+                    width: '100%', padding: '11px 16px', background: 'none', border: 'none',
+                    display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer',
+                    fontSize: '14px', fontWeight: 500, textAlign: 'left' as const,
+                    color: item.accent ? (theme === 'dark' ? '#E8A04C' : '#D08A30') : (theme === 'dark' ? '#C8C4CC' : '#3A3640'),
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >{item.icon}{item.label}</button>
+                ))}
+                {/* Divider + Log out */}
+                <div style={{ borderTop: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }} />
+                <button onClick={() => { setShowProfileMenu(false); handleLogout(); }} style={{
+                  width: '100%', padding: '11px 16px', background: 'none', border: 'none',
+                  display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer',
+                  fontSize: '14px', fontWeight: 500, color: '#ef4444', textAlign: 'left' as const,
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.08)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                  Log out
+                </button>
+              </div>
+            </>
+          )}
+          <div style={currentStyles.sidebarFooter} onClick={() => setShowProfileMenu(p => !p)}>
             <div style={currentStyles.avatar}>
               {session?.user?.name?.substring(0, 2).toUpperCase()}
             </div>
@@ -2842,6 +2957,7 @@ function HomePage() {
               </span>
               /{session?.user?.plan === 'Free' ? 5 : session?.user?.plan === 'Pro' ? 100 : 300}
             </div>
+          </div>
           </div>
         </aside>
 
@@ -2969,19 +3085,6 @@ function HomePage() {
               onScroll={handleScroll}
               style={currentStyles.messagesArea}
             >
-              {/* Show loading state while waiting for stored chat to load */}
-              {(!isChatsLoaded || isWaitingForStoredChat) && (
-                <div style={currentStyles.emptyState}>
-                  <div style={{
-                    width: 40,
-                    height: 40,
-                    border: '3px solid transparent',
-                    borderTopColor: theme === 'dark' ? '#fff' : '#333',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite'
-                  }} />
-                </div>
-              )}
 
               {isChatsLoaded && !isWaitingForStoredChat && (() => {
                 // Find the index of the last assistant message (for showing buttons only on last one)
@@ -3618,7 +3721,7 @@ function HomePage() {
                           el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
                         }}
                         disabled={chatLoading || !canSendMessage()}
-                        style={{ ...currentStyles.textarea, caretColor: input ? undefined : 'transparent' }}
+                        style={{ ...currentStyles.textarea, caretColor: 'auto' }}
                       />
                       {chatLoading ? (
                         <button
@@ -3651,7 +3754,7 @@ function HomePage() {
                     </div>
                   </div>
                   <div style={currentStyles.inputFooter}>
-                    <span style={currentStyles.inputHint}>{chatCharacters.length > 0 ? 'Type @ to mention a character' : 'Verify what matters.'}</span>
+                    {!isMobile && <span style={currentStyles.inputHint}>{chatCharacters.length > 0 ? 'Type @ to mention a character' : 'Verify what matters.'}</span>}
                     <span style={{ fontSize: '11px', color: theme === 'dark' ? '#6B6660' : '#9A9590', fontFamily: "'JetBrains Mono', 'SF Mono', 'Courier New', monospace" }}>
                       <span style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30', fontWeight: 600 }}>{messagesUsed}</span>
                       {' of '}
@@ -3874,7 +3977,189 @@ function HomePage() {
           deleteMemoryItem={deleteMemoryItem}
           clearAllMemories={clearAllMemories}
           onClose={() => setShowAccountModal(false)}
+          hideUpgradeSections={true}
         />
+      )}
+
+      {/* Check-in & Redeem Modal */}
+      {showRedeemModal && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1100, backdropFilter: 'blur(4px)' }} onClick={() => setShowRedeemModal(false)} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+            zIndex: 1101, width: '90%', maxWidth: '420px',
+            background: theme === 'dark' ? '#141416' : '#F5F4F0',
+            border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+            borderRadius: '20px', padding: '28px', boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: theme === 'dark' ? '#F0EDE8' : '#1A1918', letterSpacing: '-0.02em' }}>Check in</h2>
+                <p style={{ margin: '4px 0 0', fontSize: '13px', color: theme === 'dark' ? '#7A7680' : '#9A9590' }}>
+                  🔥 <strong style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30' }}>{userPoints ?? 0}</strong> / 150 pts
+                </p>
+              </div>
+              <button onClick={() => setShowRedeemModal(false)} style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme === 'dark' ? '#F0EDE8' : '#1A1918' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+
+            {/* Check-in button */}
+            <button
+              disabled={checkinLoading || checkinDone}
+              onClick={async () => {
+                setCheckinLoading(true);
+                try {
+                  const res = await fetch('/api/checkin', { method: 'POST' });
+                  const data = await res.json();
+                  if (data.success) { setUserPoints(data.points); setCheckinDone(true); }
+                  else if (data.already_checked_in) { setCheckinDone(true); }
+                  else { showToast(data.error || 'Could not check in', 'error'); }
+                } catch { showToast('Could not check in', 'error'); }
+                finally { setCheckinLoading(false); }
+              }}
+              style={{
+                width: '100%', padding: '14px', marginBottom: '24px', borderRadius: '12px', border: 'none',
+                fontSize: '14px', fontWeight: 700, transition: 'all 0.2s',
+                cursor: (checkinLoading || checkinDone) ? 'not-allowed' : 'pointer',
+                background: checkinDone ? 'rgba(16,185,129,0.12)' : 'linear-gradient(135deg,#E8A04C,#E8624C)',
+                color: checkinDone ? '#10b981' : '#0C0C0E',
+              }}
+            >
+              {checkinLoading ? 'Checking in...' : checkinDone ? '✓ Checked in today' : 'Check in  +10 pts'}
+            </button>
+
+            {/* Divider */}
+            <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', color: theme === 'dark' ? '#5A5660' : '#9A9590', textTransform: 'uppercase', marginBottom: '12px' }}>Redeem points</div>
+
+            {/* Tiers */}
+            {[
+              { points: 30, label: '+2 msgs/day for the next 7 days' },
+              { points: 70, label: '+4 msgs/day for the next 7 days' },
+              { points: 150, label: '+8 msgs/day for the next 7 days' },
+            ].map(tier => {
+              const canAfford = (userPoints ?? 0) >= tier.points;
+              return (
+                <button
+                  key={tier.points}
+                  disabled={!canAfford || redeemLoading}
+                  onClick={async () => {
+                    setRedeemLoading(true);
+                    try {
+                      const res = await fetch('/api/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tier_points: tier.points }) });
+                      const data = await res.json();
+                      if (data.success) { setUserPoints(data.points_remaining); setShowRedeemModal(false); showToast(`${tier.label} unlocked!`, 'success'); }
+                      else { showToast(data.error || 'Could not redeem', 'error'); }
+                    } catch { showToast('Could not redeem', 'error'); }
+                    finally { setRedeemLoading(false); }
+                  }}
+                  style={{
+                    width: '100%', padding: '12px 16px', marginBottom: '8px', borderRadius: '12px',
+                    cursor: canAfford ? 'pointer' : 'not-allowed', opacity: canAfford ? 1 : 0.4,
+                    border: `1px solid ${canAfford ? (theme === 'dark' ? 'rgba(232,160,76,0.25)' : 'rgba(208,138,48,0.25)') : (theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)')}`,
+                    background: canAfford ? (theme === 'dark' ? 'rgba(232,160,76,0.07)' : 'rgba(208,138,48,0.05)') : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all 0.2s',
+                  }}
+                >
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: canAfford ? (theme === 'dark' ? '#E8A04C' : '#D08A30') : (theme === 'dark' ? '#7A7680' : '#9A9590') }}>{tier.label}</div>
+                    <div style={{ fontSize: '12px', color: theme === 'dark' ? '#5A5660' : '#9A9590', marginTop: '2px' }}>{tier.points} pts</div>
+                  </div>
+                  {canAfford && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={theme === 'dark' ? '#E8A04C' : '#D08A30'} strokeWidth="2" strokeLinecap="round"><polyline points="9 6 15 12 9 18"/></svg>}
+                </button>
+              );
+            })}
+            {(userPoints ?? 0) >= 150 && (
+              <p style={{ fontSize: '12px', color: theme === 'dark' ? '#7A7680' : '#9A9590', textAlign: 'center', marginTop: '8px' }}>
+                You&apos;re at the cap — redeem first, then keep earning.
+              </p>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Contact Support Modal */}
+      {showSupportModal && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1100, backdropFilter: 'blur(4px)' }} onClick={() => { setShowSupportModal(false); setSupportSent(false); setSupportMessage(''); }} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+            zIndex: 1101, width: '90%', maxWidth: '460px',
+            background: theme === 'dark' ? '#141416' : '#F5F4F0',
+            border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+            borderRadius: '20px', padding: '28px', boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: theme === 'dark' ? '#F0EDE8' : '#1A1918', letterSpacing: '-0.02em' }}>Contact support</h2>
+                <p style={{ margin: '4px 0 0', fontSize: '13px', color: theme === 'dark' ? '#7A7680' : '#9A9590' }}>We usually reply within a few hours.</p>
+              </div>
+              <button onClick={() => { setShowSupportModal(false); setSupportSent(false); setSupportMessage(''); }} style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme === 'dark' ? '#F0EDE8' : '#1A1918' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            {supportSent ? (
+              <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: 600, color: theme === 'dark' ? '#F0EDE8' : '#1A1918', marginBottom: '6px' }}>Message sent.</div>
+                <div style={{ fontSize: '13px', color: theme === 'dark' ? '#7A7680' : '#9A9590' }}>We'll get back to you at {session?.user?.email}</div>
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: '16px', padding: '12px 14px', background: theme === 'dark' ? '#1A1A1E' : '#ECEAE6', borderRadius: '10px', fontSize: '13px', color: theme === 'dark' ? '#7A7680' : '#9A9590', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  {session?.user?.email}
+                </div>
+                <textarea
+                  value={supportMessage}
+                  onChange={e => setSupportMessage(e.target.value)}
+                  placeholder="Describe your issue or question..."
+                  rows={5}
+                  style={{
+                    width: '100%', padding: '14px', borderRadius: '12px', resize: 'none' as const,
+                    background: theme === 'dark' ? '#1A1A1E' : '#ECEAE6',
+                    border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                    color: theme === 'dark' ? '#F0EDE8' : '#1A1918', fontSize: '14px',
+                    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const,
+                  }}
+                />
+                <button
+                  disabled={!supportMessage.trim() || supportSending}
+                  onClick={async () => {
+                    if (!supportMessage.trim()) return;
+                    setSupportSending(true);
+                    try {
+                      await fetch('/api/support', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: supportMessage }),
+                      });
+                      setSupportSent(true);
+                      setSupportMessage('');
+                    } catch {
+                      // fail silently — show sent anyway
+                      setSupportSent(true);
+                    } finally {
+                      setSupportSending(false);
+                    }
+                  }}
+                  style={{
+                    marginTop: '12px', width: '100%', padding: '14px',
+                    background: supportMessage.trim() ? 'linear-gradient(135deg,#E8A04C,#E8624C)' : (theme === 'dark' ? '#2A2A2E' : '#DDDBD7'),
+                    border: 'none', borderRadius: '12px', cursor: supportMessage.trim() ? 'pointer' : 'not-allowed',
+                    color: supportMessage.trim() ? '#0C0C0E' : (theme === 'dark' ? '#5A5660' : '#9A9590'),
+                    fontSize: '14px', fontWeight: 700, transition: 'all 0.2s',
+                  }}
+                >
+                  {supportSending ? 'Sending...' : 'Send message'}
+                </button>
+              </>
+            )}
+          </div>
+        </>
       )}
 
       {/* Mobile Chat Actions Modal */}
@@ -3978,31 +4263,28 @@ function HomePage() {
 
       {/* Toast notification */}
       {toast && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          zIndex: 10002,
-          padding: '12px 20px',
-          borderRadius: '12px',
-          fontSize: '14px',
-          fontWeight: 500,
-          background: toast.type === 'success' ? (theme === 'dark' ? '#1a3a1a' : '#e8f5e9')
-            : toast.type === 'error' ? (theme === 'dark' ? '#3a1a1a' : '#fbe9e7')
-            : (theme === 'dark' ? '#1a2a3a' : '#e3f2fd'),
-          color: toast.type === 'success' ? '#4caf50'
-            : toast.type === 'error' ? '#ef5350'
-            : '#42a5f5',
-          border: `1px solid ${toast.type === 'success' ? 'rgba(76,175,80,0.3)'
-            : toast.type === 'error' ? 'rgba(239,83,80,0.3)'
-            : 'rgba(66,165,245,0.3)'}`,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-          animation: 'fadeSlideIn 0.3s ease-out',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}>
+        <div
+          onClick={() => { if (toast.onClick) { toast.onClick(); setToast(null); } }}
+          style={{
+            position: 'fixed', top: '20px', right: '20px', zIndex: 10002,
+            padding: '12px 20px', borderRadius: '12px', fontSize: '14px', fontWeight: 500,
+            background: toast.type === 'success' ? (theme === 'dark' ? '#1a3a1a' : '#e8f5e9')
+              : toast.type === 'error' ? (theme === 'dark' ? '#3a1a1a' : '#fbe9e7')
+              : (theme === 'dark' ? '#1a2a3a' : '#e3f2fd'),
+            color: toast.type === 'success' ? '#4caf50'
+              : toast.type === 'error' ? '#ef5350'
+              : '#42a5f5',
+            border: `1px solid ${toast.type === 'success' ? 'rgba(76,175,80,0.3)'
+              : toast.type === 'error' ? 'rgba(239,83,80,0.3)'
+              : 'rgba(66,165,245,0.3)'}`,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+            animation: 'fadeSlideIn 0.3s ease-out',
+            display: 'flex', alignItems: 'center', gap: '8px',
+            cursor: toast.onClick ? 'pointer' : 'default',
+          }}
+        >
           {toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ'} {toast.message}
+          {toast.onClick && <span style={{ fontSize: '12px', opacity: 0.7, marginLeft: '4px' }}>Tap to open →</span>}
         </div>
       )}
 

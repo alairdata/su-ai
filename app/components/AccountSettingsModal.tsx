@@ -36,6 +36,7 @@ interface AccountSettingsModalProps {
   deleteMemoryItem: (id: string) => void;
   clearAllMemories: () => void;
   onClose: () => void;
+  hideUpgradeSections?: boolean;
 }
 
 function makeStyles(theme: string) {
@@ -184,7 +185,7 @@ export default function AccountSettingsModal({
   isCancellingSubscription, getProgressPercentage,
   upgradePlan, cancelSubscription, handleLogout,
   showConfirm, deleteMemoryItem, clearAllMemories,
-  onClose,
+  onClose, hideUpgradeSections = false,
 }: AccountSettingsModalProps) {
   const s = makeStyles(theme);
   const isDark = theme === 'dark';
@@ -315,7 +316,7 @@ export default function AccountSettingsModal({
             </div>
 
             {/* Current Plan */}
-            <div style={s.modalSection}>
+            {!hideUpgradeSections && <div style={s.modalSection}>
               <h3 style={s.modalSectionTitle}>Current Plan</h3>
               <div style={s.planCurrentBadge}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
@@ -473,7 +474,7 @@ export default function AccountSettingsModal({
                   </div>
                 </div>
               </div>
-            </div>
+            </div>}
 
             {/* AI Memory — Collapsible */}
             <div style={s.modalSection}>
@@ -575,7 +576,7 @@ export default function AccountSettingsModal({
             </div>
 
             {/* Support */}
-            <div style={s.modalSection}>
+            {!hideUpgradeSections && <div style={s.modalSection}>
               <h3 style={s.modalSectionTitle}>Need Help?</h3>
               <p style={{ fontSize: '14px', color: isDark ? '#aaa' : '#666', marginBottom: '12px' }}>
                 We&apos;re here to help with any questions or issues.
@@ -590,7 +591,7 @@ export default function AccountSettingsModal({
                 </svg>
                 sounfilteredai@gmail.com
               </a>
-            </div>
+            </div>}
 
             {/* Account Actions */}
             <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: `1px solid ${isDark ? '#333' : '#eee'}` }}>

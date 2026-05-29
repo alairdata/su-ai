@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
     // Query DB for actual user data - don't trust JWT session alone
     const { data: dbUser, error: userError } = await supabase
       .from("users")
-      .select("plan, messages_used_today, email")
+      .select("plan, messages_used_today, email, weekly_bonus_msgs, bonus_expires_at")
       .eq("id", session.user.id)
       .single();
 
@@ -181,7 +181,14 @@ export async function POST(req: NextRequest) {
 
     // Get effective plan (checks VIP status from DB email)
     const userPlan = getEffectivePlan(dbUser.plan, dbUser.email);
-    const dailyLimit = getPlanLimit(userPlan);
+    let dailyLimit = getPlanLimit(userPlan);
+
+    // Add bonus msgs if boost is still active
+    if (dbUser.weekly_bonus_msgs && dbUser.bonus_expires_at) {
+      if (new Date(dbUser.bonus_expires_at) > new Date()) {
+        dailyLimit += dbUser.weekly_bonus_msgs;
+      }
+    }
 
     // Parse body first to determine if image/file is attached (costs 2 messages)
     const body = await req.json();

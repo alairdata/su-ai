@@ -141,6 +141,7 @@ export const updateTimezoneSchema = z.object({
 
 export const initializePaymentSchema = z.object({
   plan,
+  billing: z.enum(['monthly', 'yearly']).optional().default('monthly'),
 }).strict();
 
 export const verifyPaymentSchema = z.object({

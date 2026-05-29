@@ -4,6 +4,7 @@ const ALLOWED_ORIGINS = [
   process.env.NEXTAUTH_URL,
   'https://app.so-unfiltered-ai.com',
   'https://so-unfiltered-ai.com',
+  ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000', 'http://localhost:3001'] : []),
 ].filter(Boolean);
 
 // Paths that skip CSRF check (webhooks + auth callbacks need external access)

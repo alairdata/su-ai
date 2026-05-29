@@ -3,9 +3,15 @@ import { createHmac } from 'crypto';
 const LEMONSQUEEZY_API_KEY = process.env.LEMONSQUEEZY_API_KEY!;
 const BASE_URL = 'https://api.lemonsqueezy.com/v1';
 
-export const PLAN_VARIANTS: Record<string, string> = {
-  Pro: process.env.LEMONSQUEEZY_PRO_VARIANT_ID!,
-  Plus: process.env.LEMONSQUEEZY_PLUS_VARIANT_ID!,
+export const PLAN_VARIANTS: Record<string, { monthly: string; yearly: string }> = {
+  Pro: {
+    monthly: process.env.LEMONSQUEEZY_PRO_VARIANT_ID!,
+    yearly: process.env.LEMONSQUEEZY_PRO_YEARLY_VARIANT_ID!,
+  },
+  Plus: {
+    monthly: process.env.LEMONSQUEEZY_PLUS_VARIANT_ID!,
+    yearly: process.env.LEMONSQUEEZY_PLUS_YEARLY_VARIANT_ID!,
+  },
 };
 
 export const PLAN_CONFIG = {
@@ -36,9 +42,11 @@ export async function createCheckout(params: {
   email: string;
   userId: string;
   successUrl: string;
+  billing?: 'monthly' | 'yearly';
 }): Promise<string> {
-  const variantId = PLAN_VARIANTS[params.plan];
-  if (!variantId) throw new Error(`No variant ID configured for plan: ${params.plan}`);
+  const billing = params.billing || 'monthly';
+  const variantId = PLAN_VARIANTS[params.plan]?.[billing];
+  if (!variantId) throw new Error(`No variant ID configured for plan: ${params.plan} (${billing})`);
 
   const storeId = process.env.LEMONSQUEEZY_STORE_ID!;
 
@@ -51,6 +59,7 @@ export async function createCheckout(params: {
           custom: {
             user_id: params.userId,
             plan: params.plan,
+            billing,
           },
         },
         product_options: {

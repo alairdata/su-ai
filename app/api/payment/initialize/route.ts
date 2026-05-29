@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const { plan } = validation.data;
+    const { plan, billing } = validation.data;
     const userId = session.user.id;
     const email = session.user.email;
 
@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
         plan,
         email,
         userId,
+        billing: billing as 'monthly' | 'yearly',
         successUrl: `${baseUrl}/payment/callback?provider=lemonsqueezy`,
       });
 

@@ -6,9 +6,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 const PLAN_CONFIG = {
   Pro: {
-    priceUSD: 4.99,
     name: 'Pro',
     tagline: 'For people who actually use it.',
+    monthly: { priceUSD: 4.99 },
+    yearly: { priceUSD: 3.99, totalUSD: 47.88 },
     features: [
       '100 messages a day',
       'Memory that carries across conversations',
@@ -17,9 +18,10 @@ const PLAN_CONFIG = {
     ],
   },
   Plus: {
-    priceUSD: 9.99,
     name: 'Plus',
     tagline: 'For people who are serious.',
+    monthly: { priceUSD: 9.99 },
+    yearly: { priceUSD: 7.99, totalUSD: 95.88 },
     features: [
       '300 messages a day',
       'Everything in Pro',
@@ -52,11 +54,7 @@ export default function CheckoutPage() {
 }
 
 function CheckoutLoading() {
-  return (
-    <div style={s.container}>
-      <div style={s.spinner} />
-    </div>
-  );
+  return <div style={s.container} />;
 }
 
 function CheckoutContent() {
@@ -66,10 +64,12 @@ function CheckoutContent() {
 
   const planParam = searchParams.get('plan') as PaidPlan | null;
   const [selectedPlan, setSelectedPlan] = useState<PaidPlan>(planParam || 'Pro');
+  const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const plan = PLAN_CONFIG[selectedPlan];
+  const price = plan[billing];
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -92,7 +92,7 @@ function CheckoutContent() {
       const res = await fetch('/api/payment/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: selectedPlan }),
+        body: JSON.stringify({ plan: selectedPlan, billing }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to initialize payment');
@@ -111,7 +111,7 @@ function CheckoutContent() {
       <div style={s.card}>
 
         {/* Back */}
-        <button onClick={() => router.push('/')} style={s.backBtn}>
+        <button onClick={() => router.back()} style={s.backBtn}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5M12 19l-7-7 7-7"/>
           </svg>
@@ -127,6 +127,37 @@ function CheckoutContent() {
           </div>
         </div>
 
+        {/* Billing Toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', background: '#18181C', borderRadius: '12px', padding: '4px', gap: '4px' }}>
+            <button
+              onClick={() => setBilling('monthly')}
+              style={{
+                padding: '8px 20px', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: 600,
+                cursor: 'pointer', transition: 'all 0.2s',
+                background: billing === 'monthly' ? '#1E1E24' : 'transparent',
+                color: billing === 'monthly' ? '#F0EDE8' : '#7A7680',
+                boxShadow: billing === 'monthly' ? '0 2px 8px rgba(0,0,0,0.3)' : 'none',
+              }}
+            >Monthly</button>
+            <button
+              onClick={() => setBilling('yearly')}
+              style={{
+                padding: '8px 20px', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: 600,
+                cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '8px',
+                background: billing === 'yearly' ? '#1E1E24' : 'transparent',
+                color: billing === 'yearly' ? '#F0EDE8' : '#7A7680',
+                boxShadow: billing === 'yearly' ? '0 2px 8px rgba(0,0,0,0.3)' : 'none',
+              }}
+            >
+              Yearly
+              <span style={{ background: 'linear-gradient(135deg,#E8A04C,#E8624C)', color: '#0C0C0E', fontSize: '10px', fontWeight: 800, padding: '2px 7px', borderRadius: '20px', letterSpacing: '0.01em' }}>
+                SAVE 20%
+              </span>
+            </button>
+          </div>
+        </div>
+
         {/* Plan Tabs */}
         <div style={s.tabs}>
           {(['Pro', 'Plus'] as PaidPlan[]).map((p) => (
@@ -139,7 +170,7 @@ function CheckoutContent() {
               }}
             >
               <span style={{ fontWeight: 700 }}>{p}</span>
-              <span style={{ fontSize: '13px', opacity: 0.7 }}>${PLAN_CONFIG[p].priceUSD}/mo</span>
+              <span style={{ fontSize: '13px', opacity: 0.7 }}>${PLAN_CONFIG[p][billing].priceUSD}/mo</span>
             </button>
           ))}
         </div>
@@ -147,9 +178,14 @@ function CheckoutContent() {
         {/* Plan Detail */}
         <div style={s.planBox}>
           <div style={s.priceRow}>
-            <span style={s.price}>${plan.priceUSD}</span>
+            <span style={s.price}>${price.priceUSD}</span>
             <span style={s.period}>/month</span>
           </div>
+          {billing === 'yearly' && (
+            <div style={{ fontSize: '13px', color: '#E8A04C', marginBottom: '4px', fontWeight: 600 }}>
+              Billed as ${('totalUSD' in price ? price.totalUSD : 0).toFixed(2)}/year — 2 months free
+            </div>
+          )}
           <p style={s.tagline}>{plan.tagline}</p>
 
           <div style={s.featureList}>
@@ -175,8 +211,10 @@ function CheckoutContent() {
         >
           {isLoading ? (
             <><div style={s.btnSpinner} /> Processing...</>
+          ) : billing === 'yearly' ? (
+            `Get ${plan.name} — $${('totalUSD' in price ? price.totalUSD : 0).toFixed(2)}/yr`
           ) : (
-            `Get ${plan.name} — $${plan.priceUSD}/mo`
+            `Get ${plan.name} — $${price.priceUSD}/mo`
           )}
         </button>
 

@@ -398,3 +398,222 @@ Organized by category. Each entry shows: **event name**, **properties**, and **w
 | Growth & Discovery | 4 |
 | A/B Testing | 2 |
 | **Total** | **81** |
+
+---
+
+# Funnels
+
+Funnels to build in Mixpanel using the event names above. Each step must fire in order for the user to count in that funnel.
+
+---
+
+## 1. Signup → Activation
+
+The core acquisition-to-value funnel. Measures how many new users actually get to the point of sending a message.
+
+```
+user_signed_up
+  → email_verified
+  → session_started
+  → first_message_sent
+```
+
+**What to watch:** Drop-off between `email_verified` and `first_message_sent` is your biggest activation gap. If users verify but don't message, the empty-state UX is the problem.
+
+---
+
+## 2. Onboarding Completion
+
+Measures how many new users finish the full onboarding flow vs. bouncing out.
+
+```
+onboarding_started
+  → onboarding_screen_viewed  (screen: 2)
+  → onboarding_screen_viewed  (screen: 3)
+  → onboarding_completed
+```
+
+**What to watch:** Screen-by-screen drop-off tells you exactly which slide loses people. High `onboarding_skipped` rate = the flow is too long or not valuable enough.
+
+---
+
+## 3. Paid Conversion
+
+Tracks the full path from a free user hitting their limit to becoming a paying subscriber.
+
+```
+daily_limit_reached
+  → upgrade_modal_opened
+  → upgrade_initiated
+  → subscription_started
+```
+
+**What to watch:** Drop-off between `upgrade_initiated` and `subscription_started` is payment abandonment — Paystack friction or card failures. Drop-off between `daily_limit_reached` and `upgrade_modal_opened` means the upgrade prompt isn't showing or isn't visible enough.
+
+---
+
+## 4. Upgrade Intent (no limit required)
+
+For users who choose to upgrade without being forced by the limit.
+
+```
+upgrade_modal_opened
+  → upgrade_initiated
+  → subscription_started
+```
+
+**What to watch:** Compares voluntary vs. forced upgrades (`daily_limit_reached`-triggered). Voluntary converters tend to have higher retention — track both funnels separately.
+
+---
+
+## 5. Character Creation
+
+Measures how many users who open the character builder actually finish creating one.
+
+```
+character_modal_opened
+  → character_created
+```
+
+**What to watch:** High drop-off here means the creation form is too complex or unclear. Cross-reference `character_modal_closed` with `action: cancelled` vs. `action: added` to see the abandon rate.
+
+---
+
+## 6. Character Usage
+
+After creating a character, do users actually use it?
+
+```
+character_created
+  → character_mentioned
+  → character_response_received
+```
+
+**What to watch:** If users create characters but never @mention them, the feature isn't discoverable in the chat. Could be a UI prompt issue.
+
+---
+
+## 7. File Upload
+
+Tracks the full file attachment flow from selection to successful delivery.
+
+```
+file_selected
+  → file_uploaded
+  → message_sent  (has_attachment: true)
+```
+
+**What to watch:** Drop-off between `file_selected` and `file_uploaded` = upload failures or user cancels. Drop-off between `file_uploaded` and `message_sent` = user uploaded but didn't send — possibly confused about the flow.
+
+---
+
+## 8. Password Reset Recovery
+
+Measures how many users who forget their password actually make it back.
+
+```
+password_reset_requested
+  → password_reset_completed
+  → user_logged_in
+```
+
+**What to watch:** Drop-off between `requested` and `completed` is your unrecovered users — they're likely churned. Low completion rate = check email deliverability or reset link expiry.
+
+---
+
+## 9. Message Send Quality
+
+Full round-trip of a message — from intent to completed AI response.
+
+```
+typing_started
+  → message_sent
+  → streaming_started
+  → streaming_completed
+```
+
+**What to watch:** Drop-off between `message_sent` and `streaming_started` = server latency or connection issues. Drop-off between `streaming_started` and `streaming_completed` = interruptions (user stops it or errors out). High `streaming_interrupted` or `ai_response_error` rates appear here.
+
+---
+
+## 10. Retention Milestones
+
+Tracks how many users are still around at each retention checkpoint.
+
+```
+first_message_sent
+  → retention_day  (day: 1)
+  → retention_day  (day: 3)
+  → retention_day  (day: 7)
+  → retention_day  (day: 14)
+  → retention_day  (day: 30)
+```
+
+**What to watch:** The steepest drop is almost always D1 → D3. If D7 retention is above 20%, the product has real habit-forming potential. Compare this funnel for users who completed onboarding vs. those who skipped it.
+
+---
+
+## 11. Power User Path
+
+Tracks the journey from new user to genuinely hooked.
+
+```
+first_message_sent
+  → activation_milestone  (total_messages: 3)
+  → activation_milestone  (total_messages: 10)
+  → activation_milestone  (total_messages: 50)
+  → daily_limit_reached
+```
+
+**What to watch:** Users who reach 10 messages are your best conversion targets. Users who hit 50 messages and haven't paid yet are the hottest upgrade targets — these map directly to the "upgrade targets" panel in the admin dashboard.
+
+---
+
+## 12. What's New Engagement
+
+Measures how many users who see the release notes actually read them.
+
+```
+whats_new_shown
+  → whats_new_screen_viewed  (screen: 2)
+  → whats_new_screen_viewed  (screen: 3)
+  → whats_new_screen_viewed  (screen: 4)
+  → whats_new_completed
+```
+
+**What to watch:** If most users stop at screen 2, the content on screen 2 isn't compelling or is too long. High `whats_new_dismissed` rate overall = feature announcements aren't landing.
+
+---
+
+## 13. Win-Back
+
+Tracks cancelled subscribers who come back and resubscribe.
+
+```
+subscription_cancelled
+  → session_started
+  → upgrade_modal_opened
+  → subscription_reactivated
+```
+
+**What to watch:** Time between `subscription_cancelled` and `subscription_reactivated` tells you how long the win-back window is. If most reactivations happen within 7 days, a targeted email on day 3-5 post-cancellation would convert well.
+
+---
+
+## Funnel Summary
+
+| Funnel | Steps | Key Metric |
+|---|---|---|
+| Signup → Activation | 4 | % who send first message |
+| Onboarding Completion | 4 | % who finish vs. skip |
+| Paid Conversion (forced) | 4 | % who pay after hitting limit |
+| Upgrade Intent (voluntary) | 3 | % who pay without hitting limit |
+| Character Creation | 2 | % who finish building a character |
+| Character Usage | 3 | % of creators who use their character |
+| File Upload | 3 | % of selections that become sent messages |
+| Password Reset Recovery | 3 | % of resets that return to login |
+| Message Send Quality | 4 | % of messages with clean full response |
+| Retention Milestones | 6 | D1 / D7 / D30 retention rates |
+| Power User Path | 5 | % reaching 10 and 50 message milestones |
+| What's New Engagement | 5 | % who read all screens |
+| Win-Back | 4 | % of cancellations that resubscribe |
