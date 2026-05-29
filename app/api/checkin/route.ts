@@ -52,9 +52,8 @@ export async function POST(req: NextRequest) {
     // Rate limit: max 1 attempt per hour
     const clientIP = getClientIP(req);
     const rl = rateLimit(getUserIPKey(session.user.id, clientIP, 'checkin'), {
-      ...RATE_LIMITS.payment,
-      maxRequests: 1,
-      windowMs: 60 * 60 * 1000,
+      limit: 1,
+      windowSeconds: 60 * 60,
     });
     if (!rl.success) {
       return NextResponse.json({ error: 'Too many check-in attempts. Try again later.' }, { status: 429 });
