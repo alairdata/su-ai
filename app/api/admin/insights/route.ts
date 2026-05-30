@@ -162,13 +162,13 @@ export async function GET(req: NextRequest) {
     // ── 2. TIME TO GHOST ──
     // For users with 0 total messages, they ghosted on Day 0
     // For users who stopped, find last message date - signup date
-    const now = new Date();
+    const nowGhost = new Date();
     const ghostBuckets = { day0: 0, day1: 0, day2_3: 0, day4_7: 0, day8_14: 0, day15_30: 0 };
 
     for (const user of users) {
       const msgs = userMessages.get(user.id);
       const signupDate = new Date(user.created_at);
-      const daysSinceSignup = Math.floor((now.getTime() - signupDate.getTime()) / (1000 * 60 * 60 * 24));
+      const daysSinceSignup = Math.floor((nowGhost.getTime() - signupDate.getTime()) / (1000 * 60 * 60 * 24));
 
       // Only consider users who haven't been active in 7+ days as potential ghosts
       if (!msgs || msgs.length === 0) {
@@ -177,7 +177,7 @@ export async function GET(req: NextRequest) {
       } else {
         // Check if they're a ghost (no activity in last 14 days)
         const lastMsg = new Date(msgs[msgs.length - 1].created_at);
-        const daysSinceLastMsg = Math.floor((now.getTime() - lastMsg.getTime()) / (1000 * 60 * 60 * 24));
+        const daysSinceLastMsg = Math.floor((nowGhost.getTime() - lastMsg.getTime()) / (1000 * 60 * 60 * 24));
 
         if (daysSinceLastMsg >= 14) {
           // They ghosted - when?
