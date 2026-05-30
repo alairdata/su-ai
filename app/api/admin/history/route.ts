@@ -159,6 +159,7 @@ export async function GET(req: NextRequest) {
   // Count messages per user within the selected period
   const userMessageCounts: Map<string, number> = new Map();
   for (const msg of messages) {
+    if (!msg.chat_id) continue;
     const userId = chatUserMap.get(msg.chat_id);
     if (userId) {
       userMessageCounts.set(userId, (userMessageCounts.get(userId) || 0) + 1);
