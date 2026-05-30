@@ -157,17 +157,12 @@ export async function GET(req: NextRequest) {
     chatUserMap.set(chat.id, chat.user_id);
   }
 
-  // Count messages per user using user_message_stats for accurate totals
+  // Count messages per user within the selected period
   const userMessageCounts: Map<string, number> = new Map();
-  const { data: userMsgStats } = await supabase
-    .from("user_message_stats")
-    .select("id, total_messages");
-
-  if (userMsgStats) {
-    for (const s of userMsgStats) {
-      if ((s.total_messages || 0) > 0) {
-        userMessageCounts.set(s.id, s.total_messages);
-      }
+  for (const msg of messages) {
+    const userId = chatUserMap.get(msg.chat_id);
+    if (userId) {
+      userMessageCounts.set(userId, (userMessageCounts.get(userId) || 0) + 1);
     }
   }
 
