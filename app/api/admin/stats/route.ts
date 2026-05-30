@@ -107,6 +107,7 @@ export async function GET(req: NextRequest) {
     },
     activeSubscriptions: users.filter(u => u.subscription_status === "active").length,
     activeUsers: users.filter(u => (u.total_messages || 0) > 0).length,
+    engagedUsers: users.filter(u => (u.total_messages || 0) >= 5).length,
     totalMessagesToday: users.reduce((sum, u) => sum + (u.messages_used_today || 0), 0),
     signupsToday: users.filter(u => new Date(u.created_at) >= today).length,
     signupsThisWeek: users.filter(u => new Date(u.created_at) >= thisWeek).length,
