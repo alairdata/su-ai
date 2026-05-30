@@ -134,7 +134,10 @@ export default function BackofficePage() {
   }, []);
 
   useEffect(() => {
-    if (authChecked) fetchChartData(chartPeriod);
+    if (authChecked) {
+      fetchChartData(chartPeriod);
+      fetchInsights(chartPeriod);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chartPeriod]);
 
@@ -186,11 +189,12 @@ export default function BackofficePage() {
     }
   };
 
-  const fetchInsights = async () => {
+  const fetchInsights = async (period?: Period) => {
     setInsightsLoading(true);
     setInsightsError(false);
     try {
-      const res = await fetch("/api/admin/insights");
+      const url = period ? `/api/admin/insights?period=${period}` : "/api/admin/insights";
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setInsights(data);

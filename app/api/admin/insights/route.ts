@@ -37,6 +37,15 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // ── Period filter ──
+    const period = req.nextUrl.searchParams.get('period') || 'all';
+    const now = new Date();
+    const periodStart = period === 'day' ? new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      : period === 'week' ? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      : period === 'month' ? new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      : period === 'year' ? new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+      : null;
+
     // ── Fetch all users ──
     const { data: allUsers } = await supabase
       .from("users")
@@ -74,12 +83,14 @@ export async function GET(req: NextRequest) {
       let offset = 0;
       const pageSize = 1000;
       while (true) {
-        const { data: page } = await supabase
+        let q = supabase
           .from("messages")
           .select("id, chat_id, created_at")
           .eq("role", "user")
           .order("created_at", { ascending: true })
           .range(offset, offset + pageSize - 1);
+        if (periodStart) q = q.gte("created_at", periodStart.toISOString());
+        const { data: page } = await q;
         if (!page || page.length === 0) break;
         allMessagesList.push(...page);
         if (page.length < pageSize) break;
