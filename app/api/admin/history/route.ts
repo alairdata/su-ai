@@ -147,12 +147,11 @@ export async function GET(req: NextRequest) {
   allMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-  // Build chat_id → user_id map for active user tracking (only chats within period)
+  // Build chat_id → user_id map for ALL chats (messages can be in older chats)
   const chatUserMap = new Map<string, string>();
   const { data: chatMappings } = await supabase
     .from("chats")
-    .select("id, user_id")
-    .gte("created_at", startDate.toISOString());
+    .select("id, user_id");
   for (const chat of (chatMappings || [])) {
     chatUserMap.set(chat.id, chat.user_id);
   }
