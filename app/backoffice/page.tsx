@@ -25,6 +25,7 @@ interface Stats {
   totalUsers: number;
   planCounts: { Free: number; Pro: number; Plus: number };
   activeSubscriptions: number;
+  activeUsers: number;
   totalMessagesToday: number;
   signupsToday: number;
   signupsThisWeek: number;
@@ -792,6 +793,7 @@ export default function BackofficePage() {
           {stats && (
             <div className="stat-grid">
               <div className="sc"><div className="sc-label">TOTAL USERS</div><div className="sc-val">{hasFilter ? filteredStats.totalUsers : stats.totalUsers}</div><div className="sc-sub">{hasFilter ? "filtered" : "all-time signups"}</div></div>
+              <div className="sc"><div className="sc-label">ACTIVE USERS</div><div className="sc-val">{hasFilter ? filteredStats.totalUsers : stats.activeUsers}</div><div className="sc-sub">sent at least 1 message</div></div>
               <div className="sc"><div className="sc-label">ACTIVE CUSTOMERS</div><div className="sc-val">{stats.activeSubscriptions}</div><div className="sc-sub">Pro + Plus subscribers</div></div>
               <div className="sc"><div className="sc-label">TOTAL MESSAGES</div><div className="sc-val">{hasFilter ? filteredStats.totalMsgs.toLocaleString() : stats.allTimeMessages.toLocaleString()}</div><div className="sc-sub">{hasFilter ? "from filtered users" : <><span className="g">{stats.totalMessages.toLocaleString()}</span> active{stats.deletedMessages > 0 ? ` · ${stats.deletedMessages.toLocaleString()} deleted` : ""}</>}</div></div>
               <div className="sc"><div className="sc-label">TOTAL INTERACTIONS</div><div className="sc-val">{(stats.totalMessagesAllRoles ?? 0).toLocaleString()}</div><div className="sc-sub">user + AI messages combined</div></div>
