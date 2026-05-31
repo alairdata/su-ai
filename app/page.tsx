@@ -1706,7 +1706,7 @@ function HomePage() {
     if (!checkinDone && !checkinNudgedRef.current) {
       checkinNudgedRef.current = true;
       setTimeout(() => {
-        showToast('🔥 Check in today for +10 pts', 'info', () => setShowRedeemModal(true));
+        setShowRedeemModal(true);
       }, 1500);
     }
 
