@@ -110,12 +110,19 @@ export function useChats() {
     }
   }, [userId]);
 
-  // Seed localMessagesUsed from session on load so the null fallback never shows a stale 0
+  // Fetch actual message count from DB on load — never trust the JWT cache
   useEffect(() => {
-    if (session?.user?.messagesUsedToday !== undefined && localMessagesUsed === null) {
-      setLocalMessagesUsed(session.user.messagesUsedToday);
-    }
-  }, [session?.user?.id, session?.user?.messagesUsedToday]);
+    if (!session?.user?.id) return;
+    fetch('/api/user/message-count')
+      .then(r => r.json())
+      .then(d => { if (typeof d.count === 'number') setLocalMessagesUsed(d.count); })
+      .catch(() => {
+        // Fallback to session value if fetch fails
+        if (session?.user?.messagesUsedToday !== undefined) {
+          setLocalMessagesUsed(session.user.messagesUsedToday);
+        }
+      });
+  }, [session?.user?.id]);
 
 
   // Load chats from API when user logs in
