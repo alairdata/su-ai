@@ -4,7 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcrypt';
-import { isVipEmail } from '@/lib/plans';
+import { isVipEmail, isSpecialEmail } from '@/lib/plans';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -240,7 +240,7 @@ export const authOptions: NextAuthOptions = {
         // First try with reset_timezone, fall back to without if column doesn't exist
         let user: {
           name: string;
-          plan: "Free" | "Pro" | "Plus";
+          plan: "Free" | "Special" | "Pro" | "Plus";
           messages_used_today: number;
           total_messages: number;
           last_reset_date: string | null;
@@ -294,6 +294,8 @@ export const authOptions: NextAuthOptions = {
           // VIP override: Give Plus access to special email addresses
           if (isVipEmail(session.user.email)) {
             session.user.plan = 'Plus';
+          } else if (isSpecialEmail(session.user.email)) {
+            session.user.plan = 'Special';
           }
 
           // Compute today's message count.
