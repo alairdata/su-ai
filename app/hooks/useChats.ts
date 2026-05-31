@@ -110,7 +110,9 @@ export function useChats() {
     }
   }, [userId]);
 
-  // Fetch actual message count from DB on load — never trust the JWT cache
+  // ⚠️ CRITICAL — NEVER replace this with session?.user?.messagesUsedToday.
+  // The JWT is a stale cache and resets to 0 on refresh, letting users bypass the daily limit.
+  // Always fetch the real count from /api/user/message-count on load.
   useEffect(() => {
     if (!session?.user?.id) return;
     fetch('/api/user/message-count')

@@ -1,3 +1,9 @@
+// ⚠️ CRITICAL — DO NOT change the seeding logic in useChats.ts to use the JWT/session value.
+// The message count MUST always be fetched from this endpoint on page load.
+// The JWT caches a stale value and causes the counter to reset to 0 on refresh,
+// letting users bypass the daily limit. This endpoint reads directly from the messages
+// table (same source of truth as the increment_messages_used_today RPC).
+// If this ever breaks, users can bypass daily limits by refreshing the page.
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/mobile-auth';
 import { createClient } from '@supabase/supabase-js';
