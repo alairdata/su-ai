@@ -7,7 +7,7 @@ declare module "next-auth" {
       id: string;
       email: string;
       name: string;
-      plan: "Free" | "Pro" | "Plus";
+      plan: "Free" | "Special" | "Pro" | "Plus";
       messagesUsedToday: number;
       totalMessages: number;
       isNewUser?: boolean;
@@ -25,7 +25,7 @@ declare module "next-auth" {
     id: string;
     email: string;
     name: string;
-    plan: "Free" | "Pro" | "Plus";
+    plan: "Free" | "Special" | "Pro" | "Plus";
     messagesUsedToday: number;
     totalMessages: number;
     isNewUser?: boolean;

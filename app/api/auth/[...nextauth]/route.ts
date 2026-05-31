@@ -210,7 +210,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.plan = token.plan as "Free" | "Pro" | "Plus";
+        session.user.plan = token.plan as "Free" | "Special" | "Pro" | "Plus";
         session.user.messagesUsedToday = token.messagesUsedToday as number;
         session.user.isNewUser = token.isNewUser as boolean;
         session.user.onboardingComplete = token.onboardingComplete as boolean;
