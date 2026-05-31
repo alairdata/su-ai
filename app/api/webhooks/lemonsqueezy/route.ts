@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyWebhookSignature, getNextBillingDate } from '@/lib/lemonsqueezy';
 import { sendSubscriptionEmail, sendPaymentFailedEmail } from '@/lib/email';
+import { logPaymentEvent } from '@/lib/payment-events';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -111,6 +112,7 @@ export async function POST(req: NextRequest) {
             .catch(() => {});
         }
 
+        await logPaymentEvent({ user_id: userId, event_type: 'subscription_created', plan, amount_usd: plan === 'Pro' ? 4.99 : 9.99, status: 'active' });
         console.log('[LS Webhook] Subscription created:', { userId, plan });
         break;
       }
@@ -167,6 +169,7 @@ export async function POST(req: NextRequest) {
           grace_period_end: null,
         }).eq('id', user.id);
 
+        await logPaymentEvent({ user_id: user.id, event_type: 'payment_success', plan: user.plan, amount_usd: user.plan === 'Pro' ? 4.99 : 9.99, status: 'renewed' });
         console.log('[LS Webhook] Renewal succeeded:', user.id);
         break;
       }
@@ -192,6 +195,7 @@ export async function POST(req: NextRequest) {
             .catch(() => {});
         }
 
+        await logPaymentEvent({ user_id: user.id, event_type: 'payment_failed', plan: user.plan, status: 'failed', failure_reason: `retry attempt ${retryCount}` });
         console.log('[LS Webhook] Payment failed:', user.id, `retry ${retryCount}`);
         break;
       }
@@ -229,6 +233,7 @@ export async function POST(req: NextRequest) {
           subscription_status: 'canceling',
         }).eq('id', user.id);
 
+        await logPaymentEvent({ user_id: user.id, event_type: 'subscription_cancelled', plan: user.plan, status: 'canceling' });
         if (user.email) {
           await sendSubscriptionEmail(user.email, user.name || 'there', user.plan || 'Pro', 'cancelled', user.current_period_end)
             .catch(() => {});
@@ -253,6 +258,7 @@ export async function POST(req: NextRequest) {
           lemonsqueezy_customer_portal_url: null,
         }).eq('id', user.id);
 
+        await logPaymentEvent({ user_id: user.id, event_type: 'subscription_expired', status: 'expired' });
         console.log('[LS Webhook] Subscription expired, downgraded to Free:', user.id);
         break;
       }

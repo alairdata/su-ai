@@ -6,6 +6,7 @@ import { createCheckout } from '@/lib/lemonsqueezy';
 import { rateLimit, getClientIP, rateLimitHeaders, RATE_LIMITS, getUserIPKey } from '@/lib/rate-limit';
 import { initializePaymentSchema, validateInput } from '@/lib/validations';
 import { sanitizeErrorForClient } from '@/lib/env';
+import { logPaymentEvent } from '@/lib/payment-events';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -70,6 +71,13 @@ export async function POST(request: NextRequest) {
 
     // ── Lemon Squeezy ──────────────────────────────────────────────
     if (PAYMENT_PROVIDER === 'lemonsqueezy') {
+      await logPaymentEvent({
+        user_id: userId,
+        event_type: 'checkout_started',
+        plan,
+        provider: 'lemonsqueezy',
+        status: 'initiated',
+      });
       const checkoutUrl = await createCheckout({
         plan,
         email,

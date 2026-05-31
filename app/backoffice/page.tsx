@@ -54,7 +54,19 @@ interface InsightsData {
 }
 
 type Period = "day" | "week" | "month" | "year";
-type Tab = "users" | "finance";
+type Tab = "users" | "finance" | "payments";
+
+interface PaymentEvent {
+  id: string;
+  event_type: string;
+  plan: string | null;
+  amount_usd: number | null;
+  status: string | null;
+  provider: string | null;
+  failure_reason: string | null;
+  created_at: string;
+  user: { id: string; name: string; email: string } | null;
+}
 type Scenario = "bear" | "base" | "bull";
 
 declare global {
@@ -77,6 +89,9 @@ export default function BackofficePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingUser, setUpdatingUser] = useState<string | null>(null);
+  const [paymentEvents, setPaymentEvents] = useState<PaymentEvent[]>([]);
+  const [paymentEventsLoading, setPaymentEventsLoading] = useState(false);
+  const [paymentEventFilter, setPaymentEventFilter] = useState('');
 
   // UI
   const [activeTab, setActiveTab] = useState<Tab>("users");
@@ -186,6 +201,22 @@ export default function BackofficePage() {
       console.error("Failed to fetch chart data:", err);
     } finally {
       setChartLoading(false);
+    }
+  };
+
+  const fetchPaymentEvents = async (eventType = '') => {
+    setPaymentEventsLoading(true);
+    try {
+      const url = `/api/admin/payment-events${eventType ? `?event_type=${eventType}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setPaymentEvents(data.events || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch payment events:', err);
+    } finally {
+      setPaymentEventsLoading(false);
     }
   };
 
@@ -790,6 +821,7 @@ export default function BackofficePage() {
       <div className="tabs">
         <button className={`tab ${activeTab === "users" ? "active" : ""}`} onClick={() => setActiveTab("users")}>Users</button>
         <button className={`tab ${activeTab === "finance" ? "active" : ""}`} onClick={() => setActiveTab("finance")}>Finance</button>
+        <button className={`tab ${activeTab === "payments" ? "active" : ""}`} onClick={() => { setActiveTab("payments"); fetchPaymentEvents(paymentEventFilter); }}>Payments</button>
       </div>
 
       {/* ══ USERS TAB ══ */}
@@ -1357,6 +1389,85 @@ export default function BackofficePage() {
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ══ PAYMENTS TAB ══ */}
+      {activeTab === "payments" && (
+        <div className="page-content">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <span style={{ fontSize: 12, color: '#55546a' }}>Filter:</span>
+            {['', 'checkout_started', 'subscription_created', 'payment_success', 'payment_failed', 'subscription_cancelled', 'subscription_expired'].map(type => (
+              <button
+                key={type}
+                onClick={() => { setPaymentEventFilter(type); fetchPaymentEvents(type); }}
+                style={{
+                  fontSize: 11, padding: '4px 10px', borderRadius: 4, cursor: 'pointer',
+                  background: paymentEventFilter === type ? 'rgba(100,143,255,0.15)' : 'transparent',
+                  border: `1px solid ${paymentEventFilter === type ? '#648FFF' : '#2a2a35'}`,
+                  color: paymentEventFilter === type ? '#648FFF' : '#55546a',
+                }}
+              >{type || 'All'}</button>
+            ))}
+          </div>
+
+          {paymentEventsLoading ? (
+            <div style={{ textAlign: 'center', padding: 40, color: '#55546a' }}>Loading...</div>
+          ) : paymentEvents.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: '#55546a' }}>No events yet.</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #2a2a35' }}>
+                    {['Time', 'Event', 'User', 'Plan', 'Amount', 'Status', 'Note'].map(h => (
+                      <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: '#55546a', fontWeight: 600, fontSize: 10, letterSpacing: '0.5px', textTransform: 'uppercase' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentEvents.map(ev => {
+                    const eventColors: Record<string, string> = {
+                      checkout_started: '#648FFF',
+                      subscription_created: '#009E73',
+                      payment_success: '#009E73',
+                      payment_failed: '#ef4444',
+                      subscription_cancelled: '#FFB000',
+                      subscription_expired: '#ef4444',
+                      subscription_updated: '#55546a',
+                    };
+                    const color = eventColors[ev.event_type] || '#9896a8';
+                    return (
+                      <tr key={ev.id} style={{ borderBottom: '1px solid #1a1a22' }}>
+                        <td style={{ padding: '10px 12px', color: '#55546a', whiteSpace: 'nowrap' }}>
+                          {new Date(ev.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 3, background: `${color}18`, color, border: `1px solid ${color}40` }}>
+                            {ev.event_type.replace(/_/g, ' ')}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#9896a8' }}>
+                          {ev.user ? (
+                            <div>
+                              <div style={{ color: '#e8e6f0', fontSize: 11 }}>{ev.user.name || '—'}</div>
+                              <div style={{ fontSize: 10, color: '#55546a' }}>{ev.user.email}</div>
+                            </div>
+                          ) : '—'}
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#9896a8' }}>{ev.plan || '—'}</td>
+                        <td style={{ padding: '10px 12px', color: ev.amount_usd ? '#009E73' : '#55546a' }}>
+                          {ev.amount_usd ? `$${ev.amount_usd.toFixed(2)}` : '—'}
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#9896a8' }}>{ev.status || '—'}</td>
+                        <td style={{ padding: '10px 12px', color: '#ef4444', fontSize: 11 }}>{ev.failure_reason || '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
