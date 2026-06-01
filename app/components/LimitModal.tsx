@@ -9,11 +9,11 @@ interface LimitModalProps {
 
 export default function LimitModal({ theme, plan, limitCountdown, onClose }: LimitModalProps) {
   const { h, m, s } = limitCountdown;
-  const limit = plan === 'Free' ? 5 : plan === 'Pro' ? 100 : 300;
-  const nextPlan = plan === 'Free' ? 'Pro' : plan === 'Pro' ? 'Plus' : null;
-  const nextPlanPrice = plan === 'Free' ? '$4.99' : '$9.99';
-  const nextPlanMessages = plan === 'Free' ? '100' : '300';
-  const multiplier = plan === 'Free' ? '20x' : '3x';
+  const limit = plan === 'Free' ? 5 : plan === 'Special' ? 10 : plan === 'Pro' ? 100 : 300;
+  const nextPlan = (plan === 'Free' || plan === 'Special') ? 'Pro' : plan === 'Pro' ? 'Plus' : null;
+  const nextPlanPrice = (plan === 'Free' || plan === 'Special') ? '$4.99' : '$9.99';
+  const nextPlanMessages = (plan === 'Free' || plan === 'Special') ? '100' : '300';
+  const multiplier = plan === 'Free' ? '20x' : plan === 'Special' ? '10x' : '3x';
 
   return (
     <div
