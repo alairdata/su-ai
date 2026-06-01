@@ -1300,6 +1300,14 @@ export function useChats() {
     setSearchQuery(null);
   };
 
+  const refreshMessageCount = useCallback(async () => {
+    try {
+      const res = await fetch('/api/user/message-count');
+      const data = await res.json();
+      if (typeof data.count === 'number') setLocalMessagesUsed(data.count);
+    } catch {}
+  }, []);
+
   return {
     chats,
     currentChat,
@@ -1322,5 +1330,6 @@ export function useChats() {
     stopGeneration,
     canSendMessage,
     getRemainingMessages,
+    refreshMessageCount,
   };
 }

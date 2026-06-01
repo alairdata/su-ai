@@ -751,6 +751,7 @@ function HomePage() {
     stopGeneration,
     canSendMessage,
     getRemainingMessages,
+    refreshMessageCount,
   } = useChats();
 
   const isAuthLoading = status === "loading";
@@ -1025,14 +1026,29 @@ function HomePage() {
     }
   }, [canSend, session?.user]);
 
-  // Live countdown timer for limit modal
+  // Live countdown timer for limit modal — resets state when midnight passes
   useEffect(() => {
     if (!showLimitModal) return;
+    // If midnight already passed, fetch real count and close if reset
+    fetch('/api/user/message-count').then(r => r.json()).then(d => {
+      if (typeof d.count === 'number') {
+        refreshMessageCount();
+        const plan = session?.user?.plan || 'Free';
+        const limit = plan === 'Special' ? 10 : plan === 'Pro' ? 100 : plan === 'Plus' ? 300 : 5;
+        if (d.count < limit) setShowLimitModal(false);
+      }
+    }).catch(() => {});
     const tick = () => {
       const now = new Date();
       const midnight = new Date(now);
       midnight.setHours(24, 0, 0, 0);
       const diff = Math.max(0, Math.floor((midnight.getTime() - now.getTime()) / 1000));
+
+      if (diff === 0) {
+        // Midnight just passed — re-fetch real count and close modal
+        refreshMessageCount().then(() => setShowLimitModal(false));
+      }
+
       setLimitCountdown({
         h: Math.floor(diff / 3600),
         m: Math.floor((diff % 3600) / 60),
