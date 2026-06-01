@@ -75,6 +75,7 @@ export function useChats() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [localMessagesUsed, setLocalMessagesUsed] = useState<number | null>(null);
+  const [isMessageCountLoaded, setIsMessageCountLoaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const previousMessageCountRef = useRef(0);
   const previousParaCountRef = useRef(0);
@@ -117,12 +118,15 @@ export function useChats() {
     if (!session?.user?.id) return;
     fetch('/api/user/message-count')
       .then(r => r.json())
-      .then(d => { if (typeof d.count === 'number') setLocalMessagesUsed(d.count); })
+      .then(d => {
+        if (typeof d.count === 'number') setLocalMessagesUsed(d.count);
+        setIsMessageCountLoaded(true);
+      })
       .catch(() => {
-        // Fallback to session value if fetch fails
         if (session?.user?.messagesUsedToday !== undefined) {
           setLocalMessagesUsed(session.user.messagesUsedToday);
         }
+        setIsMessageCountLoaded(true);
       });
   }, [session?.user?.id]);
 
@@ -1331,5 +1335,6 @@ export function useChats() {
     canSendMessage,
     getRemainingMessages,
     refreshMessageCount,
+    isMessageCountLoaded,
   };
 }

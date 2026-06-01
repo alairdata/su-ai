@@ -752,6 +752,7 @@ function HomePage() {
     canSendMessage,
     getRemainingMessages,
     refreshMessageCount,
+    isMessageCountLoaded,
   } = useChats();
 
   const isAuthLoading = status === "loading";
@@ -1018,13 +1019,16 @@ function HomePage() {
   const showIntroMessage = newChatSessionRef.current !== null;
   const remainingMessages = getRemainingMessages();
 
-  // Auto-show limit modal when user hits daily limit
+  // Auto-show limit modal — only after real count is loaded from DB, not stale JWT
   const canSend = canSendMessage();
   useEffect(() => {
-    if (!canSend && session?.user) {
+    if (!canSend && session?.user && isMessageCountLoaded) {
       setShowLimitModal(true);
     }
-  }, [canSend, session?.user]);
+    if (canSend && isMessageCountLoaded) {
+      setShowLimitModal(false);
+    }
+  }, [canSend, session?.user, isMessageCountLoaded]);
 
   // Live countdown timer for limit modal — resets state when midnight passes
   useEffect(() => {
