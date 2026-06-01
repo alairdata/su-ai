@@ -1142,7 +1142,7 @@ function HomePage() {
   // Calculate progress percentage
   const getProgressPercentage = () => {
     if (!session?.user) return 0;
-    const limits: Record<string, number> = { Free: 5, Pro: 100, Plus: 300 };
+    const limits: Record<string, number> = { Free: 5, Special: 10, Pro: 100, Plus: 300 };
     const limit = limits[session.user.plan as keyof typeof limits];
     if (limit === Infinity) return 100;
     return (messagesUsed / limit) * 100;
@@ -2975,7 +2975,7 @@ function HomePage() {
               <span style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30', fontWeight: 500 }}>
                 {messagesUsed}
               </span>
-              /{session?.user?.plan === 'Free' ? 5 : session?.user?.plan === 'Pro' ? 100 : 300}
+              /{session?.user?.plan === 'Free' ? 5 : session?.user?.plan === 'Special' ? 10 : session?.user?.plan === 'Pro' ? 100 : 300}
             </div>
           </div>
           </div>
@@ -3779,7 +3779,7 @@ function HomePage() {
                       <span style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30', fontWeight: 600 }}>{messagesUsed}</span>
                       {' of '}
                       <span style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30', fontWeight: 600 }}>
-                        {session?.user?.plan === "Free" ? '5' : session?.user?.plan === "Pro" ? '100' : session?.user?.plan === "Plus" ? '300' : '5'}
+                        {session?.user?.plan === "Free" ? '5' : session?.user?.plan === "Special" ? '10' : session?.user?.plan === "Pro" ? '100' : session?.user?.plan === "Plus" ? '300' : '5'}
                       </span>
                       {' messages used today'}
                     </span>
