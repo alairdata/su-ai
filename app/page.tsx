@@ -759,6 +759,13 @@ function HomePage() {
   const isAuthenticated = !!session?.user;
   const isUnauthenticated = status === "unauthenticated";
 
+  // Auto-open upgrade modal when landing from email campaign
+  useEffect(() => {
+    if (searchParams.get('upgrade') === 'true' && session?.user) {
+      setShowLimitModal(true);
+    }
+  }, [searchParams, session]);
+
   // Check for verification status from URL
   useEffect(() => {
     const verified = searchParams.get('verified');

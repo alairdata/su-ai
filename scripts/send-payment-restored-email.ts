@@ -9,17 +9,16 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const BOLT_SVG = `<svg width="40" height="40" viewBox="0 0 100 100" fill="none"><defs><linearGradient id="bg" x1="30%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#E8A04C"/><stop offset="100%" stop-color="#E8624C"/></linearGradient></defs><path d="M56 4L30 48H50L28 96L74 44H52L72 4Z" fill="url(#bg)"/></svg>`;
 
 const recipients: { email: string; name: string }[] = [
-  { email: 'a.c.doub018@gmail.com', name: 'there' },
-  { email: 'glecoinsurancellc@gmail.com', name: 'there' },
-  { email: 'datawithprincilla@gmail.com', name: 'there' },
-  { email: 'abenatimescapes@gmail.com', name: 'there' },
+  { email: 'techgirlieprincilla@gmail.com', name: 'there' },
+  { email: 'inejsdaggers@gmail.com', name: 'there' },
+  { email: 'princilla0871@gmail.com', name: 'there' },
 ];
 
-async function sendDiscountEmail(email: string, name: string) {
+async function sendSpecialUpgradeEmail(email: string, name: string) {
   return resend.emails.send({
     from: 'So-UnFiltered AI <support@so-unfiltered-ai.com>',
     to: email,
-    subject: "We're sorry. Here's 20% off — just for you.",
+    subject: "You've been noticed. Here's something special.",
     html: `
       <!DOCTYPE html>
       <html>
@@ -35,33 +34,39 @@ async function sendDiscountEmail(email: string, name: string) {
               <div style="font-size:14px;font-weight:600;letter-spacing:-0.02em;color:#8A8690;margin-bottom:8px;">
                 <span style="color:#E8A04C;">So-UnFiltered</span> AI
               </div>
-              <h1 style="font-size:28px;font-weight:800;letter-spacing:-0.04em;color:#F0EDE8;margin:0 0 4px;line-height:1.2;">We're sorry. Really.</h1>
-              <div style="font-size:15px;color:#8A8690;margin-top:8px;">So here's something to make it right.</div>
+              <h1 style="font-size:28px;font-weight:800;letter-spacing:-0.04em;color:#F0EDE8;margin:0 0 4px;line-height:1.2;">You've been noticed.</h1>
+              <div style="font-size:15px;color:#8A8690;margin-top:8px;">Here's something special — just for you.</div>
             </div>
 
             <div style="background:#141416;border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:32px;margin-bottom:24px;">
               <div style="font-size:15px;color:#F0EDE8;margin-bottom:8px;font-weight:600;">Hey ${name},</div>
               <div style="font-size:14px;color:#8A8690;margin-bottom:24px;line-height:1.6;">
-                You tried to upgrade on So-UnFiltered AI and our payment system let you down. We know that's frustrating — and we hate that it happened to you specifically.
+                We see you.
                 <br><br>
-                We've sorted it out. New payment provider, global cards, no more friction. And to say sorry properly — here's 20% off, just for you.
+                You've been with So-UnFiltered AI from early on — sending feedback, flagging issues, staying patient through the rough patches. That means more than you know.
+                <br><br>
+                So this June, we're giving you something small to say thank you.
               </div>
 
-              <div style="background:#0C0C0E;border:2px dashed rgba(232,160,76,0.4);border-radius:14px;padding:28px;text-align:center;margin:0 0 28px;">
-                <div style="font-size:11px;color:#5A5660;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px;">Your discount code</div>
-                <div style="font-family:'JetBrains Mono','SF Mono',Courier,monospace;font-size:32px;font-weight:800;letter-spacing:0.1em;background:linear-gradient(135deg,#E8A04C,#E8624C);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">MYNDQYMA</div>
-                <div style="font-size:13px;color:#8A8690;margin-top:10px;">20% off any plan</div>
-                <div style="font-size:12px;color:#5A5660;margin-top:6px;">Expires <strong style="color:#E8A04C;">June 1, 2026</strong> — don't sit on it.</div>
+              <div style="background:#0C0C0E;border:1px solid rgba(232,160,76,0.25);border-radius:14px;padding:28px;text-align:center;margin:0 0 28px;">
+                <div style="font-size:11px;color:#5A5660;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;">Your special access — June 2026</div>
+                <div style="font-size:48px;font-weight:800;background:linear-gradient(135deg,#E8A04C,#E8624C);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;margin-bottom:8px;">10</div>
+                <div style="font-size:15px;color:#F0EDE8;font-weight:600;margin-bottom:6px;">messages a day</div>
+                <div style="font-size:13px;color:#8A8690;">for the entire month of June — no payment, no strings.</div>
+              </div>
+
+              <div style="font-size:14px;color:#8A8690;margin-bottom:28px;line-height:1.6;text-align:center;font-style:italic;">
+                You earned it by actually caring. Most people don't.
               </div>
 
               <div style="text-align:center;">
-                <a href="https://app.so-unfiltered-ai.com/checkout" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#E8A04C,#E8624C);color:#0C0C0E!important;text-decoration:none;border-radius:12px;font-weight:700;font-size:14px;letter-spacing:-0.01em;">Claim Your Discount →</a>
+                <a href="https://app.so-unfiltered-ai.com" style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#E8A04C,#E8624C);color:#0C0C0E!important;text-decoration:none;border-radius:12px;font-weight:700;font-size:14px;letter-spacing:-0.01em;">Open So-UnFiltered AI →</a>
               </div>
 
               <div style="height:1px;background:rgba(255,255,255,0.06);margin:24px 0;"></div>
 
               <div style="font-size:12px;color:#5A5660;text-align:center;">
-                Apply the code at checkout. You already tried once — we just want to make it easier this time.
+                Keep being honest with us. We're building this for people like you.
               </div>
             </div>
 
@@ -82,7 +87,7 @@ async function sendDiscountEmail(email: string, name: string) {
 async function main() {
   for (const { email, name } of recipients) {
     try {
-      const result = await sendDiscountEmail(email, name);
+      const result = await sendSpecialUpgradeEmail(email, name);
       console.log(`✓ Sent to ${email}`, result);
     } catch (err) {
       console.error(`✗ Failed to send to ${email}`, err);
