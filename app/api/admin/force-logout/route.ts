@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionFromRequest } from "@/lib/mobile-auth";
+import { getAdminIdentity } from "@/lib/admin-auth";
 import { createClient } from "@supabase/supabase-js";
 import { rateLimit, getClientIP, rateLimitHeaders } from "@/lib/rate-limit";
 
@@ -13,23 +13,17 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .map(email => email.trim().toLowerCase())
   .filter(email => email.length > 0);
 
-function isAdmin(email: string | null | undefined): boolean {
-  if (!email) return false;
-  if (ADMIN_EMAILS.length === 0) return false;
-  return ADMIN_EMAILS.includes(email.toLowerCase());
-}
-
 const ADMIN_RATE_LIMIT = { limit: 10, windowSeconds: 60 };
 
 // POST - Force logout users (all or single user by userId)
 export async function POST(req: NextRequest) {
-  const session = await getSessionFromRequest(req);
+  const admin = await getAdminIdentity(req);
 
-  if (!session?.user?.email || !isAdmin(session.user.email)) {
+  if (!admin.authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rateLimitResult = rateLimit(`admin-force-logout:${session.user.id}:${getClientIP(req)}`, ADMIN_RATE_LIMIT);
+  const rateLimitResult = rateLimit(`admin-force-logout:${admin.userId || admin.email}:${getClientIP(req)}`, ADMIN_RATE_LIMIT);
   if (!rateLimitResult.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: rateLimitHeaders(rateLimitResult) });
   }
@@ -56,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     console.log('AUDIT: Force logout user', {
       timestamp: new Date().toISOString(),
-      adminEmail: session.user.email,
+      adminEmail: admin.email,
       targetUserId: userId,
     });
 
@@ -83,7 +77,7 @@ export async function POST(req: NextRequest) {
 
   console.log('AUDIT: Force logout all users', {
     timestamp: new Date().toISOString(),
-    adminEmail: session.user.email,
+    adminEmail: admin.email,
     scope: 'all',
   });
 

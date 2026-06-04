@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionFromRequest } from "@/lib/mobile-auth";
+import { getAdminIdentity } from "@/lib/admin-auth";
 import { createClient } from "@supabase/supabase-js";
 import { rateLimit, getClientIP, rateLimitHeaders } from "@/lib/rate-limit";
 
@@ -8,36 +8,20 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Admin emails - comma-separated in env var
-// SECURITY: Do NOT fallback to VIP_EMAILS - admin access must be explicit
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
-  .split(',')
-  .map(email => email.trim().toLowerCase())
-  .filter(email => email.length > 0);
-
-function isAdmin(email: string | null | undefined): boolean {
-  if (!email) return false;
-  if (ADMIN_EMAILS.length === 0) {
-    console.error('SECURITY: ADMIN_EMAILS not configured!');
-    return false;
-  }
-  return ADMIN_EMAILS.includes(email.toLowerCase());
-}
-
 // SECURITY: Rate limit for admin endpoints
 const ADMIN_RATE_LIMIT = { limit: 60, windowSeconds: 60 };
 
 // GET - Get dashboard stats
 export async function GET(req: NextRequest) {
-  const session = await getSessionFromRequest(req);
+  const admin = await getAdminIdentity(req);
 
-  if (!session?.user?.email || !isAdmin(session.user.email)) {
+  if (!admin.authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // Rate limiting for admin endpoints
   const clientIP = getClientIP(req);
-  const rateLimitKey = `admin-stats:${session.user.id}:${clientIP}`;
+  const rateLimitKey = `admin-stats:${admin.userId || admin.email}:${clientIP}`;
   const rateLimitResult = rateLimit(rateLimitKey, ADMIN_RATE_LIMIT);
 
   if (!rateLimitResult.success) {

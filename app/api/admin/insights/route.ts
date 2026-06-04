@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionFromRequest } from "@/lib/mobile-auth";
+import { getAdminIdentity } from "@/lib/admin-auth";
 import { createClient } from "@supabase/supabase-js";
 import { rateLimit, getClientIP, rateLimitHeaders } from "@/lib/rate-limit";
 
@@ -8,30 +8,16 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
-  .split(',')
-  .map(email => email.trim().toLowerCase())
-  .filter(email => email.length > 0);
-
-function isAdmin(email: string | null | undefined): boolean {
-  if (!email) return false;
-  if (ADMIN_EMAILS.length === 0) {
-    console.error('SECURITY: ADMIN_EMAILS not configured!');
-    return false;
-  }
-  return ADMIN_EMAILS.includes(email.toLowerCase());
-}
-
 const ADMIN_RATE_LIMIT = { limit: 30, windowSeconds: 60 };
 
 // GET - Deeper insight analytics (real data)
 export async function GET(req: NextRequest) {
-  const session = await getSessionFromRequest(req);
-  if (!session?.user?.email || !isAdmin(session.user.email)) {
+  const admin = await getAdminIdentity(req);
+  if (!admin.authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rateLimitResult = rateLimit(`admin-insights:${session.user.id}:${getClientIP(req)}`, ADMIN_RATE_LIMIT);
+  const rateLimitResult = rateLimit(`admin-insights:${admin.userId || admin.email}:${getClientIP(req)}`, ADMIN_RATE_LIMIT);
   if (!rateLimitResult.success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: rateLimitHeaders(rateLimitResult) });
   }

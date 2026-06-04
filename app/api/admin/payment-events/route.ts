@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/mobile-auth';
+import { getAdminIdentity } from '@/lib/admin-auth';
 import { createClient } from '@supabase/supabase-js';
 import { rateLimit, getClientIP, rateLimitHeaders } from '@/lib/rate-limit';
 
@@ -8,16 +8,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 const ADMIN_RATE_LIMIT = { limit: 60, windowSeconds: 60 };
 
 export async function GET(req: NextRequest) {
-  const session = await getSessionFromRequest(req);
-  if (!session?.user?.email || !ADMIN_EMAILS.includes(session.user.email.toLowerCase())) {
+  const admin = await getAdminIdentity(req);
+  if (!admin.authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const rl = rateLimit(`admin-pevents:${session.user.id}:${getClientIP(req)}`, ADMIN_RATE_LIMIT);
+  const rl = rateLimit(`admin-pevents:${admin.userId || admin.email}:${getClientIP(req)}`, ADMIN_RATE_LIMIT);
   if (!rl.success) return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: rateLimitHeaders(rl) });
 
   const { searchParams } = req.nextUrl;
