@@ -2792,7 +2792,7 @@ function HomePage() {
                 New conversation
               </button>
 
-              {session?.user?.plan === 'Free' && (
+              {session?.user?.plan !== 'Plus' && (
                 <button
                   onMouseEnter={() => router.prefetch('/checkout')}
                   onClick={() => router.push('/checkout')}
@@ -2819,7 +2819,7 @@ function HomePage() {
                   <svg width="13" height="13" viewBox="0 0 100 100" fill="none">
                     <path d="M56 4L30 48H50L28 96L74 44H52L72 4Z" fill="#0C0C0E"/>
                   </svg>
-                  Upgrade
+                  {session?.user?.plan === 'Free' ? 'Upgrade' : 'Upgrade to Plus'}
                 </button>
               )}
             </div>
