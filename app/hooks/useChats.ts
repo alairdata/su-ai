@@ -3,7 +3,7 @@ import { useSession } from 'next-auth/react';
 import { PLAN_LIMITS } from '@/lib/constants';
 import { track, incrementUserProperty, EVENTS } from '@/lib/analytics';
 
-type Message = {
+export type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;

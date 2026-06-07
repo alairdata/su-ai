@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, Suspense, useRef, useCallback } from "react";
+import React, { useState, useEffect, Suspense, useRef, useCallback, useMemo } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useChats } from "./hooks/useChats";
+import MessageRow from "./components/MessageRow";
 import { useTheme } from "./hooks/useTheme";
 import { useMemories } from "./hooks/useMemories";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -704,9 +705,13 @@ function HomePage() {
   // Message editing state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessageContent, setEditingMessageContent] = useState("");
+  const editStateRef = useRef({ id: editingMessageId, content: editingMessageContent });
+  editStateRef.current = { id: editingMessageId, content: editingMessageContent };
 
   // Message feedback state (like/dislike)
   const [messageFeedback, setMessageFeedback] = useState<Record<string, 'like' | 'dislike'>>({});
+  const messageFeedbackRef = useRef(messageFeedback);
+  messageFeedbackRef.current = messageFeedback;
 
   // Plus menu state
   const [showPlusMenu, setShowPlusMenu] = useState(false);
@@ -739,6 +744,7 @@ function HomePage() {
     searchQuery,
     messagesEndRef,
     messagesUsed,
+    dailyLimit,
     sendMessage,
     startNewChat,
     createNewChat,
@@ -754,6 +760,16 @@ function HomePage() {
     refreshMessageCount,
     isMessageCountLoaded,
   } = useChats();
+
+  // Stable refs so useCallback handlers never need to be recreated during streaming
+  const regenerateResponseRef = useRef(regenerateResponse);
+  regenerateResponseRef.current = regenerateResponse;
+  const editMessageRef = useRef(editMessage);
+  editMessageRef.current = editMessage;
+  const currentChatRef = useRef(currentChat);
+  currentChatRef.current = currentChat;
+  const currentChatIdRef = useRef(currentChatId);
+  currentChatIdRef.current = currentChatId;
 
   const isAuthLoading = status === "loading";
   const isAuthenticated = !!session?.user;
@@ -935,6 +951,11 @@ function HomePage() {
   }, [currentChatId]);
 
   const messages = currentChat?.messages ?? [];
+
+  const lastAssistantIndex = useMemo(
+    () => messages.reduce((lastIdx, m, idx) => m.role === 'assistant' ? idx : lastIdx, -1),
+    [messages]
+  );
 
   // ── TEXTING-STYLE BUBBLE REVEAL ──
   // Paragraphs reveal one at a time with a typing pause between each.
@@ -1378,89 +1399,86 @@ function HomePage() {
 
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
-  const handleCopyMessage = async (content: string, messageId: string) => {
+  const handleCopyMessage = useCallback(async (content: string, messageId: string) => {
     try {
       await navigator.clipboard.writeText(content);
       track(EVENTS.MESSAGE_COPIED);
       setCopiedMessageId(messageId);
       showToast('Copied to clipboard');
       setTimeout(() => setCopiedMessageId(null), 2000);
-    } catch (error) {
-      console.error('Failed to copy:', error);
+    } catch {
       showToast('Failed to copy', 'error');
     }
-  };
+  }, [showToast]);
+
+  const handleEditContentChange = useCallback((content: string) => {
+    setEditingMessageContent(content);
+  }, []);
 
   // Edit message handlers
-  const handleEditStart = (messageId: string, content: string) => {
+  const handleEditStart = useCallback((messageId: string, content: string) => {
     setEditingMessageId(messageId);
     setEditingMessageContent(content);
-  };
+  }, []);
 
-  const handleEditCancel = () => {
+  const handleEditCancel = useCallback(() => {
     setEditingMessageId(null);
     setEditingMessageContent("");
-  };
+  }, []);
 
-  const handleEditSave = async () => {
-    if (!editingMessageId || !editingMessageContent.trim()) return;
-    await editMessage(editingMessageId, editingMessageContent);
+  const handleEditSave = useCallback(async () => {
+    const { id, content } = editStateRef.current;
+    if (!id || !content.trim()) return;
+    await editMessageRef.current(id, content);
     setEditingMessageId(null);
     setEditingMessageContent("");
-  };
+  }, []);
 
   // Regenerate handler
-  const handleRegenerate = async (userMessageId: string) => {
-    await regenerateResponse(userMessageId);
-  };
+  const handleRegenerate = useCallback(async (userMessageId: string) => {
+    await regenerateResponseRef.current(userMessageId);
+  }, []);
 
   // Like/Dislike feedback handler
-  const handleFeedback = async (messageId: string, type: 'like' | 'dislike') => {
-    // Toggle off if already selected
-    if (messageFeedback[messageId] === type) {
+  const handleFeedback = useCallback(async (messageId: string, type: 'like' | 'dislike') => {
+    if (messageFeedbackRef.current[messageId] === type) {
       setMessageFeedback(prev => {
         const updated = { ...prev };
         delete updated[messageId];
         return updated;
       });
-      // TODO: Send removal to backend
       return;
     }
-
-    // Set new feedback
     setMessageFeedback(prev => ({ ...prev, [messageId]: type }));
     track(EVENTS.MESSAGE_FEEDBACK, { type });
-
-    // Send to backend
     try {
       await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messageId,
-          chatId: currentChatId,
+          chatId: currentChatIdRef.current,
           feedback: type,
         }),
       });
     } catch (error) {
       console.error('Failed to send feedback:', error);
     }
-  };
+  }, []);
 
   // Find the user message that preceded an AI message (for regenerate on AI side)
-  const findPrecedingUserMessageId = (aiMessageId: string): string | null => {
-    if (!currentChat) return null;
-    const messages = currentChat.messages;
-    const aiIndex = messages.findIndex(m => m.id === aiMessageId);
+  const findPrecedingUserMessageId = useCallback((aiMessageId: string): string | null => {
+    if (!currentChatRef.current) return null;
+    const msgs = currentChatRef.current.messages;
+    const aiIndex = msgs.findIndex(m => m.id === aiMessageId);
     if (aiIndex <= 0) return null;
-    // Find the user message before this AI message
     for (let i = aiIndex - 1; i >= 0; i--) {
-      if (messages[i].role === 'user') {
-        return messages[i].id;
+      if (msgs[i].role === 'user') {
+        return msgs[i].id;
       }
     }
     return null;
-  };
+  }, []);
 
   const _formatTimestamp = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', {
@@ -3113,434 +3131,59 @@ function HomePage() {
               style={currentStyles.messagesArea}
             >
 
-              {isChatsLoaded && !isWaitingForStoredChat && (() => {
-                // Find the index of the last assistant message (for showing buttons only on last one)
-                const lastAssistantIndex = messages.reduce((lastIdx, m, idx) =>
-                  m.role === 'assistant' ? idx : lastIdx, -1);
-
-                return (
+              {isChatsLoaded && !isWaitingForStoredChat && (
                 <div style={{
                   ...currentStyles.chatMessages,
                   ...(isMobile ? currentStyles.chatMessagesMobile : {})
                 }}>
                   {/* Intro message - always shown as the first message */}
-                  {(
-                    <div style={currentStyles.messageRowAssistant}>
-                      <div style={currentStyles.messageWrapper}>
-                        <div
-                          className="message-bubble"
-                          style={currentStyles.messageBubbleAssistant}
-                        >
-                          <div style={currentStyles.messageText}>
-                            <p style={{ margin: 0, display: 'block' }}>
-                              I&apos;m not here to hold your hand or tell you what you want to hear.{' '}
-                              <span style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30' }}>
-                                So let&apos;s skip the small talk and get to it{greeting.name ? `, ${greeting.name}` : ''}.
-                              </span>
-                            </p>
-                          </div>
+                  <div style={currentStyles.messageRowAssistant}>
+                    <div style={currentStyles.messageWrapper}>
+                      <div
+                        className="message-bubble"
+                        style={currentStyles.messageBubbleAssistant}
+                      >
+                        <div style={currentStyles.messageText}>
+                          <p style={{ margin: 0, display: 'block' }}>
+                            I&apos;m not here to hold your hand or tell you what you want to hear.{' '}
+                            <span style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30' }}>
+                              So let&apos;s skip the small talk and get to it{greeting.name ? `, ${greeting.name}` : ''}.
+                            </span>
+                          </p>
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
                   {messages.map((m, index) => {
-                    const isLastAssistant = m.role === 'assistant' && index === lastAssistantIndex;
-
-                    // Hide empty assistant messages UNLESS it's the last one (which shows typing dots)
-                    // Also hide if searching (search indicator will show instead)
-                    if (m.role === "assistant" && !m.content && (!isLastAssistant || isSearching)) {
+                    const isLast = m.role === 'assistant' && index === lastAssistantIndex;
+                    if (m.role === "assistant" && !m.content && (!isLast || isSearching)) {
                       return null;
                     }
                     return (
-                    <div
-                      key={m.id}
-                      style={m.role === "user" ? currentStyles.messageRowUser : currentStyles.messageRowAssistant}
-                    >
-                      {m.role === "user" ? (
-                        /* User messages: bubble with actions below, or edit mode */
-                        <div style={currentStyles.messageWrapperUser}>
-                          {editingMessageId === m.id ? (
-                            /* Edit mode */
-                            <div style={currentStyles.editModeContainer}>
-                              <textarea
-                                value={editingMessageContent}
-                                onChange={(e) => setEditingMessageContent(e.target.value)}
-                                style={currentStyles.editTextarea}
-                                autoFocus
-                              />
-                              <div style={currentStyles.editWarning}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
-                                  <circle cx="12" cy="12" r="10"/>
-                                  <line x1="12" y1="8" x2="12" y2="12"/>
-                                  <line x1="12" y1="16" x2="12.01" y2="16"/>
-                                </svg>
-                                <span>Heads up: editing this will wipe the AI&apos;s response and get you a fresh one. No going back.</span>
-                              </div>
-                              <div style={currentStyles.editActions}>
-                                <button
-                                  onClick={handleEditCancel}
-                                  style={currentStyles.editCancelBtn}
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  onClick={handleEditSave}
-                                  disabled={!editingMessageContent.trim() || chatLoading}
-                                  style={{
-                                    ...currentStyles.editSaveBtn,
-                                    opacity: editingMessageContent.trim() && !chatLoading ? 1 : 0.5,
-                                  }}
-                                >
-                                  Save
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            /* Normal display mode */
-                            <>
-                              <div style={currentStyles.messageBubbleUser}>
-                                {m.image_url && (!m.file_type || m.file_type === "image") && (
-                                  <img
-                                    src={m.image_url}
-                                    alt="Uploaded"
-                                    onClick={() => window.open(m.image_url, '_blank')}
-                                    style={{
-                                      maxWidth: '300px',
-                                      maxHeight: '200px',
-                                      borderRadius: '12px',
-                                      marginBottom: m.content ? '8px' : 0,
-                                      cursor: 'pointer',
-                                      display: 'block',
-                                    }}
-                                  />
-                                )}
-                                {m.image_url && m.file_type && m.file_type !== "image" && (
-                                  <div
-                                    onClick={() => window.open(m.image_url, '_blank')}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '8px',
-                                      padding: '8px 12px',
-                                      background: 'rgba(255,255,255,0.06)',
-                                      borderRadius: '8px',
-                                      cursor: 'pointer',
-                                      marginBottom: m.content ? '8px' : 0,
-                                      maxWidth: '250px',
-                                    }}
-                                  >
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={m.file_type === "pdf" ? "#ef4444" : "#E8A04C"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                      <polyline points="14 2 14 8 20 8" />
-                                    </svg>
-                                    <span style={{ fontSize: '12px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      {m.file_name || 'File'}
-                                    </span>
-                                  </div>
-                                )}
-                                {m.content && (
-                                  <span>
-                                    {m.content.split(/(@\w+)/g).map((part, pi) =>
-                                      part.match(/^@\w+$/) ? (
-                                        <span key={pi} style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30', fontWeight: 600 }}>{part}</span>
-                                      ) : (
-                                        <span key={pi}>{part}</span>
-                                      )
-                                    )}
-                                  </span>
-                                )}
-                              </div>
-                              <div style={currentStyles.messageActionsUser}>
-                                {/* Refresh/retry button */}
-                                <button
-                                  onClick={() => handleRegenerate(m.id)}
-                                  disabled={chatLoading}
-                                  style={{
-                                    ...currentStyles.actionButton,
-                                    ...(isMobile ? { padding: '6px', minWidth: '32px', minHeight: '32px' } : {}),
-                                    opacity: chatLoading ? 0.3 : 1,
-                                  }}
-                                  title="Retry message"
-                                >
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
-                                    <path d="M21 3v5h-5"/>
-                                  </svg>
-                                </button>
-                                {/* Edit button */}
-                                <button
-                                  onClick={() => handleEditStart(m.id, m.content)}
-                                  disabled={chatLoading}
-                                  style={{
-                                    ...currentStyles.actionButton,
-                                    ...(isMobile ? { padding: '6px', minWidth: '32px', minHeight: '32px' } : {}),
-                                    opacity: chatLoading ? 0.3 : 1,
-                                  }}
-                                  title="Edit message"
-                                >
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                                  </svg>
-                                </button>
-                                {/* Copy button */}
-                                <button
-                                  onClick={() => handleCopyMessage(m.content, m.id)}
-                                  style={{
-                                    ...currentStyles.actionButton,
-                                    ...(isMobile ? { padding: '6px', minWidth: '32px', minHeight: '32px' } : {})
-                                  }}
-                                  title="Copy message"
-                                >
-                                  {copiedMessageId === m.id ? (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                      <polyline points="20 6 9 17 4 12"/>
-                                    </svg>
-                                  ) : (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                                    </svg>
-                                  )}
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      ) : (
-                        /* AI messages: bubble on left, copy button on right */
-                        <div style={currentStyles.messageWrapper}>
-                          {m.isError ? (
-                            /* Error state - show error message with retry button */
-                            <div
-                              className="message-bubble"
-                              style={{
-                                ...currentStyles.messageBubbleAssistant,
-                                background: theme === 'dark' ? '#3a2a2a' : '#fef2f2',
-                                border: `1px solid ${theme === 'dark' ? '#5c3c3c' : '#fecaca'}`,
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: theme === 'dark' ? '#fca5a5' : '#dc2626' }}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <circle cx="12" cy="12" r="10"/>
-                                  <line x1="12" y1="8" x2="12" y2="12"/>
-                                  <line x1="12" y1="16" x2="12.01" y2="16"/>
-                                </svg>
-                                <span style={{ fontSize: '14px' }}>{m.content}</span>
-                                <button
-                                  onClick={() => {
-                                    const userMsgId = findPrecedingUserMessageId(m.id);
-                                    if (userMsgId) handleRegenerate(userMsgId);
-                                  }}
-                                  disabled={chatLoading}
-                                  style={{
-                                    marginLeft: 'auto',
-                                    padding: '6px 12px',
-                                    fontSize: '13px',
-                                    background: theme === 'dark' ? '#4a3a3a' : '#fee2e2',
-                                    border: `1px solid ${theme === 'dark' ? '#6c4c4c' : '#fca5a5'}`,
-                                    borderRadius: '8px',
-                                    color: theme === 'dark' ? '#fca5a5' : '#dc2626',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                  }}
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
-                                    <path d="M21 3v5h-5"/>
-                                  </svg>
-                                  Retry
-                                </button>
-                              </div>
-                            </div>
-                          ) : m.content ? (
-                            m.character_name ? (
-                              /* CHARACTER MESSAGE */
-                              <div style={{ display: 'flex', gap: '10px' }}>
-                                <div style={{
-                                  width: 28, height: 28, borderRadius: '50%',
-                                  background: m.character_color_bg || '#2D1B4E',
-                                  color: m.character_color_fg || '#B388FF',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 4,
-                                }}>
-                                  {m.character_name.substring(0, 2).toUpperCase()}
-                                </div>
-                                <div style={{ maxWidth: '80%', minWidth: 0 }}>
-                                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <span style={{ color: m.character_color_fg || '#B388FF' }}>{m.character_name}</span>
-                                    <span style={{
-                                      fontSize: 8, padding: '1px 5px', borderRadius: 4,
-                                      fontWeight: 600, textTransform: 'uppercase' as const,
-                                      background: m.character_color_tag || 'rgba(179,136,255,0.15)',
-                                      color: m.character_color_fg || '#B388FF',
-                                    }}>Character</span>
-                                  </div>
-                                  <>
-                                    {m.content.split(/\n\n+/).filter(p => p.trim()).map((para, pi) => (
-                                      <div
-                                        key={pi}
-                                        className={`message-bubble${isLastAssistant ? ' bubble-pop-in' : ''}`}
-                                        style={{
-                                          padding: '12px 16px', borderRadius: '16px 16px 16px 4px',
-                                          fontSize: 14, lineHeight: 1.6,
-                                          background: m.character_color_bg_light || 'rgba(179,136,255,0.06)',
-                                          border: `1px solid ${m.character_color_border || 'rgba(179,136,255,0.2)'}`,
-                                          color: theme === 'dark' ? '#F0EDE8' : '#1A1918',
-                                        }}
-                                      >
-                                        <div style={currentStyles.messageText}>
-                                          <ReactMarkdown
-                                            components={{
-                                              p: ({ children }) => <p style={{ margin: '0 0 0.75em 0', display: 'block' }}>{children}</p>,
-                                            }}
-                                          >
-                                            {para}
-                                          </ReactMarkdown>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </>
-                                </div>
-                              </div>
-                            ) : (
-                              /* NORMAL AI MESSAGE — each paragraph is its own bubble, revealed one by one */
-                              (() => {
-                                const allParas = m.content.split(/\n\n+/).filter(p => p.trim());
-                                // Keep slicing until all are revealed — continues even after streaming ends
-                                const visibleParas = isLastAssistant
-                                  ? allParas.slice(0, revealedParaCount)
-                                  : allParas;
-                                // Show typing dots whenever there are still hidden paragraphs
-                                const hasPendingPara = isLastAssistant && revealedParaCount < allParas.length;
-                                return (
-                                  <>
-                                    {visibleParas.map((para, pi) => (
-                                      <div
-                                        key={pi}
-                                        className="message-bubble bubble-pop-in"
-                                        style={currentStyles.messageBubbleAssistant}
-                                      >
-                                        <div style={currentStyles.messageText}>
-                                          <ReactMarkdown
-                                            components={{
-                                              p: ({ children }) => <p style={{ margin: '0 0 0.75em 0', display: 'block' }}>{children}</p>,
-                                            }}
-                                          >
-                                            {para}
-                                          </ReactMarkdown>
-                                        </div>
-                                      </div>
-                                    ))}
-                                    {hasPendingPara && (
-                                      <div className="typing-bubble-wrapper">
-                                        <div className="typing-bubble">
-                                          <span className="typing-dot" />
-                                          <span className="typing-dot" />
-                                          <span className="typing-dot" />
-                                        </div>
-                                        <div className="typing-bubble-tail">
-                                          <div className="tail-circle tail-circle-1" />
-                                          <div className="tail-circle tail-circle-2" />
-                                        </div>
-                                      </div>
-                                    )}
-                                  </>
-                                );
-                              })()
-                            )
-                          ) : (!isSearching && isLastAssistant) ? (
-                            /* Typing indicator bubble - only for the LAST assistant message and only when not searching */
-                            <div className="typing-bubble-wrapper">
-                              <div className="typing-bubble">
-                                <span className="typing-dot" />
-                                <span className="typing-dot" />
-                                <span className="typing-dot" />
-                              </div>
-                              <div className="typing-bubble-tail">
-                                <div className="tail-circle tail-circle-1" />
-                                <div className="tail-circle tail-circle-2" />
-                              </div>
-                            </div>
-                          ) : null}
-                          {/* Show action buttons only after ALL bubbles are revealed */}
-                          {m.content && !m.isFinalized && !chatLoading &&
-                            (!isLastAssistant || revealedParaCount >= m.content.split(/\n\n+/).filter(p => p.trim()).length) && (
-                            <div style={currentStyles.messageActions}>
-                              {/* Copy button */}
-                              <button
-                                onClick={() => handleCopyMessage(m.content, m.id)}
-                                style={{
-                                  ...currentStyles.actionButton,
-                                  ...(isMobile ? { padding: '6px', minWidth: '32px', minHeight: '32px' } : {})
-                                }}
-                                title="Copy message"
-                              >
-                                {copiedMessageId === m.id ? (
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="20 6 9 17 4 12"/>
-                                  </svg>
-                                ) : (
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                                  </svg>
-                                )}
-                              </button>
-                              {/* Thumbs up button */}
-                              <button
-                                onClick={() => handleFeedback(m.id, 'like')}
-                                style={{
-                                  ...currentStyles.actionButton,
-                                  ...(isMobile ? { padding: '6px', minWidth: '32px', minHeight: '32px' } : {}),
-                                  ...(messageFeedback[m.id] === 'like' ? { color: '#10b981', opacity: 1 } : {}),
-                                }}
-                                title="Good response"
-                              >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill={messageFeedback[m.id] === 'like' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
-                                </svg>
-                              </button>
-                              {/* Thumbs down button */}
-                              <button
-                                onClick={() => handleFeedback(m.id, 'dislike')}
-                                style={{
-                                  ...currentStyles.actionButton,
-                                  ...(isMobile ? { padding: '6px', minWidth: '32px', minHeight: '32px' } : {}),
-                                  ...(messageFeedback[m.id] === 'dislike' ? { color: '#ef4444', opacity: 1 } : {}),
-                                }}
-                                title="Bad response"
-                              >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill={messageFeedback[m.id] === 'dislike' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
-                                </svg>
-                              </button>
-                              {/* Refresh/regenerate button */}
-                              <button
-                                onClick={() => {
-                                  const userMsgId = findPrecedingUserMessageId(m.id);
-                                  if (userMsgId) handleRegenerate(userMsgId);
-                                }}
-                                disabled={chatLoading}
-                                style={{
-                                  ...currentStyles.actionButton,
-                                  ...(isMobile ? { padding: '6px', minWidth: '32px', minHeight: '32px' } : {}),
-                                  opacity: chatLoading ? 0.3 : 1,
-                                }}
-                                title="Regenerate response"
-                              >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
-                                  <path d="M21 3v5h-5"/>
-                                </svg>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
+                      <MessageRow
+                        key={m.id}
+                        m={m}
+                        isLastAssistant={isLast}
+                        isSearching={isSearching}
+                        chatLoading={chatLoading}
+                        theme={theme}
+                        isMobile={isMobile}
+                        styles={currentStyles}
+                        revealedParaCount={isLast ? revealedParaCount : 9999}
+                        isEditing={editingMessageId === m.id}
+                        editingContent={editingMessageId === m.id ? editingMessageContent : ''}
+                        isCopied={copiedMessageId === m.id}
+                        feedback={messageFeedback[m.id] ?? null}
+                        onRegenerate={handleRegenerate}
+                        onEditStart={handleEditStart}
+                        onEditCancel={handleEditCancel}
+                        onEditSave={handleEditSave}
+                        onEditContentChange={handleEditContentChange}
+                        onCopyMessage={handleCopyMessage}
+                        onFeedback={handleFeedback}
+                        onFindPrecedingUser={findPrecedingUserMessageId}
+                      />
+                    );
                   })}
 
                   {/* Show searching indicator when AI is searching the web */}
@@ -3572,11 +3215,9 @@ function HomePage() {
                     </div>
                   )}
 
-
                   <div ref={messagesEndRef} />
                 </div>
-                );
-              })()}
+              )}
             </div>
 
             {/* Scroll to bottom floating button */}
@@ -3786,7 +3427,7 @@ function HomePage() {
                       <span style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30', fontWeight: 600 }}>{messagesUsed}</span>
                       {' of '}
                       <span style={{ color: theme === 'dark' ? '#E8A04C' : '#D08A30', fontWeight: 600 }}>
-                        {session?.user?.plan === "Free" ? '5' : session?.user?.plan === "Special" ? '10' : session?.user?.plan === "Pro" ? '100' : session?.user?.plan === "Plus" ? '300' : '5'}
+                        {dailyLimit}
                       </span>
                       {' messages used today'}
                     </span>
@@ -4076,7 +3717,7 @@ function HomePage() {
                     try {
                       const res = await fetch('/api/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tier_points: tier.points }) });
                       const data = await res.json();
-                      if (data.success) { setUserPoints(data.points_remaining); setShowRedeemModal(false); showToast(`${tier.label} unlocked!`, 'success'); }
+                      if (data.success) { setUserPoints(data.points_remaining); setShowRedeemModal(false); showToast(`${tier.label} unlocked!`, 'success'); refreshMessageCount(); }
                       else { showToast(data.error || 'Could not redeem', 'error'); }
                     } catch { showToast('Could not redeem', 'error'); }
                     finally { setRedeemLoading(false); }
