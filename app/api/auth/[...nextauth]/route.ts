@@ -283,7 +283,7 @@ export const authOptions: NextAuthOptions = {
         if (user) {
           // Always use fresh data from database (for name/plan/isNewUser updates to reflect immediately)
           session.user.name = user.name;
-          session.user.plan = user.plan;
+          session.user.plan = user.plan || 'Free';
           session.user.timezone = user.timezone || 'UTC';
           session.user.isNewUser = user.is_new_user || false;
           session.user.onboardingComplete = user.onboarding_complete ?? false;
