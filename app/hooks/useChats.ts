@@ -75,6 +75,7 @@ export function useChats() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [localMessagesUsed, setLocalMessagesUsed] = useState<number | null>(null);
+  const [localDailyLimit, setLocalDailyLimit] = useState<number | null>(null);
   const [isMessageCountLoaded, setIsMessageCountLoaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const previousMessageCountRef = useRef(0);
@@ -120,6 +121,7 @@ export function useChats() {
       .then(r => r.json())
       .then(d => {
         if (typeof d.count === 'number') setLocalMessagesUsed(d.count);
+        if (typeof d.limit === 'number') setLocalDailyLimit(d.limit);
         setIsMessageCountLoaded(true);
       })
       .catch(() => {
@@ -168,7 +170,11 @@ export function useChats() {
     const currentMessageCount = chat?.messages.length || 0;
 
     if (currentMessageCount > previousMessageCountRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      // Reset para tracking so each new bubble scrolls correctly from paragraph 1
+      previousParaCountRef.current = 0;
+      // Use instant scroll during streaming to avoid animation fighting DOM height changes
+      // from paragraph reveal timers (smooth scroll mid-flight + new bubble = jumps to old message)
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
     }
     previousMessageCountRef.current = currentMessageCount;
 
@@ -178,7 +184,7 @@ export function useChats() {
       const paraCount = (lastAssistant?.content || '').split(/\n\n+/).filter(p => p.trim()).length;
       if (paraCount > previousParaCountRef.current) {
         previousParaCountRef.current = paraCount;
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
       }
     } else {
       previousParaCountRef.current = 0;
@@ -193,17 +199,17 @@ export function useChats() {
   // Use local count for real-time updates
   const messagesUsed = localMessagesUsed ?? session?.user?.messagesUsedToday ?? 0;
 
+  const effectiveDailyLimit = localDailyLimit ?? (session?.user ? (PLAN_LIMITS[session.user.plan as keyof typeof PLAN_LIMITS] || 50) : 5);
+
   const canSendMessage = (): boolean => {
     if (!session?.user) return false;
-    const limit = PLAN_LIMITS[session.user.plan as keyof typeof PLAN_LIMITS] || 50;
-    return messagesUsed < limit;
+    return messagesUsed < effectiveDailyLimit;
   };
 
   const getRemainingMessages = (): number => {
     if (!session?.user) return 0;
-    const limit = PLAN_LIMITS[session.user.plan as keyof typeof PLAN_LIMITS] || 50;
-    if (limit === Infinity) return Infinity;
-    return Math.max(0, limit - messagesUsed);
+    if (effectiveDailyLimit === Infinity) return Infinity;
+    return Math.max(0, effectiveDailyLimit - messagesUsed);
   };
 
   // Generate SMART chat title from first message
@@ -1309,6 +1315,7 @@ export function useChats() {
       const res = await fetch('/api/user/message-count');
       const data = await res.json();
       if (typeof data.count === 'number') setLocalMessagesUsed(data.count);
+      if (typeof data.limit === 'number') setLocalDailyLimit(data.limit);
     } catch {}
   }, []);
 
@@ -1322,6 +1329,7 @@ export function useChats() {
     searchQuery,
     messagesEndRef,
     messagesUsed,
+    dailyLimit: effectiveDailyLimit,
     sendMessage,
     createNewChat,
     createChatWithEntry,
