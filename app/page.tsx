@@ -443,12 +443,15 @@ function HomePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastAssistantContent, chatLoading]);
 
-  // Scroll to bottom whenever a paragraph bubble is revealed — fires after the DOM update
-  // so the scroll lands at the correct position. The useChats scroll only handles new messages.
+  // Scroll to bottom when a paragraph bubble is revealed, but only if the user
+  // is already near the bottom — don't yank them away if they've scrolled up to read.
   useEffect(() => {
     if (chatLoading && revealedParaCount > 1) {
       const area = messagesAreaRef.current;
-      if (area) area.scrollTop = area.scrollHeight;
+      if (area) {
+        const isNearBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 150;
+        if (isNearBottom) area.scrollTop = area.scrollHeight;
+      }
     }
   }, [revealedParaCount, chatLoading]);
 

@@ -79,6 +79,8 @@ export function useChats() {
   const [isMessageCountLoaded, setIsMessageCountLoaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
+  // Set to true when the user sends a message so we always scroll regardless of position
+  const forceScrollRef = useRef(false);
   const previousMessageCountRef = useRef(0);
   const previousParaCountRef = useRef(0);
   // Track pending chat ID during temp->real ID transition
@@ -165,7 +167,8 @@ export function useChats() {
     loadChats();
   }, [session, isChatsLoaded]);
 
-  // Auto-scroll when a new message is added (user sends or assistant reply starts).
+  // Auto-scroll when a new message is added.
+  // Always scrolls when the user sends (forceScrollRef), otherwise only if near the bottom.
   // Paragraph-level scroll is handled in page.tsx after the reveal timer fires (DOM-accurate).
   useEffect(() => {
     const chat = chats.find(c => c.id === currentChatId || c.id === pendingChatIdRef.current);
@@ -174,7 +177,13 @@ export function useChats() {
     if (currentMessageCount > previousMessageCountRef.current) {
       previousParaCountRef.current = 0;
       const area = messagesAreaRef.current;
-      if (area) area.scrollTop = area.scrollHeight;
+      if (area) {
+        const isNearBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 150;
+        if (forceScrollRef.current || isNearBottom) {
+          area.scrollTop = area.scrollHeight;
+        }
+        forceScrollRef.current = false;
+      }
     }
     previousMessageCountRef.current = currentMessageCount;
 
@@ -315,6 +324,7 @@ export function useChats() {
 
   const sendMessage = async (input: string, imageUrl?: string, fileData?: { url: string; fileType: string; fileName: string }, characterId?: string) => {
     if (!input.trim() || isLoading) return;
+    forceScrollRef.current = true; // user initiated — always scroll to bottom
     if (!canSendMessage()) {
       if (!dailyLimitFiredRef.current) {
         dailyLimitFiredRef.current = true;
