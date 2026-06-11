@@ -809,6 +809,7 @@ export const lightStyles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     flexDirection: 'column' as const,
     maxWidth: '100%',
+    overflowAnchor: 'none' as const,
   },
   scrollToBottomBtn: {
     position: 'absolute' as const,

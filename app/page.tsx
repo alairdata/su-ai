@@ -93,7 +93,6 @@ function HomePage() {
   const [renameValue, setRenameValue] = useState("");
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const messagesAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Analytics refs for typing/focus/abandon/scroll tracking
@@ -159,6 +158,7 @@ function HomePage() {
     isSearching,
     searchQuery,
     messagesEndRef,
+    messagesAreaRef,
     messagesUsed,
     dailyLimit,
     sendMessage,
@@ -447,7 +447,8 @@ function HomePage() {
   // so the scroll lands at the correct position. The useChats scroll only handles new messages.
   useEffect(() => {
     if (chatLoading && revealedParaCount > 1) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+      const area = messagesAreaRef.current;
+      if (area) area.scrollTop = area.scrollHeight;
     }
   }, [revealedParaCount, chatLoading]);
 
@@ -919,8 +920,9 @@ function HomePage() {
 
   // Scroll to bottom handler
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messagesEndRef]);
+    const area = messagesAreaRef.current;
+    if (area) area.scrollTo({ top: area.scrollHeight, behavior: 'smooth' });
+  }, [messagesAreaRef]);
 
   // Handle scroll to show/hide scroll button + scroll depth tracking
   const handleScroll = useCallback(() => {

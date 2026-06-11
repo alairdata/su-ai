@@ -78,6 +78,7 @@ export function useChats() {
   const [localDailyLimit, setLocalDailyLimit] = useState<number | null>(null);
   const [isMessageCountLoaded, setIsMessageCountLoaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesAreaRef = useRef<HTMLDivElement>(null);
   const previousMessageCountRef = useRef(0);
   const previousParaCountRef = useRef(0);
   // Track pending chat ID during temp->real ID transition
@@ -172,7 +173,8 @@ export function useChats() {
 
     if (currentMessageCount > previousMessageCountRef.current) {
       previousParaCountRef.current = 0;
-      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+      const area = messagesAreaRef.current;
+      if (area) area.scrollTop = area.scrollHeight;
     }
     previousMessageCountRef.current = currentMessageCount;
 
@@ -1318,6 +1320,7 @@ export function useChats() {
     isSearching,
     searchQuery,
     messagesEndRef,
+    messagesAreaRef,
     messagesUsed,
     dailyLimit: effectiveDailyLimit,
     sendMessage,
