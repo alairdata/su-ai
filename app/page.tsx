@@ -443,6 +443,14 @@ function HomePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastAssistantContent, chatLoading]);
 
+  // Scroll to bottom whenever a paragraph bubble is revealed — fires after the DOM update
+  // so the scroll lands at the correct position. The useChats scroll only handles new messages.
+  useEffect(() => {
+    if (chatLoading && revealedParaCount > 1) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+    }
+  }, [revealedParaCount, chatLoading]);
+
   // Don't show greeting while chats are loading (prevents flash when restoring from localStorage)
   // Also don't show if we're waiting for a stored chat to load
   const isWaitingForStoredChat = currentChatId && !currentChat;

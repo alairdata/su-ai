@@ -164,29 +164,19 @@ export function useChats() {
     loadChats();
   }, [session, isChatsLoaded]);
 
-  // Smart auto-scroll: scroll when message count increases OR when a new paragraph bubble appears
+  // Auto-scroll when a new message is added (user sends or assistant reply starts).
+  // Paragraph-level scroll is handled in page.tsx after the reveal timer fires (DOM-accurate).
   useEffect(() => {
     const chat = chats.find(c => c.id === currentChatId || c.id === pendingChatIdRef.current);
     const currentMessageCount = chat?.messages.length || 0;
 
     if (currentMessageCount > previousMessageCountRef.current) {
-      // Reset para tracking so each new bubble scrolls correctly from paragraph 1
       previousParaCountRef.current = 0;
-      // Use instant scroll during streaming to avoid animation fighting DOM height changes
-      // from paragraph reveal timers (smooth scroll mid-flight + new bubble = jumps to old message)
       messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
     }
     previousMessageCountRef.current = currentMessageCount;
 
-    // Scroll down when streaming message gains a new paragraph bubble
-    if (isLoading) {
-      const lastAssistant = chat?.messages.slice().reverse().find(m => m.role === 'assistant');
-      const paraCount = (lastAssistant?.content || '').split(/\n\n+/).filter(p => p.trim()).length;
-      if (paraCount > previousParaCountRef.current) {
-        previousParaCountRef.current = paraCount;
-        messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
-      }
-    } else {
+    if (!isLoading) {
       previousParaCountRef.current = 0;
     }
   }, [chats, currentChatId, isLoading]);
