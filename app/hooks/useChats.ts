@@ -145,6 +145,10 @@ export function useChats() {
     const loadChats = async () => {
       try {
         const res = await fetch('/api/chats');
+        if (!res.ok) {
+          console.error('Failed to load chats, status:', res.status);
+          return;
+        }
         const data = await res.json();
         // Only show chats that have messages
         const chatsWithMessages = (data.chats || []).filter((chat: Chat) => chat.messages && chat.messages.length > 0);
