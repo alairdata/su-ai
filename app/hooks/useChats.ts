@@ -112,6 +112,13 @@ export function useChats() {
         setCurrentChatIdState(null);
       }
       lastUserIdRef.current = userId;
+    } else if (!userId && lastUserIdRef.current !== null) {
+      // User logged out — reset cache so chats are re-fetched on next login
+      lastUserIdRef.current = null;
+      _chatsCache = [];
+      _chatsCacheLoaded = false;
+      setIsChatsLoaded(false);
+      setChatsAndCache([]);
     }
   }, [userId]);
 
