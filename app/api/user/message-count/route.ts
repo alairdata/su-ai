@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/mobile-auth';
 import { createClient } from '@supabase/supabase-js';
+import { PLAN_LIMITS } from '@/lib/constants';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,10 +25,10 @@ export async function GET(req: NextRequest) {
 
     const userId = session.user.id;
 
-    // Get user's timezone
+    // Get user's timezone and plan info for effective limit calculation
     const { data: user } = await supabase
       .from('users')
-      .select('timezone, reset_timezone')
+      .select('timezone, reset_timezone, plan, weekly_bonus_msgs, bonus_expires_at')
       .eq('id', userId)
       .single();
 
@@ -38,6 +39,13 @@ export async function GET(req: NextRequest) {
       user_id_param: userId,
       user_tz_param: userTz,
     });
+
+    // Compute effective daily limit (plan base + active weekly bonus)
+    const now = new Date();
+    const bonusActive = user?.bonus_expires_at && new Date(user.bonus_expires_at) > now;
+    const bonusMsgs = bonusActive ? (user?.weekly_bonus_msgs || 0) : 0;
+    const basePlanLimit = PLAN_LIMITS[user?.plan as keyof typeof PLAN_LIMITS] ?? 5;
+    const effectiveLimit = basePlanLimit + bonusMsgs;
 
     if (error) {
       // Fallback: count from messages table directly using UTC day
@@ -51,10 +59,10 @@ export async function GET(req: NextRequest) {
         .eq('role', 'user')
         .gte('created_at', todayStart.toISOString());
 
-      return NextResponse.json({ count: count || 0 });
+      return NextResponse.json({ count: count || 0, limit: effectiveLimit });
     }
 
-    return NextResponse.json({ count: data || 0 });
+    return NextResponse.json({ count: data || 0, limit: effectiveLimit });
   } catch (err) {
     console.error('message-count error:', err);
     return NextResponse.json({ count: 0 });
