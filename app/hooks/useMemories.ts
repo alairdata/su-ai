@@ -15,6 +15,7 @@ export function useMemories() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [plan, setPlan] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
 
   const fetchMemories = useCallback(async () => {
     setIsLoading(true);
@@ -24,6 +25,7 @@ export function useMemories() {
       const data = await res.json();
       setMemories(data.memories || []);
       setPlan(data.plan || null);
+      setLocked(data.locked || false);
     } catch (error) {
       console.error('Failed to fetch memories:', error);
     } finally {
@@ -64,6 +66,7 @@ export function useMemories() {
     memories,
     isLoading,
     plan,
+    locked,
     fetchMemories,
     deleteMemory,
     clearAll,
