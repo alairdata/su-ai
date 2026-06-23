@@ -23,9 +23,12 @@ export async function GET(req: NextRequest) {
     .single();
 
   const userPlan = getEffectivePlan(dbUser?.plan, dbUser?.email);
+  if (userPlan === "Free") {
+    return NextResponse.json({ memories: [], plan: "Free" });
+  }
+
   const memories = await getUserMemories(session.user.id);
-  // Free users can see their memories (locked in UI) but can't manage or inject them
-  return NextResponse.json({ memories, plan: userPlan, locked: userPlan === "Free" });
+  return NextResponse.json({ memories, plan: userPlan });
 }
 
 export async function DELETE(req: NextRequest) {

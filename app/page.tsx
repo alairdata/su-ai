@@ -30,7 +30,7 @@ import { OnboardingScreen1, OnboardingScreen2, OnboardingScreen3 } from "./compo
 function HomePage() {
   const { data: session, status, update: updateSession } = useSession();
   const { theme, toggleTheme } = useTheme();
-  const { memories, isLoading: isMemoriesLoading, plan: memoryPlan, locked: memoriesLocked, fetchMemories, deleteMemory: deleteMemoryItem, clearAll: clearAllMemories } = useMemories();
+  const { memories, isLoading: isMemoriesLoading, plan: memoryPlan, fetchMemories, deleteMemory: deleteMemoryItem, clearAll: clearAllMemories } = useMemories();
   const searchParams = useSearchParams();
   const router = useRouter();
   
@@ -367,7 +367,6 @@ function HomePage() {
   }, [currentChatId]);
 
   const messages = currentChat?.messages ?? [];
-  const userMessageCount = useMemo(() => messages.filter(m => m.role === 'user').length, [messages]);
 
   const lastAssistantIndex = useMemo(
     () => messages.reduce((lastIdx, m, idx) => m.role === 'assistant' ? idx : lastIdx, -1),
@@ -2369,34 +2368,6 @@ function HomePage() {
             </div>
           </div>
 
-          {/* Locked memory teaser for free users */}
-          {memoriesLocked && memories.length > 0 && !sidebarCollapsed && (
-            <div
-              onClick={() => router.push('/checkout')}
-              style={{
-                margin: '0 12px 8px',
-                padding: '10px 12px',
-                borderRadius: '10px',
-                background: theme === 'dark' ? 'rgba(232,160,76,0.06)' : 'rgba(208,138,48,0.06)',
-                border: `1px solid ${theme === 'dark' ? 'rgba(232,160,76,0.18)' : 'rgba(208,138,48,0.2)'}`,
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#E8A04C" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-                <span style={{ fontSize: '10px', fontWeight: 700, color: '#E8A04C', letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>Memory locked</span>
-              </div>
-              <div style={{ fontSize: '11px', color: theme === 'dark' ? '#5A5660' : '#9A9590', lineHeight: 1.5, filter: 'blur(3.5px)', userSelect: 'none' as const, marginBottom: '6px' }}>
-                {memories.slice(0, 2).map(m => `• ${m.content}`).join('\n')}
-              </div>
-              <div style={{ fontSize: '10px', color: '#E8A04C', fontWeight: 600 }}>
-                Upgrade to Pro to unlock →
-              </div>
-            </div>
-          )}
-
           <div style={{ position: 'relative' }}>
           {showProfileMenu && (
             <>
@@ -2718,46 +2689,6 @@ function HomePage() {
                   <polyline points="6 9 12 15 18 9"/>
                 </svg>
               </button>
-            )}
-
-            {/* Context limit banner — appears at message 4+ for free users */}
-            {session?.user?.plan === 'Free' && userMessageCount >= 4 && (
-              <div style={{
-                margin: '0 auto 4px',
-                maxWidth: '680px',
-                width: '100%',
-                padding: '0 16px',
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '8px',
-                  padding: '7px 12px',
-                  borderRadius: '8px',
-                  background: theme === 'dark' ? 'rgba(255,180,0,0.06)' : 'rgba(180,120,0,0.05)',
-                  border: `1px solid ${theme === 'dark' ? 'rgba(255,180,0,0.15)' : 'rgba(180,120,0,0.15)'}`,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B8860B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
-                    <span style={{ fontSize: '11.5px', color: theme === 'dark' ? '#C8A040' : '#8A6000', lineHeight: 1.4 }}>
-                      Short-term memory active — earlier details are being condensed.
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => router.push('/checkout')}
-                    style={{
-                      flexShrink: 0, fontSize: '11px', fontWeight: 700, color: '#E8A04C',
-                      background: 'none', border: 'none', cursor: 'pointer', padding: '0', whiteSpace: 'nowrap' as const,
-                    }}
-                  >
-                    Upgrade →
-                  </button>
-                </div>
-              </div>
             )}
 
             {/* Bottom input area */}

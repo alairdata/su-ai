@@ -668,8 +668,8 @@ CHAT CHARACTERS RULES — VERY IMPORTANT:
 
           await Promise.all(savePromises);
 
-          // Fire-and-forget: extract memories for ALL users (free users too — stored but not injected)
-          if (!mentionedCharacter && !isRegenerate && fullResponse) {
+          // Fire-and-forget: extract memories from this exchange (paid users, non-character only)
+          if (hasMemoryAccess && !mentionedCharacter && !isRegenerate && fullResponse) {
             getUserMemories(userId).then((existingMemories) =>
               extractMemories(userId, chatId, userMessage, fullResponse, existingMemories)
             ).catch(() => {}); // Never block on memory errors
